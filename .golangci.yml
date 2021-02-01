@@ -1,0 +1,51 @@
+run:
+  deadline: 2m
+  skip-files: []
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  gocyclo:
+    min-complexity: 12
+  maligned:
+    suggest-new: true
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  funlen:
+    lines: 75
+    statements: 40
+  godox:
+    keywords:
+      - FIXME
+
+linters:
+  enable-all: true
+  disable:
+    - maligned
+    - lll
+    - dupl
+    - wsl
+    - nlreturn
+    - gomnd
+    - goerr113
+    - wrapcheck
+    - exhaustivestruct
+    - testpackage
+    - tparallel
+    - paralleltest
+    - ifshort
+
+issues:
+  exclude-use-default: false
+  max-per-linter: 0
+  max-same-issues: 0
+  exclude:
+    - 'ST1000: at least one file in a package should have a package comment'
+  exclude-rules:
+    - path: .*_test.go
+      linters:
+        - funlen
+        - unused
