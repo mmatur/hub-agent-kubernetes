@@ -6,7 +6,7 @@ linters-settings:
   govet:
     check-shadowing: true
   gocyclo:
-    min-complexity: 12
+    min-complexity: 15
   maligned:
     suggest-new: true
   goconst:
@@ -15,8 +15,8 @@ linters-settings:
   misspell:
     locale: US
   funlen:
-    lines: 75
-    statements: 40
+    lines: 80
+    statements: 50
   godox:
     keywords:
       - FIXME
@@ -37,6 +37,10 @@ linters:
     - tparallel
     - paralleltest
     - ifshort
+    - scopelint
+    - prealloc
+    - exhaustive
+    - cyclop
 
 issues:
   exclude-use-default: false

@@ -1,5 +1,5 @@
 .PHONY: clean check test build \
-		publish publish-latest image lint
+		publish publish-latest image image-dev lint
 
 BIN_NAME := neo-agent
 MAIN_DIRECTORY := ./cmd/agent
@@ -22,10 +22,13 @@ test: clean
 
 build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
-	CGO_ENABLED=0 go build -v -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${BIN_NAME} ${MAIN_DIRECTORY}
+	CGO_ENABLED=0 go build -trimpath -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${BIN_NAME} ${MAIN_DIRECTORY}
 
-image:
+image: build
 	docker build -t gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) .
+
+image-dev: build
+	docker build -t neo-agent:dev .
 
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)
