@@ -20,11 +20,38 @@ linters-settings:
   godox:
     keywords:
       - FIXME
+  gofumpt:
+    extra-rules: true
+  depguard:
+    list-type: blacklist
+    include-go-root: false
+    packages:
+      - github.com/sirupsen/logrus
+      - github.com/pkg/errors
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - rangeValCopy
+      - octalLiteral
+      - paramTypeCombine # already handle by gofumpt.extra-rules
+    settings:
+      hugeParam:
+        sizeThreshold: 100
+#  ifshort:
+#    max-decl-lines: 1
+#    max-decl-chars: 20
 
 linters:
   enable-all: true
   disable:
-    - maligned
+    - maligned # deprecated
+    - interfacer # deprecated
+    - sqlclosecheck # not relevant (SQL)
+    - rowserrcheck # not relevant (SQL)
+    - cyclop # duplicate of gocyclo
     - lll
     - dupl
     - wsl
@@ -32,15 +59,14 @@ linters:
     - gomnd
     - goerr113
     - wrapcheck
+    - exhaustive
     - exhaustivestruct
     - testpackage
     - tparallel
     - paralleltest
-    - ifshort
     - scopelint
     - prealloc
-    - exhaustive
-    - cyclop
+    - ifshort # disable due to false-positive, the linter will be fixed https://github.com/esimonov/ifshort
 
 issues:
   exclude-use-default: false
