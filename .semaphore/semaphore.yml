@@ -46,10 +46,10 @@ blocks:
       jobs:
         - name: Warm cache
           commands:
+            - go mod download
             - go mod tidy
             - git diff --exit-code go.mod
             - git diff --exit-code go.sum
-            - go mod download
             - cache store "mod-${SEMAPHORE_PROJECT_NAME}-${SEMAPHORE_GIT_BRANCH}-$(checksum go.mod)" "${GOPATH}/pkg/mod"
             - cache store "mod-${SEMAPHORE_PROJECT_NAME}-$(checksum go.mod)" "${GOPATH}/pkg/mod"
             - cache store "mod-${SEMAPHORE_PROJECT_NAME}" "${GOPATH}/pkg/mod"
