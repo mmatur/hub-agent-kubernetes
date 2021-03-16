@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myIngress
+  namespace: myns
+  annotations:
+    cert-manager.io/cluster-issuer: foo
+spec:
+  ingressClassName: myIngressClass
+  rules:
+    - host: foo.bar
+      http:
+        paths:
+          - backend:
+              service:
+                name: myService
+          - backend:
+              service:
+                name: mySecondService
+  tls:
+    - hosts:
+        - foo.com
+      secretName: mySecret
+status:
+  loadBalancer:
+    ingress:
+      - ip: 1.2.3.4
+        hostname: foo.bar
+        ports:
+          - port: 8080
+            protocol: TCP

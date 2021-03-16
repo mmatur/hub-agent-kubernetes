@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: myreplicaset
+  namespace: myns
+  labels:
+    one.label: value
+
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: foo
+          image: traefik:latest
+        - name: bar
+          image: traefik:latest
+
+status:
+  availableReplicas: 1

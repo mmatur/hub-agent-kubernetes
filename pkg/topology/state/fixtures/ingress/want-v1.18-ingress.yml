@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myIngress_v1beta1
+  namespace: myns
+spec:
+  ingressClassName: myIngressClass
+  defaultBackend:
+    service:
+      name: myService
+      port:
+        number: 443
+  rules:
+    - host: foo.bar
+      http:
+        paths:
+          - path: /foobar
+            pathType: Prefix
+            backend:
+              service:
+                name: myService
+                port:
+                  number: 443
+  tls:
+    - hosts:
+        - foo.com
+      secretName: mySecret
+status:
+  loadBalancer:
+    ingress:
+      - ip: 1.2.3.4
+        hostname: foo.bar
+        ports:
+          - port: 8080
+            protocol: TCP

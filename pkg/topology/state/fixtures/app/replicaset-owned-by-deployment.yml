@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: myreplicaset
+  namespace: myns
+  labels:
+    one.label: value
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: mydeployment
+
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: foo
+          image: traefik:latest
+
+status:
+  availableReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mydeployment
+  namespace: myns
+  labels:
+    one.label: value
+
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: foo
+          image: traefik:latest
+
+status:
+  availableReplicas: 1

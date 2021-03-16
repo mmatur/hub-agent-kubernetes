@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mystatefulset
+  namespace: myns
+  labels:
+    one.label: value
+
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: foo
+          image: traefik:latest
+
+status:
+  readyReplicas: 1

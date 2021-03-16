@@ -17,10 +17,22 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "log-level",
-				Usage:    "log level",
+				Usage:    "The log level for the agent",
 				EnvVars:  []string{"LOG_LEVEL"},
 				Value:    "info",
 				Required: false,
+			},
+			&cli.StringFlag{
+				Name:     "platform-url",
+				Usage:    "The URL at which to reach the Neo platform API",
+				EnvVars:  []string{"PLATFORM_URL"},
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "token",
+				Usage:    "The token to use for Neo platform API calls",
+				EnvVars:  []string{"TOKEN"},
+				Required: true,
 			},
 		},
 		Action: func(cliCtx *cli.Context) error {
@@ -33,7 +45,7 @@ func main() {
 			})
 
 			group.Go(func() error {
-				return topology(ctx)
+				return runTopologyWatcher(ctx, cliCtx)
 			})
 
 			group.Go(func() error {
@@ -51,11 +63,6 @@ func main() {
 }
 
 func metrics(ctx context.Context) error {
-	// TODO
-	return nil
-}
-
-func topology(ctx context.Context) error {
 	// TODO
 	return nil
 }
