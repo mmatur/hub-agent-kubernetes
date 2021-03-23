@@ -18,7 +18,7 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 			JWT: &JWTAccessControl{
 				SigningSecretBase64Encoded: policy.Spec.JWT.SigningSecretBase64Encoded,
 				PublicKey:                  policy.Spec.JWT.PublicKey,
-				ForwardAuthorization:       policy.Spec.JWT.ForwardAuthorization,
+				StripAuthorizationHeader:   policy.Spec.JWT.StripAuthorizationHeader,
 				ForwardHeaders:             policy.Spec.JWT.ForwardHeaders,
 				TokenQueryKey:              policy.Spec.JWT.TokenQueryKey,
 				JWKsFile:                   policy.Spec.JWT.JWKsFile,

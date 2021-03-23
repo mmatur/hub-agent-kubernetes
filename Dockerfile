@@ -8,3 +8,4 @@ COPY neo-agent .
 
 ENTRYPOINT ["/neo-agent"]
 EXPOSE 80
+EXPOSE 443

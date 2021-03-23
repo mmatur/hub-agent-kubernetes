@@ -86,7 +86,7 @@ type JWTAccessControl struct {
 	PublicKey                  string            `json:"publicKey,omitempty"`
 	JWKsFile                   string            `json:"jwksFile,omitempty"`
 	JWKsURL                    string            `json:"jwksUrl,omitempty"`
-	ForwardAuthorization       bool              `json:"forwardAuthorization"`
+	StripAuthorizationHeader   bool              `json:"stripAuthorizationHeader,omitempty"`
 	ForwardHeaders             map[string]string `json:"forwardHeaders,omitempty"`
 	TokenQueryKey              string            `json:"tokenQueryKey,omitempty"`
 	Claims                     string            `json:"claims,omitempty"`

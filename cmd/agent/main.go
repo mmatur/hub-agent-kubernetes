@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/neo-agent/pkg/logger"
@@ -12,45 +14,26 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:  "Neo-AGENT CLI",
+		Name:  "Neo agent CLI",
 		Usage: "Run neo-agent service",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "log-level",
-				Usage:    "The log level for the agent",
-				EnvVars:  []string{"LOG_LEVEL"},
-				Value:    "info",
-				Required: false,
-			},
-			&cli.StringFlag{
-				Name:     "platform-url",
-				Usage:    "The URL at which to reach the Neo platform API",
-				EnvVars:  []string{"PLATFORM_URL"},
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "token",
-				Usage:    "The token to use for Neo platform API calls",
-				EnvVars:  []string{"TOKEN"},
-				Required: true,
-			},
-		},
+		Flags: allFlags(),
 		Action: func(cliCtx *cli.Context) error {
-			logger.Setup(cliCtx.String("log-level"))
+			logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
 
-			group, ctx := errgroup.WithContext(context.Background())
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
 
-			group.Go(func() error {
-				return metrics(ctx)
-			})
+			group, ctx := errgroup.WithContext(ctx)
+
+			group.Go(func() error { return metrics(ctx) })
 
 			group.Go(func() error {
 				return runTopologyWatcher(ctx, cliCtx)
 			})
 
-			group.Go(func() error {
-				return acl(ctx)
-			})
+			group.Go(func() error { return accessControl(ctx, cliCtx) })
+
+			group.Go(func() error { return runAuth(ctx, cliCtx) })
 
 			return group.Wait()
 		},
@@ -62,12 +45,41 @@ func main() {
 	}
 }
 
-func metrics(ctx context.Context) error {
-	// TODO
-	return nil
+func allFlags() []cli.Flag {
+	flgs := []cli.Flag{
+		&cli.StringFlag{
+			Name:    "log-level",
+			Usage:   "Log level to use (debug, info, warn, error or fatal)",
+			EnvVars: []string{"LOG_LEVEL"},
+			Value:   "info",
+		},
+		&cli.StringFlag{
+			Name:    "log-format",
+			Usage:   "Log format to use (json or console)",
+			EnvVars: []string{"LOG_FORMAT"},
+			Value:   "json",
+		},
+		&cli.StringFlag{
+			Name:     "platform-url",
+			Usage:    "The URL at which to reach the Neo platform API",
+			EnvVars:  []string{"PLATFORM_URL"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "token",
+			Usage:    "The token to use for Neo platform API calls",
+			EnvVars:  []string{"TOKEN"},
+			Required: true,
+		},
+	}
+
+	flgs = append(flgs, authFlags()...)
+	flgs = append(flgs, acpFlags()...)
+
+	return flgs
 }
 
-func acl(ctx context.Context) error {
+func metrics(ctx context.Context) error {
 	// TODO
 	return nil
 }

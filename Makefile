@@ -39,3 +39,6 @@ publish-latest:
 
 check:
 	golangci-lint run
+
+generate-crd:
+	@$(CURDIR)/script/code-gen.sh

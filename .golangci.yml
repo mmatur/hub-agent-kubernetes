@@ -1,8 +1,8 @@
 run:
-  deadline: 2m
-  skip-files: []
+  deadline: 10m
+  skip-files: [ ]
   skip-dirs:
-   - pkg/crd/generated/
+    - pkg/crd/generated
 
 linters-settings:
   govet:
@@ -12,7 +12,7 @@ linters-settings:
   maligned:
     suggest-new: true
   goconst:
-    min-len: 3
+    min-len: 5
     min-occurrences: 3
   misspell:
     locale: US
@@ -108,10 +108,12 @@ issues:
       linters:
         - funlen
         - unused
-    # TODO Must be removed
-    - path: pkg/crd/*
+    - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
-        - gochecknoinits
-        - godot
-        - golint
         - gochecknoglobals
+    - path: pkg/acp/admission/reviewer/reviewer.go
+      linters:
+        - goconst
+    - path: pkg/acp/admission/reviewer/nginx_ingress_snippet.go
+      linters:
+        - gosec
