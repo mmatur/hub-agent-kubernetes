@@ -1,0 +1,74 @@
+{
+  "type": "map",
+  "values": {
+    "type": "array",
+    "items": {
+      "type": "record",
+      "name": "data_point_group",
+      "namespace": "org.traefik.neo",
+      "fields": [
+        {
+          "name": "ingress_controller",
+          "type": "string"
+        },
+        {
+          "name": "service",
+          "type": "string"
+        },
+        {
+          "name": "data_points",
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "record",
+              "name": "data_point",
+              "namespace": "org.traefik.neo",
+              "fields": [
+                {
+                  "name": "timestamp",
+                  "type": "long"
+                },
+                {
+                  "name": "req_per_s",
+                  "type": "double"
+                },
+                {
+                  "name": "request_error_per",
+                  "type": "double"
+                },
+                {
+                  "name": "request_client_error_per",
+                  "type": "double"
+                },
+                {
+                  "name": "avg_response_time",
+                  "type": "double"
+                },
+                {
+                  "name": "requests",
+                  "type": "long"
+                },
+                {
+                  "name": "request_errors",
+                  "type": "long"
+                },
+                {
+                  "name": "request_client_errors",
+                  "type": "long"
+                },
+                {
+                  "name": "response_time_sum",
+                  "type": "double"
+                },
+                {
+                  "name": "response_time_count",
+                  "type": "long"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

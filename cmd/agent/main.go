@@ -25,7 +25,9 @@ func main() {
 
 			group, ctx := errgroup.WithContext(ctx)
 
-			group.Go(func() error { return metrics(ctx) })
+			group.Go(func() error {
+				return runMetrics(ctx, cliCtx)
+			})
 
 			group.Go(func() error {
 				return runTopologyWatcher(ctx, cliCtx)
@@ -73,13 +75,9 @@ func allFlags() []cli.Flag {
 		},
 	}
 
+	flgs = append(flgs, metricsFlags()...)
 	flgs = append(flgs, authFlags()...)
 	flgs = append(flgs, acpFlags()...)
 
 	return flgs
-}
-
-func metrics(ctx context.Context) error {
-	// TODO
-	return nil
 }

@@ -4,11 +4,16 @@ go 1.16
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gravitational/trace v1.1.14 // indirect
+	github.com/hamba/avro v1.5.4
+	github.com/hashicorp/go-retryablehttp v0.6.6
 	github.com/hashicorp/go-version v1.2.1
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/ldez/go-git-cmd-wrapper/v2 v2.0.0
 	github.com/pquerna/cachecontrol v0.0.0-20201205024021-ac21108117ac
+	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/common v0.15.0
 	github.com/rs/zerolog v1.20.0
 	github.com/sirupsen/logrus v1.8.0 // indirect
 	github.com/stretchr/testify v1.7.0
