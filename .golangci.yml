@@ -6,7 +6,9 @@ run:
 
 linters-settings:
   govet:
-    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment
   gocyclo:
     min-complexity: 15
   maligned:
@@ -36,6 +38,7 @@ linters-settings:
       - style
       - performance
     disabled-checks:
+      - sloppyReassign
       - rangeValCopy
       - octalLiteral
       - paramTypeCombine # already handle by gofumpt.extra-rules
@@ -76,6 +79,7 @@ linters:
   disable:
     - maligned # deprecated
     - interfacer # deprecated
+    - scopelint # deprecated
     - sqlclosecheck # not relevant (SQL)
     - rowserrcheck # not relevant (SQL)
     - cyclop # duplicate of gocyclo
@@ -91,8 +95,9 @@ linters:
     - testpackage
     - tparallel
     - paralleltest
-    - scopelint
     - prealloc
+    - forcetypeassert
+    - bodyclose # Too many false positives: https://github.com/timakin/bodyclose/issues/30
     - ifshort # disable due to false-positive, the linter will be fixed https://github.com/esimonov/ifshort
 
 issues:
