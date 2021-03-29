@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gravitational/trace v1.1.14 // indirect
 	github.com/hamba/avro v1.5.4
-	github.com/hashicorp/go-retryablehttp v0.6.6
+	github.com/hashicorp/go-retryablehttp v0.6.8
 	github.com/hashicorp/go-version v1.2.1
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/ldez/go-git-cmd-wrapper/v2 v2.0.0

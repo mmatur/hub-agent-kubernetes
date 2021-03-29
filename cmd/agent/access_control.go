@@ -15,11 +15,11 @@ import (
 	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
 	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
 	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/neo-agent/pkg/kube"
 	"github.com/traefik/neo-agent/pkg/kubevers"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -100,7 +100,7 @@ func accessControl(ctx context.Context, cliCtx *cli.Context) error {
 }
 
 func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Handler, error) {
-	config, err := rest.InClusterConfig()
+	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}

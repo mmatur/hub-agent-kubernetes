@@ -42,6 +42,7 @@ linters-settings:
       - rangeValCopy
       - octalLiteral
       - paramTypeCombine # already handle by gofumpt.extra-rules
+      - unnamedResult
     settings:
       hugeParam:
         sizeThreshold: 100
