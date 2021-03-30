@@ -19,6 +19,8 @@ func fetchConfig(ctx context.Context, token, topologyServiceURL string) (*config
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
+	// TODO Remove this Neo-Path header when token-service is release
+	req.Header.Set("Neo-Path", "/topology")
 
 	client := http.Client{Timeout: 10 * time.Second}
 	res, err := client.Do(req)

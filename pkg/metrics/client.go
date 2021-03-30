@@ -76,6 +76,8 @@ func (c *Client) GetConfig(ctx context.Context, startup bool) (*Config, error) {
 
 	c.setAuthHeader(req)
 	req.Header.Set("Accept", "avro/binary;v1")
+	// TODO Remove this Neo-Path header when token-service is release
+	req.Header.Set("Neo-Path", "/metrics")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
