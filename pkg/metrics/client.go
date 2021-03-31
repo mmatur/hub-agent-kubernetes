@@ -120,6 +120,8 @@ func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) err
 
 	c.setAuthHeader(req)
 	req.Header.Set("Content-Type", "avro/binary;v1")
+	// TODO Remove this Neo-Path header when token-service is release
+	req.Header.Set("Neo-Path", "/metrics")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
