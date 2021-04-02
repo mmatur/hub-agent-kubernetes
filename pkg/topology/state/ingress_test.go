@@ -14,44 +14,45 @@ import (
 )
 
 func TestFetcher_GetIngresses(t *testing.T) {
-	ingressControllers := map[string]*IngressController{
-		"myIngressController@myns": {
-			Name:           "myIngressController",
-			Namespace:      "myns",
-			IngressClasses: []string{"myIngressClass"},
-		},
-	}
-
 	want := map[string]*Ingress{
 		"myIngress@myns": {
 			Name:      "myIngress",
 			Namespace: "myns",
+			ClusterID: "myClusterID",
 			Annotations: map[string]string{
 				"cert-manager.io/cluster-issuer": "foo",
 			},
-			TLS: []IngressTLS{
+			TLS: []netv1.IngressTLS{
 				{
 					Hosts:      []string{"foo.com"},
 					SecretName: "mySecret",
 				},
 			},
-			Status: corev1.LoadBalancerStatus{
-				Ingress: []corev1.LoadBalancerIngress{
-					{
-						IP:       "1.2.3.4",
-						Hostname: "foo.bar",
-						Ports: []corev1.PortStatus{
-							{
-								Port:     8080,
-								Protocol: "TCP",
+			Rules: []netv1.IngressRule{
+				{
+					Host: "foo.bar",
+					IngressRuleValue: netv1.IngressRuleValue{
+						HTTP: &netv1.HTTPIngressRuleValue{
+							Paths: []netv1.HTTPIngressPath{
+								{
+									Backend: netv1.IngressBackend{
+										Service: &netv1.IngressServiceBackend{
+											Name: "myService",
+										},
+									},
+								},
 							},
 						},
 					},
 				},
 			},
-			CertManagerEnabled: true,
-			Controller:         "myIngressController",
-			Services:           []string{"myService", "mySecondService"},
+			DefaultService: &netv1.IngressBackend{
+				Service: &netv1.IngressServiceBackend{
+					Name: "myDefaultService",
+				},
+			},
+			Controller: "myIngressController",
+			Services:   []string{"myDefaultService@myns", "myService@myns"},
 		},
 	}
 
@@ -63,7 +64,7 @@ func TestFetcher_GetIngresses(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
 	require.NoError(t, err)
 
-	got, err := f.getIngresses(ingressControllers)
+	got, err := f.getIngresses("myClusterID")
 	require.NoError(t, err)
 
 	assert.Equal(t, want, got)
@@ -149,60 +150,12 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func Test_UsesCertManager(t *testing.T) {
-	tests := []struct {
-		desc     string
-		ingress  *netv1.Ingress
-		expected bool
-	}{
-		{
-			desc: "No annotations",
-			ingress: &netv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{},
-				},
-			},
-		},
-		{
-			desc: "cert-manager.io annotation",
-			ingress: &netv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"cert-manager.io/foo": "foobar",
-					},
-				},
-			},
-			expected: true,
-		},
-		{
-			desc: "certmanager.k8s.io annotation",
-			ingress: &netv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"certmanager.k8s.io/foo": "foobar",
-					},
-				},
-			},
-			expected: true,
-		},
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, test.expected, usesCertManager(test.ingress))
-		})
-	}
-}
-
 func Test_GetControllerName(t *testing.T) {
 	tests := []struct {
-		desc               string
-		ingress            *netv1.Ingress
-		ingressControllers map[string]*IngressController
-		wantName           string
+		desc           string
+		ingress        *netv1.Ingress
+		ingressClasses []*netv1.IngressClass
+		wantName       string
 	}{
 		{
 			desc: "No annotations",
@@ -211,11 +164,7 @@ func Test_GetControllerName(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 			},
-			ingressControllers: map[string]*IngressController{
-				"myingressctrler@ns": {
-					IngressClasses: []string{"myingressclass"},
-				},
-			},
+			ingressClasses: []*netv1.IngressClass{},
 		},
 		{
 			desc: "Known ingress class with attribute",
@@ -224,10 +173,14 @@ func Test_GetControllerName(t *testing.T) {
 					IngressClassName: stringPtr("myingressclass"),
 				},
 			},
-			ingressControllers: map[string]*IngressController{
-				"myingressctrler@myns": {
-					Name:           "myingressctrler",
-					IngressClasses: []string{"myingressclass"},
+			ingressClasses: []*netv1.IngressClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "myingressclass",
+					},
+					Spec: netv1.IngressClassSpec{
+						Controller: "myingressctrler",
+					},
 				},
 			},
 			wantName: "myingressctrler",
@@ -241,13 +194,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			ingressControllers: map[string]*IngressController{
-				"myingressctrler@myns": {
-					Name:           "myingressctrler",
-					IngressClasses: []string{"myingressclass"},
-				},
-			},
-			wantName: "myingressctrler",
+			wantName: "myingressclass",
 		},
 	}
 
@@ -256,7 +203,7 @@ func Test_GetControllerName(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, test.wantName, getControllerName(test.ingress, test.ingressControllers))
+			assert.Equal(t, test.wantName, getControllerName(test.ingress, test.ingressClasses))
 		})
 	}
 }

@@ -3,11 +3,12 @@ kind: DaemonSet
 metadata:
   name: mydaemonset
   namespace: myns
-  labels:
-    one.label: value
 
 spec:
   template:
+    metadata:
+      labels:
+        one.label: value
     spec:
       containers:
         - name: foo

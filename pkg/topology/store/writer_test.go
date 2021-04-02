@@ -130,7 +130,11 @@ func TestWrite_Namespaces(t *testing.T) {
 func TestWrite_IngressControllers(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testController := &state.IngressController{Name: "myctrl"}
+	testController := &state.IngressController{
+		App: state.App{
+			Name: "myctrl",
+		},
+	}
 
 	var pushCalled bool
 	s := &Store{

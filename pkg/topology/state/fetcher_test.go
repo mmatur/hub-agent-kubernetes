@@ -69,6 +69,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 				"myIngress_netv1beta1@myns": {
 					Namespace: "myns",
 					Name:      "myIngress_netv1beta1",
+					ClusterID: "myClusterID",
 				},
 			},
 		},
@@ -79,6 +80,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 				"myIngress_netv1beta1@myns": {
 					Name:      "myIngress_netv1beta1",
 					Namespace: "myns",
+					ClusterID: "myClusterID",
 				},
 			},
 		},
@@ -89,6 +91,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 				"myIngress_netv1@myns": {
 					Name:      "myIngress_netv1",
 					Namespace: "myns",
+					ClusterID: "myClusterID",
 				},
 			},
 		},
@@ -99,6 +102,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 				"myIngress_netv1@myns": {
 					Name:      "myIngress_netv1",
 					Namespace: "myns",
+					ClusterID: "myClusterID",
 				},
 			},
 		},
@@ -130,7 +134,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			f, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion)
 			require.NoError(t, err)
 
-			got, err := f.getIngresses(make(map[string]*IngressController))
+			got, err := f.getIngresses("myClusterID")
 			require.NoError(t, err)
 
 			assert.Equal(t, test.want, got)

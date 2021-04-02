@@ -1,7 +1,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -11,18 +10,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/api/networking/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 // Supported Ingress Controllers.
 const (
-	IngressControllerTraefik        = "traefik"
-	IngressControllerNginx          = "nginx"
-	IngressControllerNginxCommunity = "nginx-community"
+	IngressControllerTypeTraefik        = "traefik"
+	IngressControllerTypeNginxOfficial  = "nginx"
+	IngressControllerTypeNginxCommunity = "nginx-community"
 )
 
-func (f *Fetcher) getIngressControllers(services map[string]*Service) (map[string]*IngressController, error) {
+func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[string]*App) (map[string]*IngressController, error) {
 	pods, err := f.k8s.Core().V1().Pods().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -39,24 +37,14 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service) (map[strin
 			continue
 		}
 
-		controller := podHasIngressController(pod)
+		controller := getControllerType(pod)
 		if controller == "" {
 			continue
 		}
 
-		// TODO Support multiple Ingress controllers of the same type in the same namespace
-		key := objectKey(controller, pod.Namespace)
+		app := findApp(apps, pod)
 
-		service := findServiceForPodLabels(services, pod.Labels)
-		if service == nil {
-			return nil, fmt.Errorf("find service for ingress controller %s", key)
-		}
-
-		var replicas int
-		replicas, err = f.getReplicas(pod)
-		if err != nil {
-			return nil, err
-		}
+		key := objectKey(app.Name, app.Namespace)
 
 		if ic, exists := result[key]; exists {
 			ic.MetricsURLs = append(ic.MetricsURLs, guessMetricsURL(controller, pod))
@@ -64,12 +52,12 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service) (map[strin
 		}
 
 		result[key] = &IngressController{
-			Name:             controller,
-			Namespace:        pod.Namespace,
-			MetricsURLs:      []string{guessMetricsURL(controller, pod)},
-			PublicIPs:        ingressesToIPs(service.Status.LoadBalancer.Ingress),
-			ServiceAddresses: service.addresses,
-			Replicas:         replicas,
+			App:         app,
+			Type:        controller,
+			MetricsURLs: []string{guessMetricsURL(controller, pod)},
+
+			// TODO What should we do if an IngressController does not have a service, log, status field?
+			PublicIPs: findPublicIPs(services, pod),
 		}
 	}
 
@@ -132,72 +120,24 @@ func setIngressClasses(result map[string]*IngressController, ingressClasses []*n
 		switch ingressClass.Spec.Controller {
 		case "k8s.io/ingress-nginx":
 			for _, controller := range result {
-				if controller.Name == IngressControllerNginxCommunity {
+				if controller.Type == IngressControllerTypeNginxCommunity {
 					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
 				}
 			}
 		case "nginx.org/ingress-controller":
 			for _, controller := range result {
-				if controller.Name == IngressControllerNginx {
+				if controller.Type == IngressControllerTypeNginxOfficial {
 					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
 				}
 			}
 		case "traefik.io/ingress-controller":
 			for _, controller := range result {
-				if controller.Name == IngressControllerTraefik {
+				if controller.Type == IngressControllerTypeTraefik {
 					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
 				}
 			}
 		}
 	}
-}
-
-func (f *Fetcher) getReplicas(pod *corev1.Pod) (int, error) {
-	var owner metav1.OwnerReference
-	for _, o := range pod.ObjectMeta.OwnerReferences {
-		if o.Controller == nil || !(*o.Controller) {
-			continue
-		}
-
-		owner = o
-		break
-	}
-
-	switch owner.Kind {
-	case "Deployment":
-		deployment, err := f.k8s.Apps().V1().Deployments().Lister().Deployments(pod.Namespace).Get(owner.Name)
-		if err != nil {
-			return 0, err
-		}
-
-		return int(*deployment.Spec.Replicas), nil
-
-	case "StatefulSet":
-		statefulSet, err := f.k8s.Apps().V1().StatefulSets().Lister().StatefulSets(pod.Namespace).Get(owner.Name)
-		if err != nil {
-			return 0, err
-		}
-
-		return int(*statefulSet.Spec.Replicas), nil
-
-	case "ReplicaSet":
-		replicaSet, err := f.k8s.Apps().V1().ReplicaSets().Lister().ReplicaSets(pod.Namespace).Get(owner.Name)
-		if err != nil {
-			return 0, err
-		}
-
-		return int(*replicaSet.Spec.Replicas), nil
-
-	case "DaemonSet":
-		daemonSet, err := f.k8s.Apps().V1().DaemonSets().Lister().DaemonSets(pod.Namespace).Get(owner.Name)
-		if err != nil {
-			return 0, err
-		}
-
-		return int(daemonSet.Status.DesiredNumberScheduled), nil
-	}
-
-	return 0, errors.New("no controller owner found for this pod")
 }
 
 // guessMetricsURL builds the metrics endpoint URL based on simple assumptions for a given pod.
@@ -205,15 +145,15 @@ func (f *Fetcher) getReplicas(pod *corev1.Pod) (int, error) {
 // TODO we can try to use the IngressController configuration to be more accurate.
 func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 	// Metrics are not supported for Nginx official.
-	if ctrl == IngressControllerNginx {
+	if ctrl == IngressControllerTypeNginxOfficial {
 		return ""
 	}
 
 	var port string
 	switch ctrl {
-	case IngressControllerTraefik:
+	case IngressControllerTypeTraefik:
 		port = "8080"
-	case IngressControllerNginxCommunity:
+	case IngressControllerTypeNginxCommunity:
 		port = "10254"
 	}
 
@@ -229,33 +169,37 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(pod.Status.PodIP, port), path)
 }
 
-func podHasIngressController(pod *corev1.Pod) string {
+func getControllerType(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
-		if strings.Contains(container.Image, "traefik:") {
-			return IngressControllerTraefik
-		}
+		// A container image has the form image:tag and the tag is optional.
+		parts := strings.Split(container.Image, ":")
 
-		if strings.Contains(container.Image, "nginx/nginx-ingress:") {
-			return IngressControllerNginx
-		}
+		switch parts[0] {
+		case "traefik":
+			return IngressControllerTypeTraefik
 
-		if strings.Contains(container.Image, "ingress-nginx/controller:") {
-			return IngressControllerNginxCommunity
+		case "nginx/nginx-ingress":
+			return IngressControllerTypeNginxOfficial
+
+		case "k8s.gcr.io/ingress-nginx/controller":
+			return IngressControllerTypeNginxCommunity
 		}
 	}
 
 	return ""
 }
 
-func findServiceForPodLabels(svcs map[string]*Service, lbls map[string]string) *Service {
-	for _, service := range svcs {
-		if len(service.Status.LoadBalancer.Ingress) == 0 {
+// TODO: Check if this might cause issues with multiple apps with the same pod labels, or if it is an expected config error.
+func findApp(apps map[string]*App, pod *corev1.Pod) App {
+	var result []App
+	for _, app := range apps {
+		if app.Namespace != pod.Namespace {
 			continue
 		}
 
 		var match bool
-		for sKey, sVal := range service.Selector {
-			if lbls[sKey] != sVal {
+		for sKey, sVal := range app.podLabels {
+			if pod.Labels[sKey] != sVal {
 				match = false
 				break
 			}
@@ -263,17 +207,53 @@ func findServiceForPodLabels(svcs map[string]*Service, lbls map[string]string) *
 		}
 
 		if match {
-			return service
+			result = append(result, *app)
 		}
 	}
 
-	return nil
+	if len(result) == 0 {
+		return App{}
+	}
+
+	// In case the pod matches multiple apps we have to pick one.
+	// As we don't know which one to pick we have to sort the matching apps before taking the first one.
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+
+	return result[0]
 }
 
-func ingressesToIPs(ingresses []corev1.LoadBalancerIngress) []string {
+func findPublicIPs(svcs map[string]*Service, pod *corev1.Pod) []string {
 	var ips []string
-	for _, ingress := range ingresses {
-		ips = append(ips, ingress.IP)
+
+	knownIPs := make(map[string]struct{})
+	for _, service := range svcs {
+		if service.Namespace != pod.Namespace || len(service.status.LoadBalancer.Ingress) == 0 {
+			continue
+		}
+
+		var match bool
+		for sKey, sVal := range service.Selector {
+			if pod.Labels[sKey] != sVal {
+				match = false
+				break
+			}
+			match = true
+		}
+
+		if !match {
+			continue
+		}
+
+		for _, ip := range service.status.LoadBalancer.Ingress {
+			if _, exists := knownIPs[ip.IP]; exists {
+				continue
+			}
+
+			knownIPs[ip.IP] = struct{}{}
+			ips = append(ips, ip.IP)
+		}
 	}
 
 	sort.Strings(ips)

@@ -21,14 +21,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "Deployment",
 			fixture: "deployment.yml",
 			want: map[string]*App{
-				"deployment/mydeployment@myns": {
+				"Deployment/mydeployment@myns": {
 					Name:          "mydeployment",
 					Kind:          "Deployment",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},
@@ -38,14 +38,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "StatefulSet",
 			fixture: "statefulset.yml",
 			want: map[string]*App{
-				"statefulSet/mystatefulset@myns": {
+				"StatefulSet/mystatefulset@myns": {
 					Name:          "mystatefulset",
 					Kind:          "StatefulSet",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},
@@ -55,14 +55,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "ReplicaSet",
 			fixture: "replicaset.yml",
 			want: map[string]*App{
-				"replicaSet/myreplicaset@myns": {
+				"ReplicaSet/myreplicaset@myns": {
 					Name:          "myreplicaset",
 					Kind:          "ReplicaSet",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},
@@ -72,14 +72,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "ReplicaSet owned by deployment does not result in two apps",
 			fixture: "replicaset-owned-by-deployment.yml",
 			want: map[string]*App{
-				"deployment/mydeployment@myns": {
+				"Deployment/mydeployment@myns": {
 					Name:          "mydeployment",
 					Kind:          "Deployment",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},
@@ -89,14 +89,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "ReplicaSet with duplicate images",
 			fixture: "replicaset-duplicate-images.yml",
 			want: map[string]*App{
-				"replicaSet/myreplicaset@myns": {
+				"ReplicaSet/myreplicaset@myns": {
 					Name:          "myreplicaset",
 					Kind:          "ReplicaSet",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},
@@ -106,14 +106,14 @@ func TestFetcher_GetApps(t *testing.T) {
 			desc:    "DaemonSet",
 			fixture: "daemonset.yml",
 			want: map[string]*App{
-				"daemonSet/mydaemonset@myns": {
+				"DaemonSet/mydaemonset@myns": {
 					Name:          "mydaemonset",
 					Kind:          "DaemonSet",
 					Namespace:     "myns",
 					Replicas:      2,
 					ReadyReplicas: 1,
 					Images:        []string{"traefik:latest"},
-					Labels: map[string]string{
+					podLabels: map[string]string{
 						"one.label": "value",
 					},
 				},

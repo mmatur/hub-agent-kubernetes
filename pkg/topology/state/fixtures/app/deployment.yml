@@ -3,12 +3,13 @@ kind: Deployment
 metadata:
   name: mydeployment
   namespace: myns
-  labels:
-    one.label: value
 
 spec:
   replicas: 2
   template:
+    metadata:
+      labels:
+        one.label: value
     spec:
       containers:
         - name: foo

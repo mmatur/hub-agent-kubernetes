@@ -1,16 +1,13 @@
 package state
 
 import (
-	"net"
 	"sort"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (f *Fetcher) getServices() (map[string]*Service, error) {
+func (f *Fetcher) getServices(apps map[string]*App) (map[string]*Service, error) {
 	services, err := f.k8s.Core().V1().Services().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -18,40 +15,45 @@ func (f *Fetcher) getServices() (map[string]*Service, error) {
 
 	result := make(map[string]*Service)
 	for _, service := range services {
-		endpoint, err := f.k8s.Core().V1().Endpoints().Lister().Endpoints(service.Namespace).Get(service.Name)
-		if err != nil && !kerror.IsNotFound(err) {
-			return nil, err
-		}
-
 		result[objectKey(service.Name, service.Namespace)] = &Service{
 			Name:      service.Name,
 			Namespace: service.Namespace,
-			Status:    service.Status,
 			Selector:  service.Spec.Selector,
-			addresses: getAddressesFromEndpoint(endpoint),
+			Apps:      selectApps(apps, service),
+			Type:      service.Spec.Type,
+			status:    service.Status,
 		}
 	}
 
 	return result, nil
 }
 
-func getAddressesFromEndpoint(endpoint *corev1.Endpoints) []string {
-	if endpoint == nil {
+func selectApps(apps map[string]*App, service *corev1.Service) []string {
+	if service.Spec.Type == corev1.ServiceTypeExternalName {
 		return nil
 	}
 
-	var addrs []string
+	var result []string
+	for key, app := range apps {
+		if app.Namespace != service.Namespace {
+			continue
+		}
 
-	for _, subset := range endpoint.Subsets {
-		for _, address := range subset.Addresses {
-			for _, port := range subset.Ports {
-				p := strconv.FormatInt(int64(port.Port), 10)
-				addrs = append(addrs, net.JoinHostPort(address.IP, p))
+		var match bool
+		for k, v := range service.Spec.Selector {
+			if app.podLabels[k] != v {
+				match = false
+				break
 			}
+			match = true
+		}
+
+		if match {
+			result = append(result, key)
 		}
 	}
 
-	sort.Strings(addrs)
+	sort.Strings(result)
 
-	return addrs
+	return result
 }

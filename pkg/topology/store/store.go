@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -56,6 +57,14 @@ func New(ctx context.Context, token, topologyServiceURL string) (*Store, error) 
 }
 
 func (s *Store) cloneRepository(ctx context.Context) error {
+	if disableGitSSLVerify() {
+		log.Info().Msg("Git SSL verify disabled")
+		output, err := git.Config(cfg.Global, cfg.Add("http.sslVerify", "false"))
+		if err != nil {
+			return fmt.Errorf("%w: %s", err, output)
+		}
+	}
+
 	// Setup local repo for topology files, by cloning neo distant repository
 	output, err := git.CloneWithContext(ctx, clone.Repository(s.gitRepo))
 	if err != nil {
@@ -86,4 +95,9 @@ func repositoryName(gitRepo string) (string, error) {
 	}
 
 	return repo[index+1:], nil
+}
+
+func disableGitSSLVerify() bool {
+	_, exists := os.LookupEnv("DISABLE_GIT_SSL_VERIFY")
+	return exists
 }

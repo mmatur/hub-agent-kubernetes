@@ -1,8 +1,6 @@
 package state
 
 import (
-	"strings"
-
 	"github.com/hashicorp/go-version"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -10,45 +8,38 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func (f *Fetcher) getIngresses(controllers map[string]*IngressController) (map[string]*Ingress, error) {
+// TODO: unify consts with ACP part after rebase.
+const (
+	ControllerAnnotationNginxOfficial  = "nginx.org/ingress-controller"
+	ControllerAnnotationNginxCommunity = "k8s.io/ingress-nginx"
+	ControllerAnnotationTraefik        = "traefik.io/ingress-controller"
+)
+
+func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 	ingresses, err := f.fetchIngresses()
+	if err != nil {
+		return nil, err
+	}
+
+	ingressClasses, err := f.fetchIngressClasses()
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]*Ingress)
 	for _, ingress := range ingresses {
-		var ingressTLS []IngressTLS
-		for _, tls := range ingress.Spec.TLS {
-			ingressTLS = append(ingressTLS, IngressTLS{
-				Hosts:      tls.Hosts,
-				SecretName: tls.SecretName,
-			})
-		}
-
 		key := objectKey(ingress.Name, ingress.Namespace)
+
 		result[key] = &Ingress{
-			Name:               ingress.Name,
-			Namespace:          ingress.Namespace,
-			Annotations:        ingress.Annotations,
-			TLS:                ingressTLS,
-			Status:             ingress.Status.LoadBalancer,
-			CertManagerEnabled: usesCertManager(ingress),
-			Controller:         getControllerName(ingress, controllers),
-		}
-
-		// Set services without duplicates.
-		knownServices := make(map[string]struct{})
-		for _, rule := range ingress.Spec.Rules {
-			for _, path := range rule.HTTP.Paths {
-				if _, exists := knownServices[path.Backend.Service.Name]; exists {
-					continue
-				}
-
-				knownServices[path.Backend.Service.Name] = struct{}{}
-
-				result[key].Services = append(result[key].Services, path.Backend.Service.Name)
-			}
+			Name:           ingress.Name,
+			Namespace:      ingress.Namespace,
+			ClusterID:      clusterID,
+			Annotations:    sanitizeAnnotations(ingress.Annotations),
+			TLS:            ingress.Spec.TLS,
+			DefaultService: ingress.Spec.DefaultBackend,
+			Rules:          ingress.Spec.Rules,
+			Controller:     getControllerName(ingress, ingressClasses),
+			Services:       getServices(ingress),
 		}
 	}
 
@@ -84,17 +75,54 @@ func (f *Fetcher) fetchIngresses() ([]*netv1.Ingress, error) {
 	return result, nil
 }
 
-func usesCertManager(ingress *netv1.Ingress) bool {
-	for annotation := range ingress.Annotations {
-		if strings.Contains(annotation, "cert-manager.io") || strings.Contains(annotation, "certmanager.k8s.io") {
-			return true
+func sanitizeAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for name, value := range annotations {
+		if name == "kubectl.kubernetes.io/last-applied-configuration" {
+			continue
+		}
+
+		result[name] = value
+	}
+
+	return result
+}
+
+func getServices(ingress *netv1.Ingress) []string {
+	var result []string
+
+	knownServices := make(map[string]struct{})
+
+	if ingress.Spec.DefaultBackend != nil && ingress.Spec.DefaultBackend.Service != nil {
+		key := objectKey(ingress.Spec.DefaultBackend.Service.Name, ingress.Namespace)
+		knownServices[key] = struct{}{}
+		result = append(result, key)
+	}
+
+	for _, r := range ingress.Spec.Rules {
+		for _, p := range r.HTTP.Paths {
+			if p.Backend.Service == nil {
+				continue
+			}
+
+			key := objectKey(p.Backend.Service.Name, ingress.Namespace)
+			if _, exists := knownServices[key]; exists {
+				continue
+			}
+
+			knownServices[key] = struct{}{}
+			result = append(result, key)
 		}
 	}
 
-	return false
+	return result
 }
 
-func getControllerName(ingress *netv1.Ingress, controllers map[string]*IngressController) string {
+func getControllerName(ingress *netv1.Ingress, ingressClasses []*netv1.IngressClass) string {
 	// Look for ingressClassName in Ingress spec.
 	var ingressClassName string
 	if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName != "" {
@@ -103,23 +131,33 @@ func getControllerName(ingress *netv1.Ingress, controllers map[string]*IngressCo
 
 	// Look for ingressClassName in annotations if it was not found in the Ingress spec.
 	if ingressClassName == "" {
-		igc, ok := ingress.Annotations["kubernetes.io/ingress.class"]
-		if ok {
-			ingressClassName = igc
+		// TODO: For now we don't support custom ingress class names so this could break.
+		return ingress.Annotations["kubernetes.io/ingress.class"]
+	}
+
+	// Find the matching ingress class.
+	var ingressClass *netv1.IngressClass
+	for _, ic := range ingressClasses {
+		if ic.Name == ingressClassName {
+			ingressClass = ic
+			break
 		}
 	}
 
-	// Look for the controller that handles the IngressClass.
-	for _, ctrl := range controllers {
-		for _, ingressClass := range ctrl.IngressClasses {
-			if ingressClassName == ingressClass {
-				return ctrl.Name
-			}
-		}
+	if ingressClass == nil {
+		return ingressClassName
 	}
 
-	// TODO: Handle cases where no ingress classes are given and we could guess which ingress controller handles this ingress.
-	return ""
+	switch ingressClass.Spec.Controller {
+	case ControllerAnnotationNginxCommunity:
+		return IngressControllerTypeNginxCommunity
+	case ControllerAnnotationNginxOfficial:
+		return IngressControllerTypeNginxOfficial
+	case ControllerAnnotationTraefik:
+		return IngressControllerTypeTraefik
+	default:
+		return ingressClass.Spec.Controller
+	}
 }
 
 func toNetworkingV1(ing *netv1beta1.Ingress) (*netv1.Ingress, error) {

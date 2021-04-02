@@ -171,18 +171,18 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 		return nil, err
 	}
 
-	cluster.Services, err = f.getServices()
+	cluster.Services, err = f.getServices(cluster.Apps)
 	if err != nil {
 		return nil, err
 	}
 
 	// getIngressControllers should be called after getServices because it depends on service information.
-	cluster.IngressControllers, err = f.getIngressControllers(cluster.Services)
+	cluster.IngressControllers, err = f.getIngressControllers(cluster.Services, cluster.Apps)
 	if err != nil {
 		return nil, err
 	}
 
-	cluster.Ingresses, err = f.getIngresses(cluster.IngressControllers)
+	cluster.Ingresses, err = f.getIngresses(cluster.ID)
 	if err != nil {
 		return nil, err
 	}

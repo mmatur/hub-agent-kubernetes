@@ -22,6 +22,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 		desc     string
 		fixture  string
 		services map[string]*Service
+		apps     map[string]*App
 		want     map[string]*IngressController
 	}{
 		{
@@ -34,8 +35,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -49,15 +49,73 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"Deployment/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+				},
+			},
+		},
+		{
+			desc:     "One ingress controller without service",
+			fixture:  "one-ingress-controller-without-service.yml",
+			services: map[string]*Service{},
+			apps: map[string]*App{
+				"Deployment/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
+			want: map[string]*IngressController{
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      nil,
 				},
 			},
 		},
@@ -71,8 +129,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -86,15 +143,36 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"Deployment/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom", "http://5.6.7.8:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom", "http://4.5.6.7:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -108,8 +186,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -123,15 +200,36 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"Deployment/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass", "myIngressClass2"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass", "myIngressClass2"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -145,8 +243,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -160,15 +257,36 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"StatefulSet/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "StatefulSet",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "StatefulSet",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -182,8 +300,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -197,15 +314,36 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"ReplicaSet/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "ReplicaSet",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "ReplicaSet",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -219,8 +357,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -234,15 +371,36 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"DaemonSet/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "DaemonSet",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
 			want: map[string]*IngressController{
-				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"myIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "DaemonSet",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"myIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -256,8 +414,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -276,8 +433,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "bar",
 					},
-					addresses: []string{"14.13.12.11", "10.9.8.7"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -291,24 +447,64 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"Deployment/traefik@myns": {
+					Name:          "traefik",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+				"Deployment/nginx@myns": {
+					Name:          "nginx",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "bar",
+					},
+					Images: []string{"nginx/nginx-ingress:latest"},
+				},
+			},
 			want: map[string]*IngressController{
 				"traefik@myns": {
-					Name:             "traefik",
-					Namespace:        "myns",
-					IngressClasses:   []string{"fooIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+					App: App{
+						Name:          "traefik",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeTraefik,
+					IngressClasses: []string{"fooIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 				"nginx@myns": {
-					Name:             "nginx",
-					Namespace:        "myns",
-					IngressClasses:   []string{"barIngressClass"},
-					MetricsURLs:      []string{""},
-					PublicIPs:        []string{"11.12.13.14", "7.8.9.10"},
-					ServiceAddresses: []string{"14.13.12.11", "10.9.8.7"},
-					Replicas:         2,
+					App: App{
+						Name:          "nginx",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"nginx/nginx-ingress:latest"},
+						podLabels: map[string]string{
+							"my.label": "bar",
+						},
+					},
+					Type:           IngressControllerTypeNginxOfficial,
+					IngressClasses: []string{"barIngressClass"},
+					MetricsURLs:    []string{""},
+					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
 		},
@@ -322,8 +518,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "foo",
 					},
-					addresses: []string{"4.3.2.1", "7.6.5.4"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -342,8 +537,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					Selector: map[string]string{
 						"my.label": "bar",
 					},
-					addresses: []string{"14.13.12.11", "10.9.8.7"},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -357,24 +551,64 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 				},
 			},
+			apps: map[string]*App{
+				"Deployment/nginx-community@myns": {
+					Name:          "nginx-community",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"ingress-nginx/controller:latest"},
+				},
+				"Deployment/nginx@myns": {
+					Name:          "nginx",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "bar",
+					},
+					Images: []string{"nginx/nginx-ingress:latest"},
+				},
+			},
 			want: map[string]*IngressController{
 				"nginx-community@myns": {
-					Name:             "nginx-community",
-					Namespace:        "myns",
-					IngressClasses:   []string{"fooIngressClass"},
-					MetricsURLs:      []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:        []string{"1.2.3.4", "4.5.6.7"},
-					ServiceAddresses: []string{"4.3.2.1", "7.6.5.4"},
-					Replicas:         2,
+					App: App{
+						Name:          "nginx-community",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"ingress-nginx/controller:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:           IngressControllerTypeNginxCommunity,
+					IngressClasses: []string{"fooIngressClass"},
+					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
+					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
 				},
 				"nginx@myns": {
-					Name:             "nginx",
-					Namespace:        "myns",
-					IngressClasses:   []string{"barIngressClass"},
-					MetricsURLs:      []string{""},
-					PublicIPs:        []string{"11.12.13.14", "7.8.9.10"},
-					ServiceAddresses: []string{"14.13.12.11", "10.9.8.7"},
-					Replicas:         2,
+					App: App{
+						Name:          "nginx",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"nginx/nginx-ingress:latest"},
+						podLabels: map[string]string{
+							"my.label": "bar",
+						},
+					},
+					Type:           IngressControllerTypeNginxOfficial,
+					IngressClasses: []string{"barIngressClass"},
+					MetricsURLs:    []string{""},
+					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
 		},
@@ -393,7 +627,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 			f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
 			require.NoError(t, err)
 
-			got, err := f.getIngressControllers(test.services)
+			got, err := f.getIngressControllers(test.services, test.apps)
 			require.NoError(t, err)
 
 			assert.Equal(t, test.want, got)
@@ -410,7 +644,7 @@ func TestGuessMetricsURL(t *testing.T) {
 	}{
 		{
 			desc: "Pod with ingress controller defaults",
-			ctrl: IngressControllerNginxCommunity,
+			ctrl: IngressControllerTypeNginxCommunity,
 			pod: &corev1.Pod{
 				Status: corev1.PodStatus{
 					PodIP: "1.2.3.4",
@@ -448,7 +682,7 @@ func TestGuessMetricsURL(t *testing.T) {
 	}
 }
 
-func TestPodHasIngressController(t *testing.T) {
+func TestGetControllerType(t *testing.T) {
 	tests := []struct {
 		desc               string
 		pod                *corev1.Pod
@@ -493,7 +727,7 @@ func TestPodHasIngressController(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: "traefik/traefik:latest",
+							Image: "traefik:latest",
 						},
 					},
 				},
@@ -512,26 +746,7 @@ func TestPodHasIngressController(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: "traefik:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			expected:           true,
-			expectedController: "traefik",
-		},
-		{
-			desc: "Yet another valid Traefik controller image",
-			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "traefik:latest",
+							Image: "traefik",
 						},
 					},
 				},
@@ -587,46 +802,41 @@ func TestPodHasIngressController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			controller := podHasIngressController(test.pod)
+			controller := getControllerType(test.pod)
 
 			assert.Equal(t, test.expectedController, controller)
 		})
 	}
 }
 
-func TestFindServiceForPodLabels(t *testing.T) {
+func TestFindPublicIPs(t *testing.T) {
 	tests := []struct {
-		desc            string
-		services        map[string]*Service
-		labels          map[string]string
-		expectedService *Service
-		expected        bool
+		desc     string
+		services map[string]*Service
+		pod      *corev1.Pod
+		wantIPs  []string
 	}{
 		{
 			desc: "Labels, no services",
-			labels: map[string]string{
-				"foo": "bar",
-				"bar": "foo",
-			},
-		},
-		{
-			desc: "No labels",
-			services: map[string]*Service{
-				"foo-service": {
-					Name:      "foo",
-					Namespace: "bar",
-					Selector: map[string]string{
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
 						"foo": "bar",
+						"bar": "foo",
 					},
-					Status: corev1.ServiceStatus{},
 				},
 			},
 		},
 		{
 			desc: "Service with no ingress",
-			labels: map[string]string{
-				"foo": "bar",
-				"bar": "foo",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "bar",
+					Labels: map[string]string{
+						"foo": "bar",
+						"bar": "foo",
+					},
+				},
 			},
 			services: map[string]*Service{
 				"foo-service": {
@@ -635,7 +845,7 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					Selector: map[string]string{
 						"foo": "bar",
 					},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{},
 						},
@@ -645,9 +855,14 @@ func TestFindServiceForPodLabels(t *testing.T) {
 		},
 		{
 			desc: "One service matches",
-			labels: map[string]string{
-				"foo": "bar",
-				"bar": "foo",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Labels: map[string]string{
+						"foo": "bar",
+						"bar": "foo",
+					},
+				},
 			},
 			services: map[string]*Service{
 				"foo-service": {
@@ -656,7 +871,7 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					Selector: map[string]string{
 						"foo": "bar",
 					},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -668,29 +883,18 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
-			expectedService: &Service{
-				Name:      "foo",
-				Namespace: "foo",
-				Selector: map[string]string{
-					"foo": "bar",
-				},
-				Status: corev1.ServiceStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{
-							{
-								IP:       "foo",
-								Hostname: "bar",
-							},
-						},
-					},
-				},
-			},
+			wantIPs: []string{"foo"},
 		},
 		{
 			desc: "Two services, one matches",
-			labels: map[string]string{
-				"foo": "bar",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Labels: map[string]string{
+						"foo": "bar",
+						"bar": "foo",
+					},
+				},
 			},
 			services: map[string]*Service{
 				"foo-service": {
@@ -699,7 +903,7 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					Selector: map[string]string{
 						"foo": "bar",
 					},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -716,7 +920,7 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					Selector: map[string]string{
 						"bar": "foo",
 					},
-					Status: corev1.ServiceStatus{
+					status: corev1.ServiceStatus{
 						LoadBalancer: corev1.LoadBalancerStatus{
 							Ingress: []corev1.LoadBalancerIngress{
 								{
@@ -728,24 +932,63 @@ func TestFindServiceForPodLabels(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
-			expectedService: &Service{
-				Name:      "foo",
-				Namespace: "foo",
-				Selector: map[string]string{
-					"foo": "bar",
+			wantIPs: []string{"foo"},
+		},
+		{
+			desc: "Two services, both match",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
 				},
-				Status: corev1.ServiceStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{
-							{
-								IP:       "foo",
-								Hostname: "bar",
+			},
+			services: map[string]*Service{
+				"foo-service": {
+					Name:      "foo",
+					Namespace: "foo",
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP:       "foo",
+									Hostname: "bar",
+								},
+								{
+									IP:       "bar",
+									Hostname: "bar",
+								},
+							},
+						},
+					},
+				},
+				"bar-service": {
+					Name:      "bar",
+					Namespace: "foo",
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP:       "bar",
+									Hostname: "bar",
+								},
+								{
+									IP:       "baz",
+									Hostname: "baz",
+								},
 							},
 						},
 					},
 				},
 			},
+			wantIPs: []string{"bar", "baz", "foo"},
 		},
 	}
 
@@ -754,9 +997,9 @@ func TestFindServiceForPodLabels(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			svs := findServiceForPodLabels(test.services, test.labels)
+			svs := findPublicIPs(test.services, test.pod)
 
-			assert.Equal(t, test.expectedService, svs)
+			assert.Equal(t, test.wantIPs, svs)
 		})
 	}
 }

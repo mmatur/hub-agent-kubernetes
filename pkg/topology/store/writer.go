@@ -112,7 +112,7 @@ func (s *Store) write(st *state.Cluster) error {
 func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 	dir := field.Name
 
-	if err := os.RemoveAll(dir); err != nil {
+	if err := os.RemoveAll(filepath.Join(s.workingDir, dir)); err != nil {
 		return err
 	}
 
@@ -137,7 +137,7 @@ func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 func (s *Store) writeSlice(field reflect.StructField, value reflect.Value) error {
 	dir := field.Name
 
-	if err := os.RemoveAll(dir); err != nil {
+	if err := os.RemoveAll(filepath.Join(s.workingDir, dir)); err != nil {
 		return err
 	}
 

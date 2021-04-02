@@ -14,7 +14,7 @@ func (f *Fetcher) getApps() (map[string]*App, error) {
 
 	result := make(map[string]*App)
 	for _, deployment := range deployments {
-		key := "deployment/" + deployment.Name + "@" + deployment.Namespace
+		key := "Deployment/" + objectKey(deployment.Name, deployment.Namespace)
 		result[key] = appFromDeployment(deployment)
 	}
 
@@ -24,7 +24,7 @@ func (f *Fetcher) getApps() (map[string]*App, error) {
 	}
 
 	for _, statefulSet := range statefulSets {
-		key := "statefulSet/" + statefulSet.Name + "@" + statefulSet.Namespace
+		key := "StatefulSet/" + objectKey(statefulSet.Name, statefulSet.Namespace)
 		result[key] = appFromStatefulSet(statefulSet)
 	}
 
@@ -38,7 +38,7 @@ func (f *Fetcher) getApps() (map[string]*App, error) {
 			continue
 		}
 
-		key := "replicaSet/" + replicaSet.Name + "@" + replicaSet.Namespace
+		key := "ReplicaSet/" + objectKey(replicaSet.Name, replicaSet.Namespace)
 		result[key] = appFromReplicaSet(replicaSet)
 	}
 
@@ -48,11 +48,21 @@ func (f *Fetcher) getApps() (map[string]*App, error) {
 	}
 
 	for _, daemonSet := range daemonSets {
-		key := "daemonSet/" + daemonSet.Name + "@" + daemonSet.Namespace
+		key := "DaemonSet/" + objectKey(daemonSet.Name, daemonSet.Namespace)
 		result[key] = appFromDaemonSet(daemonSet)
 	}
 
 	return result, nil
+}
+
+func isOwnedByDeployment(replicaSet *appsv1.ReplicaSet) bool {
+	for _, ownerReference := range replicaSet.OwnerReferences {
+		if ownerReference.Kind == "Deployment" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func appFromDeployment(deployment *appsv1.Deployment) *App {
@@ -64,6 +74,46 @@ func appFromDeployment(deployment *appsv1.Deployment) *App {
 		ReadyReplicas: int(deployment.Status.AvailableReplicas),
 		Images:        getImages(deployment.Spec.Template.Spec.Containers),
 		Labels:        deployment.Labels,
+		podLabels:     deployment.Spec.Template.Labels,
+	}
+}
+
+func appFromStatefulSet(statefulSet *appsv1.StatefulSet) *App {
+	return &App{
+		Kind:          "StatefulSet",
+		Name:          statefulSet.Name,
+		Namespace:     statefulSet.Namespace,
+		Replicas:      int(*statefulSet.Spec.Replicas),
+		ReadyReplicas: int(statefulSet.Status.ReadyReplicas),
+		Images:        getImages(statefulSet.Spec.Template.Spec.Containers),
+		Labels:        statefulSet.Labels,
+		podLabels:     statefulSet.Spec.Template.Labels,
+	}
+}
+
+func appFromReplicaSet(replicaSet *appsv1.ReplicaSet) *App {
+	return &App{
+		Kind:          "ReplicaSet",
+		Name:          replicaSet.Name,
+		Namespace:     replicaSet.Namespace,
+		Replicas:      int(*replicaSet.Spec.Replicas),
+		ReadyReplicas: int(replicaSet.Status.AvailableReplicas),
+		Images:        getImages(replicaSet.Spec.Template.Spec.Containers),
+		Labels:        replicaSet.Labels,
+		podLabels:     replicaSet.Spec.Template.Labels,
+	}
+}
+
+func appFromDaemonSet(daemonSet *appsv1.DaemonSet) *App {
+	return &App{
+		Kind:          "DaemonSet",
+		Name:          daemonSet.Name,
+		Namespace:     daemonSet.Namespace,
+		Replicas:      int(daemonSet.Status.DesiredNumberScheduled),
+		ReadyReplicas: int(daemonSet.Status.NumberAvailable),
+		Images:        getImages(daemonSet.Spec.Template.Spec.Containers),
+		Labels:        daemonSet.Labels,
+		podLabels:     daemonSet.Spec.Template.Labels,
 	}
 }
 
@@ -79,50 +129,4 @@ func getImages(containers []corev1.Container) []string {
 	}
 
 	return result
-}
-
-func appFromStatefulSet(statefulSet *appsv1.StatefulSet) *App {
-	return &App{
-		Kind:          "StatefulSet",
-		Name:          statefulSet.Name,
-		Namespace:     statefulSet.Namespace,
-		Replicas:      int(*statefulSet.Spec.Replicas),
-		ReadyReplicas: int(statefulSet.Status.ReadyReplicas),
-		Images:        getImages(statefulSet.Spec.Template.Spec.Containers),
-		Labels:        statefulSet.Labels,
-	}
-}
-
-func appFromReplicaSet(replicaSet *appsv1.ReplicaSet) *App {
-	return &App{
-		Kind:          "ReplicaSet",
-		Name:          replicaSet.Name,
-		Namespace:     replicaSet.Namespace,
-		Replicas:      int(*replicaSet.Spec.Replicas),
-		ReadyReplicas: int(replicaSet.Status.AvailableReplicas),
-		Images:        getImages(replicaSet.Spec.Template.Spec.Containers),
-		Labels:        replicaSet.Labels,
-	}
-}
-
-func appFromDaemonSet(daemonSet *appsv1.DaemonSet) *App {
-	return &App{
-		Kind:          "DaemonSet",
-		Name:          daemonSet.Name,
-		Namespace:     daemonSet.Namespace,
-		Replicas:      int(daemonSet.Status.DesiredNumberScheduled),
-		ReadyReplicas: int(daemonSet.Status.NumberAvailable),
-		Images:        getImages(daemonSet.Spec.Template.Spec.Containers),
-		Labels:        daemonSet.Labels,
-	}
-}
-
-func isOwnedByDeployment(replicaSet *appsv1.ReplicaSet) bool {
-	for _, ownerReference := range replicaSet.OwnerReferences {
-		if ownerReference.Kind == "Deployment" {
-			return true
-		}
-	}
-
-	return false
 }
