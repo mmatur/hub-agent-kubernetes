@@ -11,7 +11,10 @@ import (
 	"github.com/traefik/neo-agent/pkg/acp/admission"
 	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
 	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/neo-agent/pkg/acp/basicauth"
+	"github.com/traefik/neo-agent/pkg/acp/digestauth"
 	"github.com/traefik/neo-agent/pkg/acp/jwt"
+	"github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
 	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -259,75 +262,243 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 }
 
 func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
-	traefikClientSet := traefikkubemock.NewSimpleClientset()
-	policies := func(canonicalName string) *acp.Config {
-		return &acp.Config{JWT: &jwt.Config{}}
-	}
-	rev := reviewer.NewTraefikIngress("", ingressClassesMock{}, policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-
-	oldIng := struct {
-		Metadata metav1.ObjectMeta `json:"metadata"`
+	tests := []struct {
+		desc                    string
+		config                  *acp.Config
+		oldIngAnno              map[string]string
+		ingAnno                 map[string]string
+		wantPatch               map[string]string
+		wantAuthResponseHeaders []string
 	}{
-		Metadata: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "test",
-			Annotations: map[string]string{
+		{
+			desc: "add JWT authentication",
+			config: &acp.Config{JWT: &jwt.Config{
+				ForwardHeaders: map[string]string{
+					"fwdHeader": "claim",
+				},
+			}},
+			oldIngAnno: map[string]string{
 				reviewer.AnnotationNeoAuth:                         "my-old-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "test-zz-my-old-policy-test@kubernetescrd",
 			},
-		},
-	}
-	oldB, err := json.Marshal(oldIng)
-	require.NoError(t, err)
-
-	ing := struct {
-		Metadata metav1.ObjectMeta `json:"metadata"`
-	}{
-		Metadata: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "test",
-			Annotations: map[string]string{
+			ingAnno: map[string]string{
 				reviewer.AnnotationNeoAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
+			wantPatch: map[string]string{
+				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				"custom-annotation":                                "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"fwdHeader"},
+		},
+		{
+			desc: "add Basic authentication",
+			config: &acp.Config{BasicAuth: &basicauth.Config{
+				StripAuthorizationHeader: true,
+				ForwardUsernameHeader:    "User",
+			}},
+			oldIngAnno: map[string]string{},
+			ingAnno: map[string]string{
+				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				"custom-annotation":                                "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
+			},
+			wantPatch: map[string]string{
+				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				"custom-annotation":                                "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"User", "Authorization"},
+		},
+		{
+			desc: "add Digest authentication",
+			config: &acp.Config{DigestAuth: &digestauth.Config{
+				StripAuthorizationHeader: true,
+				ForwardUsernameHeader:    "User",
+			}},
+			oldIngAnno: map[string]string{},
+			ingAnno: map[string]string{
+				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				"custom-annotation":                                "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
+			},
+			wantPatch: map[string]string{
+				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				"custom-annotation":                                "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"User", "Authorization"},
 		},
 	}
-	b, err := json.Marshal(ing)
-	require.NoError(t, err)
 
-	ar := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			Object: runtime.RawExtension{
-				Raw: b,
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			traefikClientSet := traefikkubemock.NewSimpleClientset()
+			policies := func(canonicalName string) *acp.Config {
+				return test.config
+			}
+			rev := reviewer.NewTraefikIngress("", ingressClassesMock{}, policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+
+			oldIng := struct {
+				Metadata metav1.ObjectMeta `json:"metadata"`
+			}{
+				Metadata: metav1.ObjectMeta{
+					Name:        "name",
+					Namespace:   "test",
+					Annotations: test.oldIngAnno,
+				},
+			}
+			oldB, err := json.Marshal(oldIng)
+			require.NoError(t, err)
+
+			ing := struct {
+				Metadata metav1.ObjectMeta `json:"metadata"`
+			}{
+				Metadata: metav1.ObjectMeta{
+					Name:        "name",
+					Namespace:   "test",
+					Annotations: test.ingAnno,
+				},
+			}
+			b, err := json.Marshal(ing)
+			require.NoError(t, err)
+
+			ar := admv1.AdmissionReview{
+				Request: &admv1.AdmissionRequest{
+					Object: runtime.RawExtension{
+						Raw: b,
+					},
+					OldObject: runtime.RawExtension{
+						Raw: oldB,
+					},
+				},
+			}
+
+			// We run the test twice to check if reviewing the same resource twice is ok.
+			p, err := rev.Review(context.Background(), ar)
+			assert.NoError(t, err)
+			assert.NotNil(t, p)
+
+			var patches []map[string]interface{}
+			err = json.Unmarshal(p, &patches)
+			require.NoError(t, err)
+
+			assert.Equal(t, 1, len(patches))
+			assert.Equal(t, "replace", patches[0]["op"])
+			assert.Equal(t, "/metadata/annotations", patches[0]["path"])
+			assert.Equal(t, len(test.wantPatch), len(patches[0]["value"].(map[string]interface{})))
+			for k := range test.wantPatch {
+				assert.Equal(t, test.wantPatch[k], patches[0]["value"].(map[string]interface{})[k])
+			}
+
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.NotNil(t, m)
+
+			assert.Equal(t, test.wantAuthResponseHeaders, m.Spec.ForwardAuth.AuthResponseHeaders)
+		})
+	}
+}
+
+func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
+	tests := []struct {
+		desc                    string
+		config                  *acp.Config
+		wantAuthResponseHeaders []string
+	}{
+		{
+			desc: "Update middleware with JWT configuration",
+			config: &acp.Config{
+				JWT: &jwt.Config{
+					StripAuthorizationHeader: true,
+				},
 			},
-			OldObject: runtime.RawExtension{
-				Raw: oldB,
+			wantAuthResponseHeaders: []string{"Authorization"},
+		},
+		{
+			desc: "Update middleware with basic configuration",
+			config: &acp.Config{
+				BasicAuth: &basicauth.Config{
+					StripAuthorizationHeader: true,
+				},
 			},
+			wantAuthResponseHeaders: []string{"Authorization"},
+		},
+		{
+			desc: "Update middleware with digest configuration",
+			config: &acp.Config{
+				DigestAuth: &digestauth.Config{
+					StripAuthorizationHeader: true,
+				},
+			},
+			wantAuthResponseHeaders: []string{"Authorization"},
 		},
 	}
 
-	// We run the test twice to check if reviewing the same resource twice is ok.
-	for i := 0; i < 2; i++ {
-		p, err := rev.Review(context.Background(), ar)
-		require.NoError(t, err)
-		assert.NotNil(t, p)
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 
-		var patches []map[string]interface{}
-		err = json.Unmarshal(p, &patches)
-		require.NoError(t, err)
+			middleware := v1alpha1.Middleware{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "zz-my-policy-test",
+					Namespace: "test",
+				},
+				Spec: v1alpha1.MiddlewareSpec{
+					ForwardAuth: &v1alpha1.ForwardAuth{
+						AuthResponseHeaders: []string{"fwdHeader"},
+					},
+				},
+			}
+			traefikClientSet := traefikkubemock.NewSimpleClientset(&middleware)
+			policies := func(canonicalName string) *acp.Config {
+				return test.config
+			}
+			rev := reviewer.NewTraefikIngress("", ingressClassesMock{}, policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
 
-		assert.Equal(t, 1, len(patches))
-		assert.Equal(t, "replace", patches[0]["op"])
-		assert.Equal(t, "/metadata/annotations", patches[0]["path"])
-		assert.Equal(t, "my-policy@test", patches[0]["value"].(map[string]interface{})["neo.traefik.io/access-control-policy"])
-		assert.Equal(t, "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd", patches[0]["value"].(map[string]interface{})["traefik.ingress.kubernetes.io/router.middlewares"])
-		assert.Equal(t, "foobar", patches[0]["value"].(map[string]interface{})["custom-annotation"])
+			ing := struct {
+				Metadata metav1.ObjectMeta `json:"metadata"`
+			}{
+				Metadata: metav1.ObjectMeta{
+					Name:        "name",
+					Namespace:   "test",
+					Annotations: map[string]string{reviewer.AnnotationNeoAuth: "my-policy@test"},
+				},
+			}
+			b, err := json.Marshal(ing)
+			require.NoError(t, err)
 
-		m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
-		require.NoError(t, err)
-		assert.NotNil(t, m)
+			ar := admv1.AdmissionReview{
+				Request: &admv1.AdmissionRequest{
+					Object: runtime.RawExtension{
+						Raw: b,
+					},
+				},
+			}
+
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.NotNil(t, m)
+			assert.Equal(t, []string{"fwdHeader"}, m.Spec.ForwardAuth.AuthResponseHeaders)
+
+			// We run the test twice to check if reviewing the same resource twice is ok.
+			p, err := rev.Review(context.Background(), ar)
+			assert.NoError(t, err)
+			assert.NotNil(t, p)
+
+			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.NotNil(t, m)
+
+			assert.Equal(t, test.wantAuthResponseHeaders, m.Spec.ForwardAuth.AuthResponseHeaders)
+		})
 	}
 }
 

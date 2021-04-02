@@ -61,7 +61,7 @@ func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	if !headersChanged(oldACP, newACP) {
+	if !headersChanged(oldACP.Spec, newACP.Spec) {
 		return
 	}
 
@@ -92,11 +92,33 @@ func canonicalName(name, ns string) string {
 	return name + "@" + ns
 }
 
-func headersChanged(oldCfg, newCfg *neov1alpha1.AccessControlPolicy) bool {
-	if oldCfg.Spec.JWT == nil {
-		return true
-	}
+func headersChanged(oldCfg, newCfg neov1alpha1.AccessControlPolicySpec) bool {
+	switch {
+	case newCfg.JWT != nil:
+		if oldCfg.JWT == nil {
+			return true
+		}
 
-	return !reflect.DeepEqual(oldCfg.Spec.JWT.ForwardHeaders, newCfg.Spec.JWT.ForwardHeaders) ||
-		oldCfg.Spec.JWT.StripAuthorizationHeader != newCfg.Spec.JWT.StripAuthorizationHeader
+		return !reflect.DeepEqual(oldCfg.JWT.ForwardHeaders, newCfg.JWT.ForwardHeaders) ||
+			oldCfg.JWT.StripAuthorizationHeader != newCfg.JWT.StripAuthorizationHeader
+
+	case newCfg.BasicAuth != nil:
+		if oldCfg.BasicAuth == nil {
+			return true
+		}
+
+		return newCfg.BasicAuth.ForwardUsernameHeader != oldCfg.BasicAuth.ForwardUsernameHeader ||
+			newCfg.BasicAuth.StripAuthorizationHeader != oldCfg.BasicAuth.StripAuthorizationHeader
+
+	case newCfg.DigestAuth != nil:
+		if oldCfg.DigestAuth == nil {
+			return true
+		}
+
+		return newCfg.DigestAuth.ForwardUsernameHeader != oldCfg.DigestAuth.ForwardUsernameHeader ||
+			newCfg.DigestAuth.StripAuthorizationHeader != oldCfg.DigestAuth.StripAuthorizationHeader
+
+	default:
+		return false
+	}
 }

@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
 	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
 )
 
@@ -37,25 +35,5 @@ func (p PolGetter) GetConfig(canonicalName string) (*acp.Config, error) {
 		return nil, fmt.Errorf("get ACP: %w", err)
 	}
 
-	if policy.Spec.JWT == nil {
-		return nil, fmt.Errorf("ACP %q not found", canonicalName)
-	}
-
-	return fromJWTPolicy(policy), nil
-}
-
-func fromJWTPolicy(policy *neov1alpha1.AccessControlPolicy) *acp.Config {
-	return &acp.Config{
-		JWT: &jwt.Config{
-			SigningSecret:              policy.Spec.JWT.SigningSecret,
-			SigningSecretBase64Encoded: policy.Spec.JWT.SigningSecretBase64Encoded,
-			PublicKey:                  policy.Spec.JWT.PublicKey,
-			JWKsFile:                   jwt.FileOrContent(policy.Spec.JWT.JWKsFile),
-			JWKsURL:                    policy.Spec.JWT.JWKsURL,
-			StripAuthorizationHeader:   policy.Spec.JWT.StripAuthorizationHeader,
-			ForwardHeaders:             policy.Spec.JWT.ForwardHeaders,
-			TokenQueryKey:              policy.Spec.JWT.TokenQueryKey,
-			Claims:                     policy.Spec.JWT.Claims,
-		},
-	}
+	return acp.ConfigFromPolicy(policy), nil
 }

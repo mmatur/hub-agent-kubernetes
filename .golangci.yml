@@ -46,9 +46,12 @@ linters-settings:
     settings:
       hugeParam:
         sizeThreshold: 100
-#  ifshort:
-#    max-decl-lines: 1
-#    max-decl-chars: 20
+  gomoddirectives:
+    replace-allow-list:
+      - github.com/abbot/go-http-auth
+  #  ifshort:
+  #    max-decl-lines: 1
+  #    max-decl-chars: 20
   importas:
     # Standard Kubernetes rewrites:
     corev1: "k8s.io/api/core/v1"
@@ -114,14 +117,20 @@ issues:
       linters:
         - funlen
         - unused
+        - noctx
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
         - gochecknoglobals
     - path: pkg/acp/admission/reviewer/reviewer.go
       linters:
         - goconst
+    # False positive.
     - path: pkg/acp/admission/reviewer/nginx_ingress_snippet.go
       linters:
         - gosec
     - path: pkg/metrics/protocol/protocol.go
       text: '[[:alpha:]]+V\dSchema is a global variable'
+    # Digest auth uses md5 in tests.
+    - path: pkg/acp/digestauth/digest_auth_request_test.go
+      linters:
+        - gosec

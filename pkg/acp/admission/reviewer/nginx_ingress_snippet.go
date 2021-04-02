@@ -46,15 +46,27 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 		for headerName := range cfg.JWT.ForwardHeaders {
 			headerToFwd = append(headerToFwd, headerName)
 		}
-
 		if cfg.JWT.StripAuthorizationHeader {
 			headerToFwd = append(headerToFwd, "Authorization")
 		}
-
-		return headerToFwd, nil
+	case cfg.BasicAuth != nil:
+		if headerName := cfg.BasicAuth.ForwardUsernameHeader; headerName != "" {
+			headerToFwd = append(headerToFwd, headerName)
+		}
+		if cfg.BasicAuth.StripAuthorizationHeader {
+			headerToFwd = append(headerToFwd, "Authorization")
+		}
+	case cfg.DigestAuth != nil:
+		if headerName := cfg.DigestAuth.ForwardUsernameHeader; headerName != "" {
+			headerToFwd = append(headerToFwd, headerName)
+		}
+		if cfg.DigestAuth.StripAuthorizationHeader {
+			headerToFwd = append(headerToFwd, "Authorization")
+		}
 	default:
 		return nil, errors.New("unsupported ACP type")
 	}
+	return headerToFwd, nil
 }
 
 func generateLocationSnippet(headerToForward []string) string {

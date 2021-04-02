@@ -3,6 +3,7 @@ module github.com/traefik/neo-agent
 go 1.16
 
 require (
+	github.com/abbot/go-http-auth v0.4.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gravitational/trace v1.1.14 // indirect
@@ -28,3 +29,5 @@ require (
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
 	sigs.k8s.io/external-dns v0.7.6
 )
+
+replace github.com/abbot/go-http-auth => github.com/containous/go-http-auth v0.4.1-0.20210329152427-e70ce7ef1ade

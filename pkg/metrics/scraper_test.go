@@ -20,13 +20,10 @@ func TestScraper_ScrapeNginx(t *testing.T) {
 	s := metrics.NewScraper(http.DefaultClient)
 
 	got, err := s.Scrape(context.Background(), metrics.ParserNginx, []string{srvURL})
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		return
-	}
-	if assert.Len(t, got, 6) {
-		return
-	}
+	require.Len(t, got, 6)
+
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 20})
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 19})
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestClientErrors, Service: "default/whoami", Value: 19})
@@ -46,13 +43,10 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 	s := metrics.NewScraper(http.DefaultClient)
 
 	got, err := s.Scrape(context.Background(), metrics.ParserTraefik, []string{srvURL})
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		return
-	}
-	if assert.Len(t, got, 6) {
-		return
-	}
+	require.Len(t, got, 6)
+
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 12})
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 14})
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestClientErrors, Service: "default/whoami", Value: 14})

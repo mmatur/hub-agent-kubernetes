@@ -18,7 +18,21 @@ import (
 	"github.com/traefik/neo-agent/pkg/acp/jwt/expr"
 )
 
-type jwtAuth struct {
+// Config configures a JWT ACP handler.
+type Config struct {
+	SigningSecret              string
+	SigningSecretBase64Encoded bool
+	PublicKey                  string
+	JWKsFile                   FileOrContent
+	JWKsURL                    string
+	StripAuthorizationHeader   bool
+	ForwardHeaders             map[string]string
+	TokenQueryKey              string
+	Claims                     string
+}
+
+// Handler is a JWT ACP Handler.
+type Handler struct {
 	name string
 
 	signingSecret string
@@ -33,27 +47,13 @@ type jwtAuth struct {
 	dynKeySetsMu sync.RWMutex
 	dynKeySets   map[string]*RemoteKeySet
 
-	stripAuthorization bool
-	fwdHeaders         map[string]string
+	fwdHeaders map[string]string
 
 	validateCustomClaims expr.Predicate
 }
 
-// Config configures a JWT ACP handler.
-type Config struct {
-	SigningSecret              string            `json:"signing_secret"`
-	SigningSecretBase64Encoded bool              `json:"signing_secret_base_64_encoded"`
-	PublicKey                  string            `json:"public_key"`
-	JWKsFile                   FileOrContent     `json:"jwks_file"`
-	JWKsURL                    string            `json:"jwks_url"`
-	StripAuthorizationHeader   bool              `json:"strip_authorization_header"`
-	ForwardHeaders             map[string]string `json:"forward_headers"`
-	TokenQueryKey              string            `json:"token_query_key"`
-	Claims                     string            `json:"claims"`
-}
-
-// New returns a new JWT authentication middleware.
-func New(cfg *Config, polName string) (http.Handler, error) {
+// NewHandler returns a new JWT ACP Handler.
+func NewHandler(cfg *Config, polName string) (*Handler, error) {
 	if cfg.PublicKey == "" && cfg.SigningSecret == "" && cfg.JWKsFile == "" && cfg.JWKsURL == "" {
 		return nil, errors.New("at least a signing secret, public key or a JWKs file or URL is required")
 	}
@@ -102,14 +102,13 @@ func New(cfg *Config, polName string) (http.Handler, error) {
 		return nil, err
 	}
 
-	return &jwtAuth{
+	return &Handler{
 		name:                 polName,
 		signingSecret:        signingSecret,
 		pubKey:               pubKey,
 		jwksURL:              cfg.JWKsURL,
 		keySet:               ks,
 		dynKeySets:           make(map[string]*RemoteKeySet),
-		stripAuthorization:   cfg.StripAuthorizationHeader,
 		fwdHeaders:           cfg.ForwardHeaders,
 		tokQryKey:            tokenQueryKey,
 		validateCustomClaims: pred,
@@ -136,12 +135,12 @@ func keySet(src *Config) (KeySet, error) {
 	return nil, nil
 }
 
-func (j *jwtAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	l := log.With().Str("handler_type", "JWT").Str("handler_name", j.name).Logger()
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	l := log.With().Str("handler_type", "JWT").Str("handler_name", h.name).Logger()
 
-	extractor := jwtExtractor{tokQryKey: j.tokQryKey}
+	extractor := jwtExtractor{tokQryKey: h.tokQryKey}
 	p := &jwt.Parser{UseJSONNumber: true}
-	tok, err := jwtreq.ParseFromRequest(req, extractor, j.keyFunc(req.Context()), jwtreq.WithParser(p))
+	tok, err := jwtreq.ParseFromRequest(req, extractor, h.keyFunc(req.Context()), jwtreq.WithParser(p))
 	if err != nil {
 		var jwtErr *jwt.ValidationError
 		if errors.As(err, &jwtErr) && jwtErr.Errors&jwt.ValidationErrorUnverifiable != 0 {
@@ -154,14 +153,14 @@ func (j *jwtAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if j.validateCustomClaims != nil {
-		if !j.validateCustomClaims(tok.Claims.(jwt.MapClaims)) {
+	if h.validateCustomClaims != nil {
+		if !h.validateCustomClaims(tok.Claims.(jwt.MapClaims)) {
 			rw.WriteHeader(http.StatusForbidden)
 			return
 		}
 	}
 
-	hdrs, err := expr.PluckClaims(j.fwdHeaders, tok.Claims.(jwt.MapClaims))
+	hdrs, err := expr.PluckClaims(h.fwdHeaders, tok.Claims.(jwt.MapClaims))
 	if err != nil {
 		l.Error().Err(err).Msg("Unable to set forwarded header")
 		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -172,10 +171,6 @@ func (j *jwtAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		for _, val := range vals {
 			rw.Header().Add(name, val)
 		}
-	}
-
-	if j.stripAuthorization {
-		rw.Header().Del("Authorization")
 	}
 
 	rw.WriteHeader(http.StatusOK)
@@ -202,7 +197,7 @@ func (j jwtExtractor) ExtractToken(req *http.Request) (string, error) {
 }
 
 // keyFunc returns a function to find the correct key to validate its given JWT's signature.
-func (j *jwtAuth) keyFunc(ctx context.Context) jwt.Keyfunc {
+func (h *Handler) keyFunc(ctx context.Context) jwt.Keyfunc {
 	return func(tok *jwt.Token) (key interface{}, err error) {
 		var prefix string
 		if len(tok.Method.Alg()) > 2 {
@@ -214,19 +209,19 @@ func (j *jwtAuth) keyFunc(ctx context.Context) jwt.Keyfunc {
 		switch prefix {
 		case "RS", "ES":
 			if kid != "" {
-				return j.resolveKey(ctx, tok, kid)
+				return h.resolveKey(ctx, tok, kid)
 			}
 
-			if j.pubKey == nil {
+			if h.pubKey == nil {
 				return nil, errors.New("no public key configured")
 			}
-			return j.pubKey, nil
+			return h.pubKey, nil
 
 		case "HS":
-			if j.signingSecret == "" {
+			if h.signingSecret == "" {
 				return nil, errors.New("no signing secret configured")
 			}
-			return []byte(j.signingSecret), nil
+			return []byte(h.signingSecret), nil
 
 		default:
 			return nil, fmt.Errorf("unsupported signing algorithm %q", tok.Method.Alg())
@@ -235,8 +230,8 @@ func (j *jwtAuth) keyFunc(ctx context.Context) jwt.Keyfunc {
 }
 
 // resolveKey finds the correct key that was used to sign the given JWT.
-func (j *jwtAuth) resolveKey(ctx context.Context, tok *jwt.Token, kid string) (interface{}, error) {
-	ks := j.keySet
+func (h *Handler) resolveKey(ctx context.Context, tok *jwt.Token, kid string) (key interface{}, err error) {
+	ks := h.keySet
 	if ks == nil {
 		c, ok := tok.Claims.(jwt.MapClaims)
 		if !ok {
@@ -251,8 +246,7 @@ func (j *jwtAuth) resolveKey(ctx context.Context, tok *jwt.Token, kid string) (i
 			return nil, errors.New("expected `iss` claim to be a string")
 		}
 
-		var err error
-		ks, err = j.remoteKeySet(c["iss"].(string))
+		ks, err = h.remoteKeySet(c["iss"].(string))
 		if err != nil {
 			return nil, err
 		}
@@ -270,33 +264,33 @@ func (j *jwtAuth) resolveKey(ctx context.Context, tok *jwt.Token, kid string) (i
 }
 
 // remoteKeySet returns the remote key set for the given issuer, or creates a new one if none is found.
-func (j *jwtAuth) remoteKeySet(iss string) (*RemoteKeySet, error) {
+func (h *Handler) remoteKeySet(iss string) (*RemoteKeySet, error) {
 	base, err := url.Parse(iss)
 	if err != nil {
 		return nil, err
 	}
 
-	parsed, err := base.Parse(j.jwksURL)
+	parsed, err := base.Parse(h.jwksURL)
 	if err != nil {
 		return nil, err
 	}
 
 	ksURL := parsed.String()
 
-	j.dynKeySetsMu.RLock()
-	rks, ok := j.dynKeySets[ksURL]
-	j.dynKeySetsMu.RUnlock()
+	h.dynKeySetsMu.RLock()
+	rks, ok := h.dynKeySets[ksURL]
+	h.dynKeySetsMu.RUnlock()
 	if ok {
 		return rks, nil
 	}
 
-	j.dynKeySetsMu.Lock()
-	rks = j.dynKeySets[ksURL]
+	h.dynKeySetsMu.Lock()
+	rks = h.dynKeySets[ksURL]
 	if rks == nil {
 		rks = NewRemoteKeySet(ksURL)
-		j.dynKeySets[ksURL] = rks
+		h.dynKeySets[ksURL] = rks
 	}
-	j.dynKeySetsMu.Unlock()
+	h.dynKeySetsMu.Unlock()
 
 	return rks, nil
 }

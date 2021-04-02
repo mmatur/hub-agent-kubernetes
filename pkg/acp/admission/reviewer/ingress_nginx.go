@@ -122,7 +122,6 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("marshal ingress patch: %w", err)
 	}
-
 	return b, nil
 }
 

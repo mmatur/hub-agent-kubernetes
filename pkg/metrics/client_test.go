@@ -52,10 +52,8 @@ func TestClient_GetConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg, err := client.GetConfig(context.Background(), true)
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		return
-	}
 	assert.Equal(t, 5*time.Minute, cfg.Interval)
 	assert.Equal(t, []string{"1m", "10m"}, cfg.Tables)
 	wantPnts := map[string][]metrics.DataPointGroup{

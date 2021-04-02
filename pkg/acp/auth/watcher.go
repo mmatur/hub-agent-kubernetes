@@ -10,6 +10,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/neo-agent/pkg/acp"
+	"github.com/traefik/neo-agent/pkg/acp/basicauth"
+	"github.com/traefik/neo-agent/pkg/acp/digestauth"
 	"github.com/traefik/neo-agent/pkg/acp/jwt"
 	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,8 +26,8 @@ import (
 // Watcher watches access control policy resources and builds configurations out of them.
 type Watcher struct {
 	configsMu sync.RWMutex
-	configs   map[string]acp.Config
-	previous  map[string]acp.Config
+	configs   map[string]*acp.Config
+	previous  map[string]*acp.Config
 
 	refresh chan struct{}
 
@@ -36,7 +38,7 @@ type Watcher struct {
 // once every throttle.
 func NewWatcher(switcher *HTTPHandlerSwitcher) *Watcher {
 	return &Watcher{
-		configs:  make(map[string]acp.Config),
+		configs:  make(map[string]*acp.Config),
 		refresh:  make(chan struct{}, 1),
 		switcher: switcher,
 	}
@@ -54,7 +56,7 @@ func (w *Watcher) Run(ctx context.Context) {
 				continue
 			}
 
-			cfgs := make(map[string]acp.Config, len(w.configs))
+			cfgs := make(map[string]*acp.Config, len(w.configs))
 			for k, v := range w.configs {
 				cfgs[k] = v
 			}
@@ -91,7 +93,7 @@ func (w *Watcher) OnAdd(obj interface{}) {
 	}
 
 	w.configsMu.Lock()
-	w.configs[canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)] = fromPolicy(v)
+	w.configs[canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)] = acp.ConfigFromPolicy(v)
 	w.configsMu.Unlock()
 
 	select {
@@ -112,7 +114,7 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 	}
 
 	polName := canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)
-	cfg := fromPolicy(v)
+	cfg := acp.ConfigFromPolicy(v)
 
 	w.configsMu.Lock()
 	w.configs[polName] = cfg
@@ -153,33 +155,13 @@ func canonicalName(name, ns string) string {
 	return name + "@" + ns
 }
 
-func fromPolicy(policy *neov1alpha1.AccessControlPolicy) acp.Config {
-	var c acp.Config
-
-	if jwtCfg := policy.Spec.JWT; jwtCfg != nil {
-		c.JWT = &jwt.Config{
-			SigningSecret:              jwtCfg.SigningSecret,
-			SigningSecretBase64Encoded: jwtCfg.SigningSecretBase64Encoded,
-			PublicKey:                  jwtCfg.PublicKey,
-			JWKsFile:                   jwt.FileOrContent(jwtCfg.JWKsFile),
-			JWKsURL:                    jwtCfg.JWKsURL,
-			StripAuthorizationHeader:   jwtCfg.StripAuthorizationHeader,
-			ForwardHeaders:             jwtCfg.ForwardHeaders,
-			TokenQueryKey:              jwtCfg.TokenQueryKey,
-			Claims:                     jwtCfg.Claims,
-		}
-	}
-
-	return c
-}
-
-func buildRoutes(cfgs map[string]acp.Config) (http.Handler, error) {
+func buildRoutes(cfgs map[string]*acp.Config) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	for name, cfg := range cfgs {
 		switch {
 		case cfg.JWT != nil:
-			jwtHandler, err := jwt.New(cfg.JWT, name)
+			jwtHandler, err := jwt.NewHandler(cfg.JWT, name)
 			if err != nil {
 				return nil, fmt.Errorf("create %q JWT ACP handler: %w", name, err)
 			}
@@ -189,6 +171,25 @@ func buildRoutes(cfgs map[string]acp.Config) (http.Handler, error) {
 			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering JWT ACP handler")
 
 			mux.Handle(path, jwtHandler)
+
+		case cfg.BasicAuth != nil:
+			h, err := basicauth.NewHandler(cfg.BasicAuth, name)
+			if err != nil {
+				return nil, fmt.Errorf("create %q basic auth ACP handler: %w", name, err)
+			}
+			path := "/" + name
+			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering basic auth ACP handler")
+			mux.Handle(path, h)
+
+		case cfg.DigestAuth != nil:
+			h, err := digestauth.NewHandler(cfg.DigestAuth, name)
+			if err != nil {
+				return nil, fmt.Errorf("create %q digest auth ACP handler: %w", name, err)
+			}
+			path := "/" + name
+			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering digest auth ACP handler")
+			mux.Handle(path, h)
+
 		default:
 			return nil, errors.New("unknown ACP handler type")
 		}

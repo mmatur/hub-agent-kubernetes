@@ -11,6 +11,8 @@ import (
 	"github.com/traefik/neo-agent/pkg/acp/admission"
 	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
 	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/neo-agent/pkg/acp/basicauth"
+	"github.com/traefik/neo-agent/pkg/acp/digestauth"
 	"github.com/traefik/neo-agent/pkg/acp/jwt"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -316,7 +318,7 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 		},
 		{
-			desc: "Remove neo authentication",
+			desc: "Remove authentication",
 			config: acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
@@ -375,6 +377,116 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "Patches between existing snippets",
+			config: acp.Config{
+				JWT: &jwt.Config{
+					StripAuthorizationHeader: false,
+				},
+			},
+			ingAnnotation: map[string]string{
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"custom-annotation":                                 "foobar",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-bad-policy@test;}\n##neo-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end\n# Stuff after.",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "\n# Stuff after.",
+			},
+		},
+		{
+			desc: "Remove neo authentication with custom snippets present",
+			config: acp.Config{
+				JWT: &jwt.Config{
+					StripAuthorizationHeader: true,
+				},
+			},
+			ingAnnotation: map[string]string{
+				"custom-annotation":                                 "foobar",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
+				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":         "foobar",
+				"nginx.org/server-snippets": "# Stuff before.\n",
+			},
+		},
+		{
+			desc: "Add basic authentication with username and strip authorization",
+			config: acp.Config{
+				BasicAuth: &basicauth.Config{
+					Users:                    []string{"user:password"},
+					StripAuthorizationHeader: true,
+					ForwardUsernameHeader:    "User",
+				},
+			},
+			ingAnnotation: map[string]string{
+				"custom-annotation":        "foobar",
+				reviewer.AnnotationNeoAuth: "my-policy",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
+				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+			},
+		},
+		{
+			desc: "Add basic authentication with username and strip authorization",
+			config: acp.Config{
+				DigestAuth: &digestauth.Config{
+					Users:                    []string{"user:password"},
+					StripAuthorizationHeader: true,
+					ForwardUsernameHeader:    "User",
+				},
+			},
+			ingAnnotation: map[string]string{
+				"custom-annotation":        "foobar",
+				reviewer.AnnotationNeoAuth: "my-policy",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
+				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+			},
+		},
+		{
+			desc: "Preserve previous snippet annotations",
+			config: acp.Config{
+				JWT: &jwt.Config{
+					SigningSecret: "secret",
+				},
+			},
+			ingAnnotation: map[string]string{
+				"custom-annotation":                                 "foobar",
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
+				"nginx.org/location-snippets":                       "# Stuff before.",
+				"nginx.org/server-snippets":                         "# Stuff before.",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				reviewer.AnnotationNeoAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
+			},
+		},
+		{
+			desc: "Patch between existing snippets",
 			config: acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: false,

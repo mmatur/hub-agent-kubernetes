@@ -16,7 +16,9 @@ type AccessControlPolicy struct {
 
 // AccessControlPolicySpec configures an access control policy.
 type AccessControlPolicySpec struct {
-	JWT *AccessControlPolicyJWT `json:"jwt"`
+	JWT        *AccessControlPolicyJWT        `json:"jwt"`
+	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth"`
+	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth"`
 }
 
 // AccessControlPolicyJWT configures a JWT access control policy.
@@ -30,6 +32,22 @@ type AccessControlPolicyJWT struct {
 	ForwardHeaders             map[string]string `json:"forwardHeaders"`
 	TokenQueryKey              string            `json:"tokenQueryKey"`
 	Claims                     string            `json:"claims"`
+}
+
+// AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
+type AccessControlPolicyBasicAuth struct {
+	Users                    string `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader"`
+}
+
+// AccessControlPolicyDigestAuth holds the HTTP digest authentication configuration.
+type AccessControlPolicyDigestAuth struct {
+	Users                    string `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

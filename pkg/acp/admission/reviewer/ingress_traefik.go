@@ -242,10 +242,9 @@ func (r *TraefikIngress) findFwdAuthMiddleware(ctx context.Context, name, namesp
 }
 
 func (r *TraefikIngress) newFwdAuthMiddlewareSpec(canonicalPolName string, cfg *acp.Config) (traefikv1alpha1.MiddlewareSpec, error) {
-	var spec traefikv1alpha1.MiddlewareSpec
+	var authResponseHeaders []string
 	switch {
 	case cfg.JWT != nil:
-		var authResponseHeaders []string
 		for headerName := range cfg.JWT.ForwardHeaders {
 			authResponseHeaders = append(authResponseHeaders, headerName)
 		}
@@ -253,19 +252,32 @@ func (r *TraefikIngress) newFwdAuthMiddlewareSpec(canonicalPolName string, cfg *
 		if cfg.JWT.StripAuthorizationHeader {
 			authResponseHeaders = append(authResponseHeaders, "Authorization")
 		}
-
-		spec = traefikv1alpha1.MiddlewareSpec{
-			ForwardAuth: &traefikv1alpha1.ForwardAuth{
-				Address:             r.agentAddress + "/" + canonicalPolName,
-				AuthResponseHeaders: authResponseHeaders,
-			},
+	case cfg.BasicAuth != nil:
+		if cfg.BasicAuth.ForwardUsernameHeader != "" {
+			authResponseHeaders = append(authResponseHeaders, cfg.BasicAuth.ForwardUsernameHeader)
 		}
 
+		if cfg.BasicAuth.StripAuthorizationHeader {
+			authResponseHeaders = append(authResponseHeaders, "Authorization")
+		}
+	case cfg.DigestAuth != nil:
+		if cfg.DigestAuth.ForwardUsernameHeader != "" {
+			authResponseHeaders = append(authResponseHeaders, cfg.DigestAuth.ForwardUsernameHeader)
+		}
+
+		if cfg.DigestAuth.StripAuthorizationHeader {
+			authResponseHeaders = append(authResponseHeaders, "Authorization")
+		}
 	default:
 		return traefikv1alpha1.MiddlewareSpec{}, errors.New("unknown ACP type")
 	}
 
-	return spec, nil
+	return traefikv1alpha1.MiddlewareSpec{
+		ForwardAuth: &traefikv1alpha1.ForwardAuth{
+			Address:             r.agentAddress + "/" + canonicalPolName,
+			AuthResponseHeaders: authResponseHeaders,
+		},
+	}, nil
 }
 
 func (r *TraefikIngress) createFwdAuthMiddleware(ctx context.Context, name, namespace, canonicalPolName string, cfg *acp.Config) error {

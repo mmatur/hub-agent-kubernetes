@@ -11,11 +11,10 @@ import (
 
 func TestValidateCustomClaims(t *testing.T) {
 	tests := []struct {
-		desc    string
-		claims  string
-		expr    string
-		want    bool
-		wantErr bool
+		desc   string
+		claims string
+		expr   string
+		want   bool
 	}{
 		{
 			desc:   "simple expression",
