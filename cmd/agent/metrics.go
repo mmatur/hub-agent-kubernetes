@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/rs/zerolog/log"
+	"github.com/traefik/neo-agent/pkg/logger"
 	"github.com/traefik/neo-agent/pkg/metrics"
 	"github.com/urfave/cli/v2"
 )
@@ -39,12 +41,13 @@ func metricsFlags() []cli.Flag {
 }
 
 func runMetrics(ctx context.Context, cliCtx *cli.Context) error {
-	retryableClient := retryablehttp.NewClient()
-	retryableClient.RetryWaitMin = time.Second
-	retryableClient.RetryWaitMax = 10 * time.Second
-	retryableClient.RetryMax = 4
+	rc := retryablehttp.NewClient()
+	rc.RetryWaitMin = time.Second
+	rc.RetryWaitMax = 10 * time.Second
+	rc.RetryMax = 4
+	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "metrics-service").Logger())
 
-	httpClient := retryableClient.StandardClient()
+	httpClient := rc.StandardClient()
 
 	client, err := metrics.NewClient(httpClient, cliCtx.String("platform-url"), cliCtx.String("token"))
 	if err != nil {

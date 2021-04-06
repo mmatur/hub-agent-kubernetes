@@ -1,4 +1,4 @@
-package kube
+package logger
 
 import (
 	"fmt"
@@ -8,31 +8,39 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// wrappedLogger wraps our logger and implements retryablehttp.LeveledLogger.
-type wrappedLogger struct {
+// WrappedLogger wraps our logger and implements retryablehttp.LeveledLogger.
+// The retry library we're using uses structured logging but sends fields as pairs of keys and values,
+// so we need to adapt them to our logger.
+type WrappedLogger struct {
 	logger zerolog.Logger
 }
 
-func (l wrappedLogger) Error(msg string, keysAndValues ...interface{}) {
+// NewWrappedLogger creates an implementation of the retryablehttp.LeveledLogger.
+func NewWrappedLogger(logger zerolog.Logger) *WrappedLogger {
+	return &WrappedLogger{logger: logger}
+}
+
+// Error starts a new message with error level.
+func (l WrappedLogger) Error(msg string, keysAndValues ...interface{}) {
 	logWithLevel(l.logger.Error(), msg, keysAndValues...)
 }
 
-func (l wrappedLogger) Info(msg string, keysAndValues ...interface{}) {
+// Info starts a new message with info level.
+func (l WrappedLogger) Info(msg string, keysAndValues ...interface{}) {
 	logWithLevel(l.logger.Info(), msg, keysAndValues...)
 }
 
-func (l wrappedLogger) Debug(msg string, keysAndValues ...interface{}) {
+// Debug starts a new message with debug level.
+func (l WrappedLogger) Debug(msg string, keysAndValues ...interface{}) {
 	logWithLevel(l.logger.Debug(), msg, keysAndValues...)
 }
 
-func (l wrappedLogger) Warn(msg string, keysAndValues ...interface{}) {
+// Warn starts a new message with warn level.
+func (l WrappedLogger) Warn(msg string, keysAndValues ...interface{}) {
 	logWithLevel(l.logger.Warn(), msg, keysAndValues...)
 }
 
 func logWithLevel(ev *zerolog.Event, msg string, kvs ...interface{}) {
-	// The retry library we're using uses structured logging but sends
-	// fields as pairs of keys and values, so we need to adapt them to
-	// our logger.
 	if len(kvs)%2 == 0 {
 		for i := 0; i < len(kvs)-1; i += 2 {
 			// The first item of the pair (the key) is supposed to be a string.

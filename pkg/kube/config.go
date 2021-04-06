@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/neo-agent/pkg/logger"
 	"k8s.io/client-go/rest"
 )
 
@@ -26,7 +27,8 @@ func InClusterConfigWithRetrier(maxRetries int) (*rest.Config, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = maxRetries
 	rc.HTTPClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
-	rc.Logger = wrappedLogger{logger: log.Logger.With().Str("component", "kubernetes_client").Logger()}
+	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "kubernetes_client").Logger())
+
 	rrt := &retryablehttp.RoundTripper{Client: rc}
 
 	wt := cfg.WrapTransport

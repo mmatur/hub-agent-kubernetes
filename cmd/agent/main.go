@@ -60,12 +60,14 @@ func allFlags() []cli.Flag {
 			Usage:   "Log format to use (json or console)",
 			EnvVars: []string{"LOG_FORMAT"},
 			Value:   "json",
+			Hidden:  true,
 		},
 		&cli.StringFlag{
 			Name:     "platform-url",
 			Usage:    "The URL at which to reach the Neo platform API",
 			EnvVars:  []string{"PLATFORM_URL"},
 			Required: true,
+			Hidden:   true,
 		},
 		&cli.StringFlag{
 			Name:     "token",
