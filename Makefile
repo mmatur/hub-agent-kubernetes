@@ -24,9 +24,13 @@ build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
 	CGO_ENABLED=0 go build -trimpath -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${BIN_NAME} ${MAIN_DIRECTORY}
 
+image: export GOOS := linux
+image: export GOARCH := amd64
 image: build
 	docker build -t gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) .
 
+image-dev: export GOOS := linux
+image-dev: export GOARCH := amd64
 image-dev: build
 	docker build -t neo-agent:dev .
 
