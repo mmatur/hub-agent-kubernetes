@@ -57,7 +57,7 @@ type Service struct {
 type Ingress struct {
 	Name           string                `json:"name"`
 	Namespace      string                `json:"namespace"`
-	ClusterID      string                `json:"clusterID"`
+	ClusterID      string                `json:"clusterId"`
 	Controller     string                `json:"controller,omitempty"`
 	Annotations    map[string]string     `json:"annotations,omitempty"`
 	TLS            []netv1.IngressTLS    `json:"tls,omitempty"`
