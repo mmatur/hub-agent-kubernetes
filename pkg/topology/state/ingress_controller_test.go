@@ -795,6 +795,25 @@ func TestGetControllerType(t *testing.T) {
 			expected:           true,
 			expectedController: "nginx-community",
 		},
+		{
+			desc: "Valid haproxy community controller image",
+			pod: &corev1.Pod{
+				TypeMeta:   metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "quay.io/jcmoraisjr/haproxy-ingress:latest",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			expected:           true,
+			expectedController: "haproxy-community",
+		},
 	}
 
 	for _, test := range tests {

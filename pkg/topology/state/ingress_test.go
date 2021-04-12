@@ -158,43 +158,118 @@ func Test_GetControllerName(t *testing.T) {
 		wantName       string
 	}{
 		{
-			desc: "No annotations",
+			desc: "No IngressClassName and annotation",
 			ingress: &netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
-			ingressClasses: []*netv1.IngressClass{},
 		},
 		{
-			desc: "Known ingress class with attribute",
+			desc: "IngressClassName matching traefik controller",
 			ingress: &netv1.Ingress{
 				Spec: netv1.IngressSpec{
-					IngressClassName: stringPtr("myingressclass"),
+					IngressClassName: stringPtr("foo"),
 				},
 			},
 			ingressClasses: []*netv1.IngressClass{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "myingressclass",
+						Name: "foo",
 					},
 					Spec: netv1.IngressClassSpec{
-						Controller: "myingressctrler",
+						Controller: ControllerTypeTraefik,
 					},
 				},
 			},
-			wantName: "myingressctrler",
+			wantName: IngressControllerTypeTraefik,
 		},
 		{
-			desc: "Known ingress class with annotation",
+			desc: "IngressClassName matching nginx official controller",
+			ingress: &netv1.Ingress{
+				Spec: netv1.IngressSpec{
+					IngressClassName: stringPtr("foo"),
+				},
+			},
+			ingressClasses: []*netv1.IngressClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: netv1.IngressClassSpec{
+						Controller: ControllerTypeNginxOfficial,
+					},
+				},
+			},
+			wantName: IngressControllerTypeNginxOfficial,
+		},
+		{
+			desc: "IngressClassName matching nginx community controller",
+			ingress: &netv1.Ingress{
+				Spec: netv1.IngressSpec{
+					IngressClassName: stringPtr("foo"),
+				},
+			},
+			ingressClasses: []*netv1.IngressClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: netv1.IngressClassSpec{
+						Controller: ControllerTypeNginxCommunity,
+					},
+				},
+			},
+			wantName: IngressControllerTypeNginxCommunity,
+		},
+		{
+			desc: "IngressClassName matching haproxy community controller",
+			ingress: &netv1.Ingress{
+				Spec: netv1.IngressSpec{
+					IngressClassName: stringPtr("foo"),
+				},
+			},
+			ingressClasses: []*netv1.IngressClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: netv1.IngressClassSpec{
+						Controller: ControllerTypeHAProxyCommunity,
+					},
+				},
+			},
+			wantName: IngressControllerTypeHAProxyCommunity,
+		},
+		{
+			desc: "IngressClassName matching unknown controller",
+			ingress: &netv1.Ingress{
+				Spec: netv1.IngressSpec{
+					IngressClassName: stringPtr("foo"),
+				},
+			},
+			ingressClasses: []*netv1.IngressClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: netv1.IngressClassSpec{
+						Controller: "my-ingress-controller",
+					},
+				},
+			},
+			wantName: "my-ingress-controller",
+		},
+		{
+			desc: "Unknown controller with annotation",
 			ingress: &netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"kubernetes.io/ingress.class": "myingressclass",
+						"kubernetes.io/ingress.class": "my-ingress-class",
 					},
 				},
 			},
-			wantName: "myingressclass",
+			wantName: "my-ingress-class",
 		},
 	}
 

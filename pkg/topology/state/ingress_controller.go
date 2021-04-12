@@ -14,10 +14,20 @@ import (
 )
 
 // Supported Ingress Controllers.
+// TODO: unify constants with ACP.
 const (
-	IngressControllerTypeTraefik        = "traefik"
-	IngressControllerTypeNginxOfficial  = "nginx"
-	IngressControllerTypeNginxCommunity = "nginx-community"
+	ControllerTypeNginxOfficial    = "nginx.org/ingress-controller"
+	ControllerTypeNginxCommunity   = "k8s.io/ingress-nginx"
+	ControllerTypeHAProxyCommunity = "haproxy-ingress.github.io/controller"
+	ControllerTypeTraefik          = "traefik.io/ingress-controller"
+)
+
+// Supported Ingress controller types.
+const (
+	IngressControllerTypeTraefik          = "traefik"
+	IngressControllerTypeNginxOfficial    = "nginx"
+	IngressControllerTypeNginxCommunity   = "nginx-community"
+	IngressControllerTypeHAProxyCommunity = "haproxy-community"
 )
 
 func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[string]*App) (map[string]*IngressController, error) {
@@ -108,7 +118,7 @@ func (f *Fetcher) fetchIngressClasses() ([]*netv1.IngressClass, error) {
 	return ingressClasses, nil
 }
 
-func setIngressClasses(result map[string]*IngressController, ingressClasses []*netv1.IngressClass) {
+func setIngressClasses(controllers map[string]*IngressController, ingressClasses []*netv1.IngressClass) {
 	// Ensure the order of IngressClasses always remains the same.
 	sort.Slice(ingressClasses, func(i, j int) bool {
 		return ingressClasses[i].Name < ingressClasses[j].Name
@@ -117,24 +127,28 @@ func setIngressClasses(result map[string]*IngressController, ingressClasses []*n
 	// TODO: Support custom controller values.
 	// TODO: Detect which ingress class is selected by which controller.
 	for _, ingressClass := range ingressClasses {
+		var ctrlType string
+
 		switch ingressClass.Spec.Controller {
-		case "k8s.io/ingress-nginx":
-			for _, controller := range result {
-				if controller.Type == IngressControllerTypeNginxCommunity {
-					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
-				}
-			}
-		case "nginx.org/ingress-controller":
-			for _, controller := range result {
-				if controller.Type == IngressControllerTypeNginxOfficial {
-					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
-				}
-			}
-		case "traefik.io/ingress-controller":
-			for _, controller := range result {
-				if controller.Type == IngressControllerTypeTraefik {
-					controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
-				}
+		case ControllerTypeNginxCommunity:
+			ctrlType = IngressControllerTypeNginxCommunity
+
+		case ControllerTypeNginxOfficial:
+			ctrlType = IngressControllerTypeNginxOfficial
+
+		case ControllerTypeTraefik:
+			ctrlType = IngressControllerTypeTraefik
+
+		case ControllerTypeHAProxyCommunity:
+			ctrlType = IngressControllerTypeHAProxyCommunity
+
+		default:
+			continue
+		}
+
+		for _, controller := range controllers {
+			if controller.Type == ctrlType {
+				controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
 			}
 		}
 	}
@@ -183,6 +197,9 @@ func getControllerType(pod *corev1.Pod) string {
 
 		case "k8s.gcr.io/ingress-nginx/controller":
 			return IngressControllerTypeNginxCommunity
+
+		case "quay.io/jcmoraisjr/haproxy-ingress":
+			return IngressControllerTypeHAProxyCommunity
 		}
 	}
 

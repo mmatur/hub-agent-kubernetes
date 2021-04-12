@@ -8,13 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// TODO: unify consts with ACP part after rebase.
-const (
-	ControllerAnnotationNginxOfficial  = "nginx.org/ingress-controller"
-	ControllerAnnotationNginxCommunity = "k8s.io/ingress-nginx"
-	ControllerAnnotationTraefik        = "traefik.io/ingress-controller"
-)
-
 func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 	ingresses, err := f.fetchIngresses()
 	if err != nil {
@@ -149,12 +142,18 @@ func getControllerName(ingress *netv1.Ingress, ingressClasses []*netv1.IngressCl
 	}
 
 	switch ingressClass.Spec.Controller {
-	case ControllerAnnotationNginxCommunity:
+	case ControllerTypeNginxCommunity:
 		return IngressControllerTypeNginxCommunity
-	case ControllerAnnotationNginxOfficial:
+
+	case ControllerTypeNginxOfficial:
 		return IngressControllerTypeNginxOfficial
-	case ControllerAnnotationTraefik:
+
+	case ControllerTypeTraefik:
 		return IngressControllerTypeTraefik
+
+	case ControllerTypeHAProxyCommunity:
+		return IngressControllerTypeHAProxyCommunity
+
 	default:
 		return ingressClass.Spec.Controller
 	}
