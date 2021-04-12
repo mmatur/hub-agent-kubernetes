@@ -101,12 +101,12 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([]b
 	}
 	snippets = mergeSnippets(snippets, ing.Metadata.Annotations)
 
-	if noPatchRequired(ing.Metadata.Annotations, snippets) {
+	if noNginxPatchRequired(ing.Metadata.Annotations, snippets) {
 		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("No patch required")
 		return nil, nil
 	}
 
-	setAnnotations(ing.Metadata.Annotations, snippets)
+	setNginxAnnotations(ing.Metadata.Annotations, snippets)
 
 	log.Ctx(ctx).Info().Str("acp_name", polName).Msg("Patching resource")
 
@@ -125,14 +125,14 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([]b
 	return b, nil
 }
 
-func noPatchRequired(anno map[string]string, snippets nginxSnippets) bool {
+func noNginxPatchRequired(anno map[string]string, snippets nginxSnippets) bool {
 	return anno["nginx.ingress.kubernetes.io/auth-url"] == snippets.AuthURL &&
 		anno["nginx.ingress.kubernetes.io/configuration-snippet"] == snippets.ConfigurationSnippet &&
 		anno["nginx.org/server-snippets"] == snippets.ServerSnippets &&
 		anno["nginx.org/location-snippets"] == snippets.LocationSnippets
 }
 
-func setAnnotations(anno map[string]string, snippets nginxSnippets) {
+func setNginxAnnotations(anno map[string]string, snippets nginxSnippets) {
 	anno["nginx.ingress.kubernetes.io/auth-url"] = snippets.AuthURL
 	anno["nginx.ingress.kubernetes.io/configuration-snippet"] = snippets.ConfigurationSnippet
 	anno["nginx.org/server-snippets"] = snippets.ServerSnippets

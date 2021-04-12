@@ -125,7 +125,8 @@ issues:
       linters:
         - goconst
     # False positive.
-    - path: pkg/acp/admission/reviewer/nginx_ingress_snippet.go
+    - path: pkg/acp/admission/reviewer/ingress_nginx_snippet.go
+      text: "G101: Potential hardcoded credentials"
       linters:
         - gosec
     - path: pkg/metrics/protocol/protocol.go

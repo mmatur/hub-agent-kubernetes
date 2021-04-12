@@ -47,7 +47,8 @@ type Handler struct {
 	dynKeySetsMu sync.RWMutex
 	dynKeySets   map[string]*RemoteKeySet
 
-	fwdHeaders map[string]string
+	stripAuthorization bool
+	fwdHeaders         map[string]string
 
 	validateCustomClaims expr.Predicate
 }
@@ -109,6 +110,7 @@ func NewHandler(cfg *Config, polName string) (*Handler, error) {
 		jwksURL:              cfg.JWKsURL,
 		keySet:               ks,
 		dynKeySets:           make(map[string]*RemoteKeySet),
+		stripAuthorization:   cfg.StripAuthorizationHeader,
 		fwdHeaders:           cfg.ForwardHeaders,
 		tokQryKey:            tokenQueryKey,
 		validateCustomClaims: pred,
@@ -171,6 +173,10 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		for _, val := range vals {
 			rw.Header().Add(name, val)
 		}
+	}
+
+	if h.stripAuthorization {
+		rw.Header().Add("Authorization", "")
 	}
 
 	rw.WriteHeader(http.StatusOK)

@@ -24,10 +24,11 @@ type Config struct {
 
 // Handler is a basic auth ACP Handler.
 type Handler struct {
-	auth            *goauth.BasicAuth
-	users           map[string]string
-	forwardUsername string
-	name            string
+	auth               *goauth.BasicAuth
+	users              map[string]string
+	forwardUsername    string
+	stripAuthorization bool
+	name               string
 }
 
 // NewHandler creates a new basic auth ACP Handler.
@@ -38,9 +39,10 @@ func NewHandler(cfg *Config, name string) (*Handler, error) {
 	}
 
 	h := &Handler{
-		users:           users,
-		forwardUsername: cfg.ForwardUsernameHeader,
-		name:            name,
+		users:              users,
+		forwardUsername:    cfg.ForwardUsernameHeader,
+		stripAuthorization: cfg.StripAuthorizationHeader,
+		name:               name,
 	}
 
 	realm := defaultRealm
@@ -53,7 +55,7 @@ func NewHandler(cfg *Config, name string) (*Handler, error) {
 	return h, nil
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	l := log.With().Str("handler_type", "BasicAuth").Str("handler_name", h.name).Logger()
 
 	username, password, ok := req.BasicAuth()
@@ -67,15 +69,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		l.Debug().Msg("Authentication failed")
 
-		h.auth.RequireAuth(w, req)
+		h.auth.RequireAuth(rw, req)
 		return
 	}
 
 	if h.forwardUsername != "" {
-		w.Header().Set(h.forwardUsername, username)
+		rw.Header().Set(h.forwardUsername, username)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if h.stripAuthorization {
+		rw.Header().Add("Authorization", "")
+	}
+
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) secretBasic(user, _ string) string {

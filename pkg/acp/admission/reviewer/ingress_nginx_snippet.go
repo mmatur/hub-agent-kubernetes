@@ -1,7 +1,6 @@
 package reviewer
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -37,36 +36,6 @@ func genSnippets(polName string, polCfg *acp.Config, agentAddr string) (nginxSni
 		LocationSnippets:     wrapNeoSnippet(fmt.Sprintf("auth_request /auth;\n%s", locSnip)),
 		ServerSnippets:       wrapNeoSnippet(fmt.Sprintf("location /auth {proxy_pass %s/%s;}", agentAddr, polName)),
 	}, nil
-}
-
-func headerToForward(cfg *acp.Config) ([]string, error) {
-	var headerToFwd []string
-	switch {
-	case cfg.JWT != nil:
-		for headerName := range cfg.JWT.ForwardHeaders {
-			headerToFwd = append(headerToFwd, headerName)
-		}
-		if cfg.JWT.StripAuthorizationHeader {
-			headerToFwd = append(headerToFwd, "Authorization")
-		}
-	case cfg.BasicAuth != nil:
-		if headerName := cfg.BasicAuth.ForwardUsernameHeader; headerName != "" {
-			headerToFwd = append(headerToFwd, headerName)
-		}
-		if cfg.BasicAuth.StripAuthorizationHeader {
-			headerToFwd = append(headerToFwd, "Authorization")
-		}
-	case cfg.DigestAuth != nil:
-		if headerName := cfg.DigestAuth.ForwardUsernameHeader; headerName != "" {
-			headerToFwd = append(headerToFwd, headerName)
-		}
-		if cfg.DigestAuth.StripAuthorizationHeader {
-			headerToFwd = append(headerToFwd, "Authorization")
-		}
-	default:
-		return nil, errors.New("unsupported ACP type")
-	}
-	return headerToFwd, nil
 }
 
 func generateLocationSnippet(headerToForward []string) string {

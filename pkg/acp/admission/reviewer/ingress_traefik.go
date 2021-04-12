@@ -242,33 +242,8 @@ func (r *TraefikIngress) findFwdAuthMiddleware(ctx context.Context, name, namesp
 }
 
 func (r *TraefikIngress) newFwdAuthMiddlewareSpec(canonicalPolName string, cfg *acp.Config) (traefikv1alpha1.MiddlewareSpec, error) {
-	var authResponseHeaders []string
-	switch {
-	case cfg.JWT != nil:
-		for headerName := range cfg.JWT.ForwardHeaders {
-			authResponseHeaders = append(authResponseHeaders, headerName)
-		}
-
-		if cfg.JWT.StripAuthorizationHeader {
-			authResponseHeaders = append(authResponseHeaders, "Authorization")
-		}
-	case cfg.BasicAuth != nil:
-		if cfg.BasicAuth.ForwardUsernameHeader != "" {
-			authResponseHeaders = append(authResponseHeaders, cfg.BasicAuth.ForwardUsernameHeader)
-		}
-
-		if cfg.BasicAuth.StripAuthorizationHeader {
-			authResponseHeaders = append(authResponseHeaders, "Authorization")
-		}
-	case cfg.DigestAuth != nil:
-		if cfg.DigestAuth.ForwardUsernameHeader != "" {
-			authResponseHeaders = append(authResponseHeaders, cfg.DigestAuth.ForwardUsernameHeader)
-		}
-
-		if cfg.DigestAuth.StripAuthorizationHeader {
-			authResponseHeaders = append(authResponseHeaders, "Authorization")
-		}
-	default:
+	authResponseHeaders, err := headerToForward(cfg)
+	if err != nil {
 		return traefikv1alpha1.MiddlewareSpec{}, errors.New("unknown ACP type")
 	}
 

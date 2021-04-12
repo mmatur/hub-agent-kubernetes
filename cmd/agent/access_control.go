@@ -151,6 +151,7 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 	reviewers := []admission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
 		reviewer.NewTraefikIngress(authServerAddr, ingClassWatcher, polGetter, traefikClientSet.TraefikV1alpha1()),
+		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 
 	return admission.NewHandler(reviewers), nil
