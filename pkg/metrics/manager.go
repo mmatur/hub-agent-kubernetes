@@ -30,7 +30,7 @@ func NewManager(client *Client, store *Store, scraper *Scraper) *Manager {
 }
 
 // Run runs the metrics manager. This is a blocking method.
-func (m *Manager) Run(ctx context.Context, scrapeIntvl time.Duration, kind, name string, urls []string) error {
+func (m *Manager) Run(ctx context.Context, scrapeIntvl time.Duration, kind, name string, urls []string, ingressSvcs map[string][]string) error {
 	cfg, err := m.client.GetConfig(ctx, true)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (m *Manager) Run(ctx context.Context, scrapeIntvl time.Duration, kind, name
 		}
 	}
 
-	go m.startScraper(ctx, scrapeIntvl, kind, name, urls)
+	go m.startScraper(ctx, scrapeIntvl, kind, name, urls, ingressSvcs)
 
 	m.runSender(ctx, cfg.Interval, cfg.Tables)
 
@@ -84,9 +84,10 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	for _, name := range tbls {
 		tbl := name
 
-		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(ic, svc string, pnts DataPoints) {
+		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(ic, ingr, svc string, pnts DataPoints) {
 			toSend[tbl] = append(toSend[tbl], DataPointGroup{
 				IngressController: ic,
+				Ingress:           ingr,
 				Service:           svc,
 				DataPoints:        pnts,
 			})
@@ -109,8 +110,8 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	return nil
 }
 
-func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, name string, urls []string) {
-	mtrcs, err := m.scraper.Scrape(ctx, kind, urls)
+func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, name string, urls []string, ingressSvcs map[string][]string) {
+	mtrcs, err := m.scraper.Scrape(ctx, kind, urls, ingressSvcs)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to scrape metrics")
 		return
@@ -125,35 +126,37 @@ func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, n
 	tick := time.NewTicker(intvl)
 	defer tick.Stop()
 
+	scrapeSec := int64(scrapeInterval.Seconds())
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
 		case <-tick.C:
-			mtrcs, err = m.scraper.Scrape(ctx, kind, urls)
+			mtrcs, err = m.scraper.Scrape(ctx, kind, urls, ingressSvcs)
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to scrape metrics")
 				return
 			}
 
-			svcs := Aggregate(mtrcs)
+			mtrcSet := Aggregate(mtrcs)
 
 			ts := time.Now().UTC().Truncate(time.Minute).Unix()
 
-			pnts := make(map[string]DataPoint, len(svcs))
-			for svc, mtrc := range svcs {
-				mtrc = mtrc.RelativeTo(ref[svc])
+			pnts := make(map[SetKey]DataPoint, len(mtrcSet))
+			for key, mtrc := range mtrcSet {
+				mtrc = mtrc.RelativeTo(ref[key])
 
 				pnt := mtrc.ToDataPoint(int64(intvl / time.Second))
 				pnt.Timestamp = ts
+				pnt.Seconds = scrapeSec
 
-				pnts[svc] = pnt
+				pnts[key] = pnt
 			}
 
 			m.store.Insert(name, pnts)
 
-			ref = svcs
+			ref = mtrcSet
 		}
 	}
 }

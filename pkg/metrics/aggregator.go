@@ -18,7 +18,7 @@ func (p DataPoints) Aggregate() DataPoint {
 	newPnt := DataPoint{}
 
 	for _, pnt := range p {
-		newPnt.ReqPerS += pnt.ReqPerS
+		newPnt.Seconds += pnt.Seconds
 		newPnt.Requests += pnt.Requests
 		newPnt.RequestErrs += pnt.RequestErrs
 		newPnt.RequestClientErrs += pnt.RequestClientErrs
@@ -26,14 +26,18 @@ func (p DataPoints) Aggregate() DataPoint {
 		newPnt.ResponseTimeCount += pnt.ResponseTimeCount
 	}
 
-	newPnt.ReqPerS /= float64(len(p))
+	if newPnt.Seconds > 0 {
+		newPnt.ReqPerS = float64(newPnt.Requests) / float64(newPnt.Seconds)
+		newPnt.RequestErrPerS = float64(newPnt.RequestErrs) / float64(newPnt.Seconds)
+		newPnt.RequestClientErrPerS = float64(newPnt.RequestClientErrs) / float64(newPnt.Seconds)
+	}
 
 	if newPnt.ResponseTimeCount > 0 {
 		newPnt.AvgResponseTime = newPnt.ResponseTimeSum / float64(newPnt.ResponseTimeCount)
 	}
 	if newPnt.Requests > 0 {
-		newPnt.RequestErrPer = float64(newPnt.RequestErrs) / float64(newPnt.Requests)
-		newPnt.RequestClientErrPer = float64(newPnt.RequestClientErrs) / float64(newPnt.Requests)
+		newPnt.RequestErrPercent = float64(newPnt.RequestErrs) / float64(newPnt.Requests)
+		newPnt.RequestClientErrPercent = float64(newPnt.RequestClientErrs) / float64(newPnt.Requests)
 	}
 
 	return newPnt
@@ -42,6 +46,7 @@ func (p DataPoints) Aggregate() DataPoint {
 // DataPointGroup contains a unique group of data points (primary keys).
 type DataPointGroup struct {
 	IngressController string      `avro:"ingress_controller"`
+	Ingress           string      `avro:"ingress"`
 	Service           string      `avro:"service"`
 	DataPoints        []DataPoint `avro:"data_points"`
 }
@@ -50,11 +55,14 @@ type DataPointGroup struct {
 type DataPoint struct {
 	Timestamp int64 `avro:"timestamp"`
 
-	ReqPerS             float64 `avro:"req_per_s"`
-	RequestErrPer       float64 `avro:"request_error_per"`
-	RequestClientErrPer float64 `avro:"request_client_error_per"`
-	AvgResponseTime     float64 `avro:"avg_response_time"`
+	ReqPerS                 float64 `avro:"req_per_s"`
+	RequestErrPerS          float64 `avro:"request_error_per_s"`
+	RequestErrPercent       float64 `avro:"request_error_per"`
+	RequestClientErrPerS    float64 `avro:"request_client_error_per_s"`
+	RequestClientErrPercent float64 `avro:"request_client_error_per"`
+	AvgResponseTime         float64 `avro:"avg_response_time"`
 
+	Seconds           int64   `avro:"seconds"`
 	Requests          int64   `avro:"requests"`
 	RequestErrs       int64   `avro:"request_errors"`
 	RequestClientErrs int64   `avro:"request_client_errors"`
@@ -62,8 +70,14 @@ type DataPoint struct {
 	ResponseTimeCount int64   `avro:"response_time_count"`
 }
 
-// Service contains assembled metrics for a service.
-type Service struct {
+// SetKey contains the primary key of a metric set.
+type SetKey struct {
+	Ingress string
+	Service string
+}
+
+// MetricSet contains assembled metrics for an ingress or service.
+type MetricSet struct {
 	Requests            int64
 	RequestErrors       int64
 	RequestClientErrors int64
@@ -71,51 +85,57 @@ type Service struct {
 }
 
 // RelativeTo returns a service metric relative to o.
-func (s Service) RelativeTo(o Service) Service {
+func (s MetricSet) RelativeTo(o MetricSet) MetricSet {
 	s.Requests -= o.Requests
 	s.RequestErrors -= o.RequestErrors
 	s.RequestClientErrors -= o.RequestClientErrors
-	s.RequestDuration.Sum -= o.RequestDuration.Sum
-	s.RequestDuration.Count -= o.RequestDuration.Count
+	if !o.RequestDuration.Relative {
+		s.RequestDuration.Sum -= o.RequestDuration.Sum
+		s.RequestDuration.Count -= o.RequestDuration.Count
+	}
 	return s
 }
 
 // ToDataPoint returns a data point calculated from s.
-func (s Service) ToDataPoint(secs int64) DataPoint {
-	var responseTime, errPer, clientErrPer float64
+func (s MetricSet) ToDataPoint(secs int64) DataPoint {
+	var responseTime, errPercent, clientErrPercent float64
 	if s.RequestDuration.Count > 0 {
 		responseTime = s.RequestDuration.Sum / float64(s.RequestDuration.Count)
 	}
 	if s.Requests > 0 {
-		errPer = float64(s.RequestErrors) / float64(s.Requests)
-		clientErrPer = float64(s.RequestClientErrors) / float64(s.Requests)
+		errPercent = float64(s.RequestErrors) / float64(s.Requests)
+		clientErrPercent = float64(s.RequestClientErrors) / float64(s.Requests)
 	}
 
 	return DataPoint{
-		ReqPerS:             float64(s.Requests) / float64(secs),
-		RequestErrPer:       errPer,
-		RequestClientErrPer: clientErrPer,
-		AvgResponseTime:     responseTime,
-		Requests:            s.Requests,
-		RequestErrs:         s.RequestErrors,
-		RequestClientErrs:   s.RequestClientErrors,
-		ResponseTimeSum:     s.RequestDuration.Sum,
-		ResponseTimeCount:   s.RequestDuration.Count,
+		ReqPerS:                 float64(s.Requests) / float64(secs),
+		RequestErrPerS:          float64(s.RequestErrors) / float64(secs),
+		RequestErrPercent:       errPercent,
+		RequestClientErrPerS:    float64(s.RequestClientErrors) / float64(secs),
+		RequestClientErrPercent: clientErrPercent,
+		AvgResponseTime:         responseTime,
+		Requests:                s.Requests,
+		RequestErrs:             s.RequestErrors,
+		RequestClientErrs:       s.RequestClientErrors,
+		ResponseTimeSum:         s.RequestDuration.Sum,
+		ResponseTimeCount:       s.RequestDuration.Count,
 	}
 }
 
 // ServiceHistogram contains histogram metrics.
 type ServiceHistogram struct {
-	Sum   float64
-	Count int64
+	Relative bool
+	Sum      float64
+	Count    int64
 }
 
 // Aggregate aggregates metrics into a service metric set.
-func Aggregate(m []Metric) map[string]Service {
-	svcs := map[string]Service{}
+func Aggregate(m []Metric) map[SetKey]MetricSet {
+	svcs := map[SetKey]MetricSet{}
 
 	for _, metric := range m {
-		svc := svcs[metric.ServiceName()]
+		key := SetKey{Ingress: metric.IngressName(), Service: metric.ServiceName()}
+		svc := svcs[key]
 
 		switch val := metric.(type) {
 		case *Counter:
@@ -138,10 +158,11 @@ func Aggregate(m []Metric) map[string]Service {
 			dur := svc.RequestDuration
 			dur.Sum += val.Sum
 			dur.Count += int64(val.Count)
+			dur.Relative = val.Relative
 			svc.RequestDuration = dur
 		}
 
-		svcs[metric.ServiceName()] = svc
+		svcs[key] = svc
 	}
 
 	return svcs

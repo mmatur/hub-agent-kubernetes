@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/traefik/neo-agent/pkg/metrics"
 )
 
@@ -36,74 +37,89 @@ func TestDataPoints_GetHandlesNotFound(t *testing.T) {
 func TestDataPoints_Aggregate(t *testing.T) {
 	pnts := metrics.DataPoints{
 		{
-			ReqPerS:             10,
-			RequestErrPer:       10,
-			RequestClientErrPer: 10,
-			AvgResponseTime:     1,
-			Requests:            10,
-			RequestErrs:         1,
-			RequestClientErrs:   1,
-			ResponseTimeSum:     10,
-			ResponseTimeCount:   1,
+			ReqPerS:                 10,
+			RequestErrPerS:          10,
+			RequestErrPercent:       10,
+			RequestClientErrPerS:    10,
+			RequestClientErrPercent: 10,
+			AvgResponseTime:         1,
+			Seconds:                 60,
+			Requests:                10,
+			RequestErrs:             1,
+			RequestClientErrs:       2,
+			ResponseTimeSum:         10,
+			ResponseTimeCount:       1,
 		},
 		{
-			ReqPerS:             20,
-			RequestErrPer:       10,
-			RequestClientErrPer: 10,
-			AvgResponseTime:     1,
-			Requests:            20,
-			RequestErrs:         2,
-			RequestClientErrs:   2,
-			ResponseTimeSum:     20,
-			ResponseTimeCount:   2,
+			ReqPerS:                 20,
+			RequestErrPerS:          20,
+			RequestErrPercent:       10,
+			RequestClientErrPerS:    20,
+			RequestClientErrPercent: 10,
+			AvgResponseTime:         1,
+			Seconds:                 60,
+			Requests:                20,
+			RequestErrs:             2,
+			RequestClientErrs:       3,
+			ResponseTimeSum:         20,
+			ResponseTimeCount:       2,
 		},
 		{
-			ReqPerS:             30,
-			RequestErrPer:       10,
-			RequestClientErrPer: 10,
-			AvgResponseTime:     1,
-			Requests:            30,
-			RequestErrs:         3,
-			RequestClientErrs:   3,
-			ResponseTimeSum:     30,
-			ResponseTimeCount:   3,
+			ReqPerS:                 30,
+			RequestErrPerS:          30,
+			RequestErrPercent:       10,
+			RequestClientErrPerS:    30,
+			RequestClientErrPercent: 10,
+			AvgResponseTime:         1,
+			Seconds:                 60,
+			Requests:                30,
+			RequestErrs:             3,
+			RequestClientErrs:       4,
+			ResponseTimeSum:         30,
+			ResponseTimeCount:       3,
 		},
 	}
 
 	got := pnts.Aggregate()
 
-	assert.Equal(t, float64(20), got.ReqPerS)
-	assert.Equal(t, 0.1, got.RequestErrPer)
-	assert.Equal(t, 0.1, got.RequestClientErrPer)
+	assert.Equal(t, 0.3333333333333333, got.ReqPerS)
+	assert.Equal(t, 0.03333333333333333, got.RequestErrPerS)
+	assert.Equal(t, 0.1, got.RequestErrPercent)
+	assert.Equal(t, 0.05, got.RequestClientErrPerS)
+	assert.Equal(t, 0.15, got.RequestClientErrPercent)
 	assert.Equal(t, float64(10), got.AvgResponseTime)
+	assert.Equal(t, int64(180), got.Seconds)
 	assert.Equal(t, int64(60), got.Requests)
 	assert.Equal(t, int64(6), got.RequestErrs)
-	assert.Equal(t, int64(6), got.RequestClientErrs)
+	assert.Equal(t, int64(9), got.RequestClientErrs)
 	assert.Equal(t, float64(60), got.ResponseTimeSum)
 	assert.Equal(t, int64(6), got.ResponseTimeCount)
 }
 
 func TestAggregator_Aggregate(t *testing.T) {
 	ms := []metrics.Metric{
-		&metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 12},
-		&metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami", Value: 14},
-		&metrics.Counter{Name: metrics.MetricRequestClientErrors, Service: "default/whoami", Value: 14},
-		&metrics.Counter{Name: metrics.MetricRequests, Service: "default/whoami2", Value: 16},
-		&metrics.Counter{Name: metrics.MetricRequestErrors, Service: "default/whoami2", Value: 16},
+		&metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngress", Service: "default/whoami", Value: 12},
+		&metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngress", Service: "default/whoami", Value: 14},
+		&metrics.Counter{Name: metrics.MetricRequestClientErrors, Ingress: "myIngress", Service: "default/whoami", Value: 14},
+		&metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngress", Service: "default/whoami2", Value: 16},
+		&metrics.Counter{Name: metrics.MetricRequestErrors, Ingress: "myIngress", Service: "default/whoami2", Value: 16},
 		&metrics.Histogram{
 			Name:    metrics.MetricRequestDuration,
+			Ingress: "myIngress",
 			Service: "default/whoami",
 			Sum:     0.041072671000000005,
 			Count:   26,
 		},
 		&metrics.Histogram{
 			Name:    metrics.MetricRequestDuration,
+			Ingress: "myIngress",
 			Service: "default/whoami2",
 			Sum:     0.021072671000000005,
 			Count:   16,
 		},
 		&metrics.Histogram{
 			Name:    metrics.MetricRequestDuration,
+			Ingress: "myIngress",
 			Service: "default/whoami2",
 			Sum:     0.021072671000000005,
 			Count:   16,
@@ -112,10 +128,9 @@ func TestAggregator_Aggregate(t *testing.T) {
 
 	svcs := metrics.Aggregate(ms)
 
-	if !assert.Len(t, svcs, 2) {
-		return
-	}
-	assert.Equal(t, svcs["default/whoami"], metrics.Service{
+	require.Len(t, svcs, 2)
+
+	assert.Equal(t, svcs[metrics.SetKey{Ingress: "myIngress", Service: "default/whoami"}], metrics.MetricSet{
 		Requests:            26,
 		RequestErrors:       0,
 		RequestClientErrors: 14,
@@ -124,7 +139,7 @@ func TestAggregator_Aggregate(t *testing.T) {
 			Count: 26,
 		},
 	})
-	assert.Equal(t, svcs["default/whoami2"], metrics.Service{
+	assert.Equal(t, svcs[metrics.SetKey{Ingress: "myIngress", Service: "default/whoami2"}], metrics.MetricSet{
 		Requests:            16,
 		RequestErrors:       16,
 		RequestClientErrors: 0,

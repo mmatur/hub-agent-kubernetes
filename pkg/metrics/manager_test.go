@@ -44,7 +44,7 @@ func TestManager_SendsMetrics(t *testing.T) {
 	})
 
 	go func() {
-		err = m.Run(ctx, time.Second, metrics.ParserNginx, "test", []string{podSrv.URL})
+		err = m.Run(ctx, time.Second, metrics.ParserNginx, "test", []string{podSrv.URL}, map[string][]string{})
 
 		assert.NoError(t, err)
 	}()

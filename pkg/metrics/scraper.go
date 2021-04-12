@@ -16,6 +16,7 @@ import (
 const (
 	ParserNginx   = "nginx"
 	ParserTraefik = "traefik"
+	ParserHAProxy = "haproxy"
 )
 
 // Metric names.
@@ -28,12 +29,14 @@ const (
 
 // Metric represents a metric object.
 type Metric interface {
+	IngressName() string
 	ServiceName() string
 }
 
 // Counter represents a counter metric.
 type Counter struct {
 	Name    string
+	Ingress string
 	Service string
 	Value   uint64
 }
@@ -51,6 +54,11 @@ func CounterFromMetric(m *dto.Metric) *Counter {
 	}
 }
 
+// IngressName returns the metric ingress name.
+func (c Counter) IngressName() string {
+	return c.Ingress
+}
+
 // ServiceName returns the metric service name.
 func (c Counter) ServiceName() string {
 	return c.Service
@@ -58,10 +66,12 @@ func (c Counter) ServiceName() string {
 
 // Histogram represents a histogram metric.
 type Histogram struct {
-	Name    string
-	Service string
-	Sum     float64
-	Count   uint64
+	Name     string
+	Relative bool
+	Ingress  string
+	Service  string
+	Sum      float64
+	Count    uint64
 }
 
 // HistogramFromMetric returns a histogram metric from a prometheus
@@ -78,6 +88,11 @@ func HistogramFromMetric(m *dto.Metric) *Histogram {
 	}
 }
 
+// IngressName returns the metric ingress name.
+func (h Histogram) IngressName() string {
+	return h.Ingress
+}
+
 // ServiceName returns the metric service name.
 func (h Histogram) ServiceName() string {
 	return h.Service
@@ -85,7 +100,7 @@ func (h Histogram) ServiceName() string {
 
 // Parser represents a platform-specific metrics parser.
 type Parser interface {
-	Parse(m *dto.MetricFamily) []Metric
+	Parse(m *dto.MetricFamily, svcs map[string][]string) []Metric
 }
 
 // Scraper scrapes metrics from Prometheus.
@@ -94,6 +109,7 @@ type Scraper struct {
 
 	nginxParser   NginxParser
 	traefikParser TraefikParser
+	haproxyParser HAProxyParser
 }
 
 // NewScraper returns a scraper instance with parser p.
@@ -104,7 +120,7 @@ func NewScraper(c *http.Client) *Scraper {
 }
 
 // Scrape returns metrics scraped from all targets.
-func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string) ([]Metric, error) {
+func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, ingressSvcs map[string][]string) ([]Metric, error) {
 	// This is a naive approach and should be dealt with
 	// as an iterator later to control the amount of RAM
 	// used while scraping many targets with many services.
@@ -116,11 +132,23 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string) (
 		p = s.nginxParser
 	case ParserTraefik:
 		p = s.traefikParser
+	case ParserHAProxy:
+		p = s.haproxyParser
 	default:
 		return nil, fmt.Errorf("unvalid parser %q", parser)
 	}
 
 	var m []Metric
+
+	// Flip the relationship to make it quicker to look up.
+	svcIngresses := map[string][]string{}
+	for ingr, svcs := range ingressSvcs {
+		for _, svc := range svcs {
+			ingrs := svcIngresses[svc]
+			ingrs = append(ingrs, ingr)
+			svcIngresses[svc] = ingrs
+		}
+	}
 
 	for _, u := range targets {
 		raw, err := s.scrapeMetrics(ctx, u)
@@ -130,7 +158,7 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string) (
 		}
 
 		for _, v := range raw {
-			m = append(m, p.Parse(v)...)
+			m = append(m, p.Parse(v, svcIngresses)...)
 		}
 	}
 

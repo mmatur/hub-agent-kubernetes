@@ -32,6 +32,10 @@
                 "type": "string"
               },
               {
+                "name": "ingress",
+                "type": "string"
+              },
+              {
                 "name": "service",
                 "type": "string"
               },
@@ -53,7 +57,15 @@
                         "type": "double"
                       },
                       {
+                        "name": "request_error_per_s",
+                        "type": "double"
+                      },
+                      {
                         "name": "request_error_per",
+                        "type": "double"
+                      },
+                      {
+                        "name": "request_client_error_per_s",
                         "type": "double"
                       },
                       {
@@ -63,6 +75,10 @@
                       {
                         "name": "avg_response_time",
                         "type": "double"
+                      },
+                      {
+                        "name": "seconds",
+                        "type": "long"
                       },
                       {
                         "name": "requests",

@@ -31,7 +31,8 @@ func TestClient_GetConfig(t *testing.T) {
 				"1m": {
 					{
 						IngressController: "foo",
-						Service:           "bar",
+						Ingress:           "bar",
+						Service:           "baz",
 						DataPoints: []metrics.DataPoint{
 							{
 								Timestamp: 21,
@@ -60,7 +61,8 @@ func TestClient_GetConfig(t *testing.T) {
 		"1m": {
 			{
 				IngressController: "foo",
-				Service:           "bar",
+				Ingress:           "bar",
+				Service:           "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,
@@ -96,7 +98,8 @@ func TestClient_Send(t *testing.T) {
 		"1m": {
 			{
 				IngressController: "foo",
-				Service:           "bar",
+				Ingress:           "bar",
+				Service:           "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,
@@ -135,7 +138,8 @@ func TestClient_SendHandlesHTTPError(t *testing.T) {
 		"1m": {
 			{
 				IngressController: "foo",
-				Service:           "bar",
+				Ingress:           "bar",
+				Service:           "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,
