@@ -205,7 +205,7 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 		cluster.ExternalDNSes[objectKey(dnsName, "crd")] = externalDNS
 	}
 
-	cluster.AccessControlPolicies, err = f.getAccessControlPolicies()
+	cluster.AccessControlPolicies, err = f.getAccessControlPolicies(cluster.ID)
 	if err != nil {
 		return nil, err
 	}

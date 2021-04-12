@@ -48,6 +48,10 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 			},
 			want: map[string]*AccessControlPolicy{
 				"myacp@myns": {
+					Name:      "myacp",
+					Namespace: "myns",
+					ClusterID: "myclusterid",
+					Method:    "jwt",
 					JWT: &JWTAccessControl{
 						SigningSecret:              "redacted",
 						JWKsFile:                   "tata",
@@ -79,8 +83,74 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 			},
 			want: map[string]*AccessControlPolicy{
 				"myacp@myns": {
+					Name:      "myacp",
+					Namespace: "myns",
+					ClusterID: "myclusterid",
+					Method:    "jwt",
 					JWT: &JWTAccessControl{
 						Claims: "iss=titi",
+					},
+				},
+			},
+		},
+		{
+			desc: "Basic Auth access control policy",
+			objects: []runtime.Object{
+				&neov1alpha1.AccessControlPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myacp",
+						Namespace: "myns",
+					},
+					Spec: neov1alpha1.AccessControlPolicySpec{
+						BasicAuth: &neov1alpha1.AccessControlPolicyBasicAuth{
+							Users:                    "toto:secret,titi:secret",
+							Realm:                    "realm",
+							StripAuthorizationHeader: true,
+						},
+					},
+				},
+			},
+			want: map[string]*AccessControlPolicy{
+				"myacp@myns": {
+					Name:      "myacp",
+					Namespace: "myns",
+					ClusterID: "myclusterid",
+					Method:    "basicauth",
+					BasicAuth: &AccessControlPolicyBasicAuth{
+						Users:                    "toto:redacted,titi:redacted",
+						Realm:                    "realm",
+						StripAuthorizationHeader: true,
+					},
+				},
+			},
+		},
+		{
+			desc: "Digest Auth access control policy",
+			objects: []runtime.Object{
+				&neov1alpha1.AccessControlPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myacp",
+						Namespace: "myns",
+					},
+					Spec: neov1alpha1.AccessControlPolicySpec{
+						DigestAuth: &neov1alpha1.AccessControlPolicyDigestAuth{
+							Users:                    "toto:realm:secret,titi:realm:secret",
+							Realm:                    "myrealm",
+							StripAuthorizationHeader: true,
+						},
+					},
+				},
+			},
+			want: map[string]*AccessControlPolicy{
+				"myacp@myns": {
+					Name:      "myacp",
+					Namespace: "myns",
+					ClusterID: "myclusterid",
+					Method:    "digestauth",
+					DigestAuth: &AccessControlPolicyDigestAuth{
+						Users:                    "toto:realm:redacted,titi:realm:redacted",
+						Realm:                    "myrealm",
+						StripAuthorizationHeader: true,
 					},
 				},
 			},
@@ -98,7 +168,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 			f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
 			require.NoError(t, err)
 
-			got, err := f.getAccessControlPolicies()
+			got, err := f.getAccessControlPolicies("myclusterid")
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.want, got)

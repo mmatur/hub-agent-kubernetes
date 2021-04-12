@@ -75,7 +75,13 @@ type ExternalDNS struct {
 
 // AccessControlPolicy describes an Access Control Policy configured within a cluster.
 type AccessControlPolicy struct {
-	JWT *JWTAccessControl `json:"jwtAccessControl,omitempty"`
+	Name       string                         `json:"name"`
+	Namespace  string                         `json:"namespace"`
+	ClusterID  string                         `json:"clusterId"`
+	Method     string                         `json:"method"`
+	JWT        *JWTAccessControl              `json:"jwtAccessControl,omitempty"`
+	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
+	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth,omitempty"`
 }
 
 // JWTAccessControl describes the settings for JWT authentication within an access control policy.
@@ -89,4 +95,20 @@ type JWTAccessControl struct {
 	ForwardHeaders             map[string]string `json:"forwardHeaders,omitempty"`
 	TokenQueryKey              string            `json:"tokenQueryKey,omitempty"`
 	Claims                     string            `json:"claims,omitempty"`
+}
+
+// AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
+type AccessControlPolicyBasicAuth struct {
+	Users                    string `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
+}
+
+// AccessControlPolicyDigestAuth holds the HTTP digest authentication configuration.
+type AccessControlPolicyDigestAuth struct {
+	Users                    string `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
 }
