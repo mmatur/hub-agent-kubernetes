@@ -503,7 +503,6 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 					Type:           IngressControllerTypeNginxOfficial,
 					IngressClasses: []string{"barIngressClass"},
-					MetricsURLs:    []string{""},
 					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
@@ -607,7 +606,6 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 					Type:           IngressControllerTypeNginxOfficial,
 					IngressClasses: []string{"barIngressClass"},
-					MetricsURLs:    []string{""},
 					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
@@ -643,15 +641,43 @@ func TestGuessMetricsURL(t *testing.T) {
 		wantURL string
 	}{
 		{
-			desc: "Pod with ingress controller defaults",
+			desc: "Pod with traefik controller defaults",
+			ctrl: IngressControllerTypeTraefik,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:8080/metrics",
+		},
+		{
+			desc: "Pod with nginx community controller defaults",
 			ctrl: IngressControllerTypeNginxCommunity,
 			pod: &corev1.Pod{
 				Status: corev1.PodStatus{
 					PodIP: "1.2.3.4",
 				},
 			},
-
 			wantURL: "http://1.2.3.4:10254/metrics",
+		},
+		{
+			desc: "Pod with haproxy community controller defaults",
+			ctrl: IngressControllerTypeHAProxyCommunity,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:9101/metrics",
+		},
+		{
+			desc: "Pod with nginx official controller",
+			ctrl: IngressControllerTypeNginxOfficial,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
 		},
 		{
 			desc: "Pod with annotations",
@@ -666,7 +692,6 @@ func TestGuessMetricsURL(t *testing.T) {
 					PodIP: "1.2.3.4",
 				},
 			},
-
 			wantURL: "http://1.2.3.4:8443/metrics",
 		},
 	}

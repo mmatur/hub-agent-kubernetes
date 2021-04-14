@@ -53,21 +53,24 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 		}
 
 		app := findApp(apps, pod)
-
 		key := objectKey(app.Name, app.Namespace)
 
-		if ic, exists := result[key]; exists {
-			ic.MetricsURLs = append(ic.MetricsURLs, guessMetricsURL(controller, pod))
-			continue
+		ic, exists := result[key]
+		if !exists {
+			ic = &IngressController{
+				App:  app,
+				Type: controller,
+
+				// TODO What should we do if an IngressController does not have a service, log, status field?
+				PublicIPs: findPublicIPs(services, pod),
+			}
+
+			result[key] = ic
 		}
 
-		result[key] = &IngressController{
-			App:         app,
-			Type:        controller,
-			MetricsURLs: []string{guessMetricsURL(controller, pod)},
-
-			// TODO What should we do if an IngressController does not have a service, log, status field?
-			PublicIPs: findPublicIPs(services, pod),
+		metricsURL := guessMetricsURL(controller, pod)
+		if metricsURL != "" {
+			ic.MetricsURLs = append(ic.MetricsURLs, metricsURL)
 		}
 	}
 
@@ -169,6 +172,8 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 		port = "8080"
 	case IngressControllerTypeNginxCommunity:
 		port = "10254"
+	case IngressControllerTypeHAProxyCommunity:
+		port = "9101"
 	}
 
 	if pod.Annotations["prometheus.io/port"] != "" {
