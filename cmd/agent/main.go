@@ -23,14 +23,20 @@ func main() {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
+			topoWatch, err := newTopologyWatcher(ctx, cliCtx)
+			if err != nil {
+				return err
+			}
+
 			group, ctx := errgroup.WithContext(ctx)
 
 			group.Go(func() error {
-				return runMetrics(ctx, cliCtx)
+				return runMetrics(ctx, cliCtx, topoWatch)
 			})
 
 			group.Go(func() error {
-				return runTopologyWatcher(ctx, cliCtx)
+				topoWatch.Start(ctx)
+				return nil
 			})
 
 			group.Go(func() error { return accessControl(ctx, cliCtx) })
@@ -77,7 +83,6 @@ func allFlags() []cli.Flag {
 		},
 	}
 
-	flgs = append(flgs, metricsFlags()...)
 	flgs = append(flgs, authFlags()...)
 	flgs = append(flgs, acpFlags()...)
 

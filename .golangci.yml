@@ -19,7 +19,7 @@ linters-settings:
   misspell:
     locale: US
   funlen:
-    lines: 80
+    lines: -1
     statements: 50
   godox:
     keywords:
@@ -116,7 +116,6 @@ issues:
     - path: .*_test.go
       linters:
         - funlen
-        - unused
         - noctx
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:

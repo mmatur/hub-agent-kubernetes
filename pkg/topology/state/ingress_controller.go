@@ -184,6 +184,7 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 	if pod.Annotations["prometheus.io/path"] != "" {
 		path = pod.Annotations["prometheus.io/path"]
 	}
+	path = strings.TrimPrefix(path, "/")
 
 	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(pod.Status.PodIP, port), path)
 }

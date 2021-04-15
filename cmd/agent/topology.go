@@ -9,18 +9,16 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func runTopologyWatcher(ctx context.Context, cliCtx *cli.Context) error {
+func newTopologyWatcher(ctx context.Context, cliCtx *cli.Context) (*topology.Watcher, error) {
 	k8s, err := state.NewFetcher(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	s, err := store.New(ctx, cliCtx.String("token"), cliCtx.String("platform-url"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	topology.NewWatcher(k8s, s).Start(ctx)
-
-	return nil
+	return topology.NewWatcher(k8s, s), nil
 }

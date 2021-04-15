@@ -3,77 +3,130 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/neo-agent/pkg/topology/state"
 )
 
-const (
-	configInterval = 24 * time.Hour
-	scrapeInterval = time.Minute
-)
+const scrapeInterval = time.Minute
 
 // Manager orchestrates metrics scraping and sending.
 type Manager struct {
 	store   *Store
 	client  *Client
 	scraper *Scraper
+
+	sendMu     sync.Mutex
+	sendIntvl  time.Duration
+	sendTables []string
+
+	scraperMu sync.Mutex
+	scrapers  map[string]chan struct{}
+	stopped   bool
+	state     atomic.Value
 }
 
 // NewManager returns a manager.
 func NewManager(client *Client, store *Store, scraper *Scraper) *Manager {
 	return &Manager{
-		store:   store,
-		client:  client,
-		scraper: scraper,
+		store:      store,
+		client:     client,
+		scraper:    scraper,
+		sendIntvl:  time.Minute,
+		sendTables: []string{"1m", "10m", "1h", "1d"},
+		scrapers:   map[string]chan struct{}{},
+	}
+}
+
+// SetConfig updates the configuration of the metrics manager.
+func (m *Manager) SetConfig(sendInterval time.Duration, sendTables []string) {
+	m.sendMu.Lock()
+	defer m.sendMu.Unlock()
+
+	m.sendIntvl = sendInterval
+	m.sendTables = sendTables
+}
+
+// TopologyStateChanged is called every time the topology state changes.
+func (m *Manager) TopologyStateChanged(ctx context.Context, cluster *state.Cluster) {
+	m.scraperMu.Lock()
+	defer m.scraperMu.Unlock()
+
+	if m.stopped || cluster == nil {
+		return
+	}
+
+	m.state.Store(cluster)
+
+	// Start new scrapers.
+	for name, ic := range cluster.IngressControllers {
+		if _, ok := m.scrapers[name]; ok {
+			continue
+		}
+
+		doneCh := make(chan struct{})
+		m.scrapers[name] = doneCh
+		go m.startScraper(ctx, ic.Type, name, doneCh)
+	}
+
+	// Remove scrapers that no longer exist.
+	for name, doneCh := range m.scrapers {
+		if _, ok := cluster.IngressControllers[name]; ok {
+			continue
+		}
+
+		close(doneCh)
+		delete(m.scrapers, name)
 	}
 }
 
 // Run runs the metrics manager. This is a blocking method.
-func (m *Manager) Run(ctx context.Context, scrapeIntvl time.Duration, kind, name string, urls []string, ingressSvcs map[string][]string) error {
-	cfg, err := m.client.GetConfig(ctx, true)
+func (m *Manager) Run(ctx context.Context) error {
+	prevData, err := m.client.GetPreviousData(ctx, true)
 	if err != nil {
 		return err
 	}
 
-	for tbl, data := range cfg.PreviousData {
+	for tbl, data := range prevData {
 		if err = m.store.Populate(tbl, data); err != nil {
 			return fmt.Errorf("unable to populate table: %w", err)
 		}
 	}
 
-	go m.startScraper(ctx, scrapeIntvl, kind, name, urls, ingressSvcs)
-
-	m.runSender(ctx, cfg.Interval, cfg.Tables)
+	m.runSender(ctx)
 
 	return nil
 }
 
-func (m *Manager) runSender(ctx context.Context, sendInterval time.Duration, sendTables []string) {
-	cfgTicker := time.NewTicker(configInterval)
-	defer cfgTicker.Stop()
-
+func (m *Manager) runSender(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-cfgTicker.C:
-			cfg, err := m.client.GetConfig(ctx, false)
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to fetch metrics configuration")
-				continue
-			}
-
-			sendInterval = cfg.Interval
-			sendTables = cfg.Tables
-
-		case <-time.After(sendInterval):
-			if err := m.send(ctx, sendTables); err != nil {
+		case <-time.After(m.getSendInterval()):
+			if err := m.send(ctx, m.getSendTables()); err != nil {
 				log.Error().Err(err).Msg("Unable to send metrics")
 			}
 		}
 	}
+}
+
+func (m *Manager) getSendInterval() time.Duration {
+	m.sendMu.Lock()
+	defer m.sendMu.Unlock()
+
+	return m.sendIntvl
+}
+
+func (m *Manager) getSendTables() []string {
+	m.sendMu.Lock()
+	defer m.sendMu.Unlock()
+
+	return m.sendTables
 }
 
 func (m *Manager) send(ctx context.Context, tbls []string) error {
@@ -110,8 +163,8 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	return nil
 }
 
-func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, name string, urls []string, ingressSvcs map[string][]string) {
-	mtrcs, err := m.scraper.Scrape(ctx, kind, urls, ingressSvcs)
+func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-chan struct{}) {
+	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), m.getSvcIngresses())
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to scrape metrics")
 		return
@@ -119,21 +172,17 @@ func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, n
 
 	ref := Aggregate(mtrcs)
 
-	if intvl.Seconds() == 0 {
-		intvl = scrapeInterval
-	}
-
-	tick := time.NewTicker(intvl)
+	tick := time.NewTicker(scrapeInterval)
 	defer tick.Stop()
 
 	scrapeSec := int64(scrapeInterval.Seconds())
 	for {
 		select {
-		case <-ctx.Done():
+		case <-doneCh:
 			return
 
 		case <-tick.C:
-			mtrcs, err = m.scraper.Scrape(ctx, kind, urls, ingressSvcs)
+			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), m.getSvcIngresses())
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to scrape metrics")
 				return
@@ -147,7 +196,7 @@ func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, n
 			for key, mtrc := range mtrcSet {
 				mtrc = mtrc.RelativeTo(ref[key])
 
-				pnt := mtrc.ToDataPoint(int64(intvl / time.Second))
+				pnt := mtrc.ToDataPoint(scrapeSec)
 				pnt.Timestamp = ts
 				pnt.Seconds = scrapeSec
 
@@ -159,4 +208,44 @@ func (m *Manager) startScraper(ctx context.Context, intvl time.Duration, kind, n
 			ref = mtrcSet
 		}
 	}
+}
+
+func (m *Manager) getSvcIngresses() map[string][]string {
+	cluster := m.state.Load().(*state.Cluster)
+
+	svcIngresses := map[string][]string{}
+	for ingrName, ingr := range cluster.Ingresses {
+		for _, svc := range ingr.Services {
+			ingrs := svcIngresses[svc]
+			ingrs = append(ingrs, ingrName)
+			svcIngresses[svc] = ingrs
+		}
+	}
+
+	return svcIngresses
+}
+
+func (m *Manager) getIngressURLs(name string) []string {
+	cluster := m.state.Load().(*state.Cluster)
+
+	ctl, ok := cluster.IngressControllers[name]
+	if !ok {
+		return nil
+	}
+
+	return ctl.MetricsURLs
+}
+
+// Close stops of all the scrapers.
+func (m *Manager) Close() error {
+	m.scraperMu.Lock()
+	defer m.scraperMu.Unlock()
+
+	for _, doneCh := range m.scrapers {
+		close(doneCh)
+	}
+
+	m.stopped = true
+
+	return nil
 }

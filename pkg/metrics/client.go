@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/hamba/avro"
@@ -26,7 +25,6 @@ type Client struct {
 	baseURL    *url.URL
 	httpClient *http.Client
 
-	configSchema  avro.Schema
 	metricsSchema avro.Schema
 
 	token string
@@ -39,11 +37,6 @@ func NewClient(client *http.Client, baseURL, token string) (*Client, error) {
 		return nil, fmt.Errorf("invalid metrics client url: %w", err)
 	}
 
-	configSchema, err := avro.Parse(protocol.ConfigV1Schema)
-	if err != nil {
-		return nil, fmt.Errorf("invalid config schema: %w", err)
-	}
-
 	metricsSchema, err := avro.Parse(protocol.MetricsV1Schema)
 	if err != nil {
 		return nil, fmt.Errorf("invalid metrics schema: %w", err)
@@ -52,22 +45,17 @@ func NewClient(client *http.Client, baseURL, token string) (*Client, error) {
 	return &Client{
 		baseURL:       base,
 		httpClient:    client,
-		configSchema:  configSchema,
 		metricsSchema: metricsSchema,
 		token:         token,
 	}, nil
 }
 
-// GetConfig gets the agent configuration.
-func (c *Client) GetConfig(ctx context.Context, startup bool) (*Config, error) {
-	endpoint, err := c.baseURL.Parse("/config")
+// GetPreviousData gets the agent configuration.
+func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string][]DataPointGroup, error) {
+	endpoint, err := c.baseURL.Parse("/agent/data")
 	if err != nil {
-		return nil, fmt.Errorf("creating metrics config url: %w", err)
+		return nil, fmt.Errorf("creating metrics previous data url: %w", err)
 	}
-
-	qry := endpoint.Query()
-	qry.Set("startup", strconv.FormatBool(startup))
-	endpoint.RawQuery = qry.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -76,12 +64,10 @@ func (c *Client) GetConfig(ctx context.Context, startup bool) (*Config, error) {
 
 	c.setAuthHeader(req)
 	req.Header.Set("Accept", "avro/binary;v1")
-	// TODO Remove this Neo-Path header when token-service is release
-	req.Header.Set("Neo-Path", "/metrics")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("getting metrics config: %w", err)
+		return nil, fmt.Errorf("getting metrics previous data: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -91,20 +77,20 @@ func (c *Client) GetConfig(ctx context.Context, startup bool) (*Config, error) {
 	}
 
 	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("getting metrics config got %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("getting metrics previous data got %d: %s", resp.StatusCode, string(body))
 	}
 
-	var cfg Config
-	if err = avro.Unmarshal(c.configSchema, body, &cfg); err != nil {
+	data := map[string][]DataPointGroup{}
+	if err = avro.Unmarshal(c.metricsSchema, body, &data); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w: %s", err, string(body))
 	}
 
-	return &cfg, nil
+	return data, nil
 }
 
 // Send sends metrics to the metrics service.
 func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) error {
-	endpoint, err := c.baseURL.Parse("/")
+	endpoint, err := c.baseURL.Parse("/agent/metrics")
 	if err != nil {
 		return fmt.Errorf("creating metrics url: %w", err)
 	}
@@ -120,8 +106,6 @@ func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) err
 
 	c.setAuthHeader(req)
 	req.Header.Set("Content-Type", "avro/binary;v1")
-	// TODO Remove this Neo-Path header when token-service is release
-	req.Header.Set("Neo-Path", "/metrics")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

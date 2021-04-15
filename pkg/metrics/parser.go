@@ -83,7 +83,7 @@ func (p NginxParser) names(lbls []*dto.LabelPair) (ingress, service string) {
 	if namespace == "" || svc == "" || ingr == "" {
 		return "", ""
 	}
-	return namespace + "/" + ingr, namespace + "/" + svc
+	return ingr + "@" + namespace, svc + "@" + namespace
 }
 
 // TraefikParser parses Traefik metrics into a common form.
@@ -141,7 +141,12 @@ func (p TraefikParser) guessService(lbls []*dto.LabelPair, svcs map[string][]str
 	}
 
 	for svc, ingrs := range svcs {
-		guess := strings.Replace(svc, "/", "-", 1) + "-"
+		parts := strings.SplitN(svc, "@", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		guess := parts[1] + "-" + parts[0] + "-"
 		if strings.HasPrefix(name, guess) {
 			svcs["guessed@"+name] = append([]string{svc}, ingrs...)
 
@@ -211,8 +216,13 @@ func (p HAProxyParser) guessService(lbls []*dto.LabelPair, svcs map[string][]str
 	}
 
 	for svc, ingrs := range svcs {
+		parts := strings.SplitN(svc, "@", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
 		for _, sep := range []string{"_", "-"} {
-			guess := strings.Replace(svc, "/", sep, 1) + sep
+			guess := parts[1] + sep + parts[0] + sep
 			if strings.HasPrefix(name, guess) {
 				svcs["guessed@"+name] = append([]string{svc}, ingrs...)
 

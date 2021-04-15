@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/hamba/avro"
 	"github.com/stretchr/testify/assert"
@@ -14,35 +13,30 @@ import (
 	"github.com/traefik/neo-agent/pkg/metrics/protocol"
 )
 
-func TestClient_GetConfig(t *testing.T) {
-	schema, err := avro.Parse(protocol.ConfigV1Schema)
+func TestClient_GetPreviousData(t *testing.T) {
+	schema, err := avro.Parse(protocol.MetricsV1Schema)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/config", r.URL.Path)
-		assert.Equal(t, "true", r.URL.Query().Get("startup"))
+		assert.Equal(t, "/agent/data", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
 		assert.Equal(t, "avro/binary;v1", r.Header.Get("Accept"))
 
-		cfg := metrics.Config{
-			Interval: 5 * time.Minute,
-			Tables:   []string{"1m", "10m"},
-			PreviousData: map[string][]metrics.DataPointGroup{
-				"1m": {
-					{
-						IngressController: "foo",
-						Ingress:           "bar",
-						Service:           "baz",
-						DataPoints: []metrics.DataPoint{
-							{
-								Timestamp: 21,
-							},
+		data := map[string][]metrics.DataPointGroup{
+			"1m": {
+				{
+					IngressController: "foo",
+					Ingress:           "bar",
+					Service:           "baz",
+					DataPoints: []metrics.DataPoint{
+						{
+							Timestamp: 21,
 						},
 					},
 				},
 			},
 		}
-		err = avro.NewEncoderForSchema(schema, w).Encode(cfg)
+		err = avro.NewEncoderForSchema(schema, w).Encode(data)
 		require.NoError(t, err)
 	}))
 	t.Cleanup(func() {
@@ -52,12 +46,10 @@ func TestClient_GetConfig(t *testing.T) {
 	client, err := metrics.NewClient(http.DefaultClient, srv.URL, "some_test_token")
 	require.NoError(t, err)
 
-	cfg, err := client.GetConfig(context.Background(), true)
+	got, err := client.GetPreviousData(context.Background(), true)
 	require.NoError(t, err)
 
-	assert.Equal(t, 5*time.Minute, cfg.Interval)
-	assert.Equal(t, []string{"1m", "10m"}, cfg.Tables)
-	wantPnts := map[string][]metrics.DataPointGroup{
+	want := map[string][]metrics.DataPointGroup{
 		"1m": {
 			{
 				IngressController: "foo",
@@ -71,10 +63,10 @@ func TestClient_GetConfig(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, wantPnts, cfg.PreviousData)
+	assert.Equal(t, want, got)
 }
 
-func TestClient_GetConfigHandlesHTTPError(t *testing.T) {
+func TestClient_GetPreviousDataHandlesHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "test error", http.StatusInternalServerError)
 	}))
@@ -85,7 +77,7 @@ func TestClient_GetConfigHandlesHTTPError(t *testing.T) {
 	client, err := metrics.NewClient(http.DefaultClient, srv.URL, "some_test_token")
 	require.NoError(t, err)
 
-	_, err = client.GetConfig(context.Background(), true)
+	_, err = client.GetPreviousData(context.Background(), true)
 
 	assert.Error(t, err)
 }
@@ -110,7 +102,7 @@ func TestClient_Send(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/", r.URL.Path)
+		assert.Equal(t, "/agent/metrics", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
 		assert.Equal(t, "avro/binary;v1", r.Header.Get("Content-Type"))
 

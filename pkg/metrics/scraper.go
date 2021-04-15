@@ -13,10 +13,11 @@ import (
 )
 
 // Parser names.
+// This should match the topology types.
 const (
-	ParserNginx   = "nginx"
+	ParserNginx   = "nginx-community"
 	ParserTraefik = "traefik"
-	ParserHAProxy = "haproxy"
+	ParserHAProxy = "haproxy-community"
 )
 
 // Metric names.
@@ -120,7 +121,7 @@ func NewScraper(c *http.Client) *Scraper {
 }
 
 // Scrape returns metrics scraped from all targets.
-func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, ingressSvcs map[string][]string) ([]Metric, error) {
+func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, svcIngresses map[string][]string) ([]Metric, error) {
 	// This is a naive approach and should be dealt with
 	// as an iterator later to control the amount of RAM
 	// used while scraping many targets with many services.
@@ -135,20 +136,10 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, i
 	case ParserHAProxy:
 		p = s.haproxyParser
 	default:
-		return nil, fmt.Errorf("unvalid parser %q", parser)
+		return nil, fmt.Errorf("invalid parser %q", parser)
 	}
 
 	var m []Metric
-
-	// Flip the relationship to make it quicker to look up.
-	svcIngresses := map[string][]string{}
-	for ingr, svcs := range ingressSvcs {
-		for _, svc := range svcs {
-			ingrs := svcIngresses[svc]
-			ingrs = append(ingrs, ingr)
-			svcIngresses[svc] = ingrs
-		}
-	}
 
 	for _, u := range targets {
 		raw, err := s.scrapeMetrics(ctx, u)
