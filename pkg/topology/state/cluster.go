@@ -79,13 +79,13 @@ type AccessControlPolicy struct {
 	Namespace  string                         `json:"namespace"`
 	ClusterID  string                         `json:"clusterId"`
 	Method     string                         `json:"method"`
-	JWT        *JWTAccessControl              `json:"jwtAccessControl,omitempty"`
+	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
 	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
 	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth,omitempty"`
 }
 
-// JWTAccessControl describes the settings for JWT authentication within an access control policy.
-type JWTAccessControl struct {
+// AccessControlPolicyJWT describes the settings for JWT authentication within an access control policy.
+type AccessControlPolicyJWT struct {
 	SigningSecret              string            `json:"signingSecret,omitempty"`
 	SigningSecretBase64Encoded bool              `json:"signingSecretBase64Encoded"`
 	PublicKey                  string            `json:"publicKey,omitempty"`

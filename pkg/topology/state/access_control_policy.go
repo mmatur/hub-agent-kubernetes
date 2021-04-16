@@ -23,7 +23,7 @@ func (f *Fetcher) getAccessControlPolicies(clusterID string) (map[string]*Access
 		switch {
 		case policy.Spec.JWT != nil:
 			acp.Method = "jwt"
-			acp.JWT = &JWTAccessControl{
+			acp.JWT = &AccessControlPolicyJWT{
 				SigningSecretBase64Encoded: policy.Spec.JWT.SigningSecretBase64Encoded,
 				PublicKey:                  policy.Spec.JWT.PublicKey,
 				StripAuthorizationHeader:   policy.Spec.JWT.StripAuthorizationHeader,

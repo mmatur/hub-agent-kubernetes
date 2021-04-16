@@ -14,9 +14,9 @@ import (
 
 // Config is the configuration of an Access Control Policy. It is used to setup ACP handlers.
 type Config struct {
-	JWT        *jwt.Config        `json:"jwt"`
-	BasicAuth  *basicauth.Config  `json:"basicauth"`
-	DigestAuth *digestauth.Config `json:"digestauth"`
+	JWT        *jwt.Config
+	BasicAuth  *basicauth.Config
+	DigestAuth *digestauth.Config
 }
 
 // ConfigFromPolicy returns an ACP configuration for the given policy.

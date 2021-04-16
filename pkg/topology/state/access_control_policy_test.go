@@ -52,7 +52,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 					Namespace: "myns",
 					ClusterID: "myclusterid",
 					Method:    "jwt",
-					JWT: &JWTAccessControl{
+					JWT: &AccessControlPolicyJWT{
 						SigningSecret:              "redacted",
 						JWKsFile:                   "tata",
 						JWKsURL:                    "tete",
@@ -87,7 +87,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 					Namespace: "myns",
 					ClusterID: "myclusterid",
 					Method:    "jwt",
-					JWT: &JWTAccessControl{
+					JWT: &AccessControlPolicyJWT{
 						Claims: "iss=titi",
 					},
 				},
