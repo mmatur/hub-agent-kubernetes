@@ -1,3 +1,4 @@
+# Upgrading to go 1.16+ breaks this image for now. Maybe see why someday.
 FROM golang:1.15
 
 RUN go get k8s.io/code-generator; exit 0

@@ -5,8 +5,8 @@ set -e -o pipefail
 PROJECT_MODULE="github.com/traefik/neo-agent"
 IMAGE_NAME="kubernetes-codegen:latest"
 
-echo "Building codegen Docker image...$USER"
-docker build --build-arg USER=$USER -f "./script/Dockerfile.codegen" \
+echo "Building codegen Docker image..."
+docker build --build-arg USER=$USER -f "./scripts/codegen.Dockerfile" \
              -t "${IMAGE_NAME}" \
              "."
 

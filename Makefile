@@ -32,7 +32,7 @@ image: build
 image-dev: export GOOS := linux
 image-dev: export GOARCH := amd64
 image-dev: build
-	docker build -t $(BIN_NAME):dev .
+	docker build -t $(BIN_NAME):dev . -f ./dev.Dockerfile
 
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)
@@ -42,4 +42,4 @@ publish-latest:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):latest
 
 generate-crd:
-	@$(CURDIR)/script/code-gen.sh
+	@$(CURDIR)/scripts/code-gen.sh
