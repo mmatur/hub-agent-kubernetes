@@ -6,16 +6,15 @@ import (
 	"github.com/traefik/neo-agent/pkg/topology"
 	"github.com/traefik/neo-agent/pkg/topology/state"
 	"github.com/traefik/neo-agent/pkg/topology/store"
-	"github.com/urfave/cli/v2"
 )
 
-func newTopologyWatcher(ctx context.Context, cliCtx *cli.Context) (*topology.Watcher, error) {
-	k8s, err := state.NewFetcher(ctx)
+func newTopologyWatcher(ctx context.Context, neoClusterID string, storeCfg store.Config) (*topology.Watcher, error) {
+	k8s, err := state.NewFetcher(ctx, neoClusterID)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := store.New(ctx, cliCtx.String("token"), cliCtx.String("platform-url"))
+	s, err := store.New(ctx, storeCfg)
 	if err != nil {
 		return nil, err
 	}

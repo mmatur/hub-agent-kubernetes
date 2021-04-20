@@ -8,11 +8,19 @@ import (
 	"strings"
 
 	"github.com/ldez/go-git-cmd-wrapper/v2/clone"
-	cfg "github.com/ldez/go-git-cmd-wrapper/v2/config"
+	"github.com/ldez/go-git-cmd-wrapper/v2/config"
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
 	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/neo-agent/pkg/agent"
 )
+
+// Config represents the topology store config.
+type Config struct {
+	agent.TopologyConfig
+
+	Token string
+}
 
 // Store stores a state in a Git repository.
 type Store struct {
@@ -22,23 +30,15 @@ type Store struct {
 }
 
 // New instantiates a new Store.
-func New(ctx context.Context, token, topologyServiceURL string) (*Store, error) {
-	config, err := fetchConfig(ctx, token, topologyServiceURL)
-	if err != nil {
-		return nil, err
-	}
-
-	path, err := repositoryName(config.GitRepo)
-	if err != nil {
-		return nil, err
-	}
+func New(ctx context.Context, cfg Config) (*Store, error) {
+	repoURL := fmt.Sprintf("https://%s:@%s/%s/%s.git", cfg.Token, cfg.GitProxyHost, cfg.GitOrgName, cfg.GitRepoName)
 
 	s := &Store{
-		gitRepo:    config.GitRepo,
-		workingDir: path,
+		gitRepo:    repoURL,
+		workingDir: cfg.GitRepoName,
 		gitExecutor: func(ctx context.Context, name string, debug bool, args ...string) (string, error) {
 			cmd := exec.CommandContext(ctx, name, args...)
-			cmd.Dir = path
+			cmd.Dir = cfg.GitRepoName
 
 			out, err := cmd.CombinedOutput()
 			output := string(out)
@@ -59,7 +59,7 @@ func New(ctx context.Context, token, topologyServiceURL string) (*Store, error) 
 func (s *Store) cloneRepository(ctx context.Context) error {
 	if disableGitSSLVerify() {
 		log.Info().Msg("Git SSL verify disabled")
-		output, err := git.Config(cfg.Global, cfg.Add("http.sslVerify", "false"))
+		output, err := git.Config(config.Global, config.Add("http.sslVerify", "false"))
 		if err != nil {
 			return fmt.Errorf("%w: %s", err, output)
 		}
@@ -73,28 +73,17 @@ func (s *Store) cloneRepository(ctx context.Context) error {
 		}
 	}
 
-	output, err = git.Config(cfg.Local, cfg.Add("user.email", "neoagent@traefik.io"), git.CmdExecutor(s.gitExecutor))
+	output, err = git.Config(config.Local, config.Add("user.email", "neoagent@traefik.io"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, output)
 	}
 
-	output, err = git.Config(cfg.Local, cfg.Add("user.name", "Neo Agent"), git.CmdExecutor(s.gitExecutor))
+	output, err = git.Config(config.Local, config.Add("user.name", "Neo Agent"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, output)
 	}
 
 	return nil
-}
-
-func repositoryName(gitRepo string) (string, error) {
-	repo := strings.TrimSuffix(gitRepo, ".git")
-
-	index := strings.LastIndex(repo, "/")
-	if index == -1 || index == len(repo)-1 {
-		return "", fmt.Errorf("malformed git repo URL: %s", gitRepo)
-	}
-
-	return repo[index+1:], nil
 }
 
 func disableGitSSLVerify() bool {

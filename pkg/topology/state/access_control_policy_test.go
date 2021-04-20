@@ -50,7 +50,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 				"myacp@myns": {
 					Name:      "myacp",
 					Namespace: "myns",
-					ClusterID: "myclusterid",
+					ClusterID: "cluster-id",
 					Method:    "jwt",
 					JWT: &AccessControlPolicyJWT{
 						SigningSecret:              "redacted",
@@ -85,7 +85,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 				"myacp@myns": {
 					Name:      "myacp",
 					Namespace: "myns",
-					ClusterID: "myclusterid",
+					ClusterID: "cluster-id",
 					Method:    "jwt",
 					JWT: &AccessControlPolicyJWT{
 						Claims: "iss=titi",
@@ -114,7 +114,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 				"myacp@myns": {
 					Name:      "myacp",
 					Namespace: "myns",
-					ClusterID: "myclusterid",
+					ClusterID: "cluster-id",
 					Method:    "basicauth",
 					BasicAuth: &AccessControlPolicyBasicAuth{
 						Users:                    "toto:redacted,titi:redacted",
@@ -145,7 +145,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 				"myacp@myns": {
 					Name:      "myacp",
 					Namespace: "myns",
-					ClusterID: "myclusterid",
+					ClusterID: "cluster-id",
 					Method:    "digestauth",
 					DigestAuth: &AccessControlPolicyDigestAuth{
 						Users:                    "toto:realm:redacted,titi:realm:redacted",
@@ -162,13 +162,14 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
+			clusterID := "cluster-id"
 			kubeClient := kubemock.NewSimpleClientset()
 			acpClient := acpfake.NewSimpleClientset(test.objects...)
 
-			f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
+			f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1", clusterID)
 			require.NoError(t, err)
 
-			got, err := f.getAccessControlPolicies("myclusterid")
+			got, err := f.getAccessControlPolicies(clusterID)
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.want, got)

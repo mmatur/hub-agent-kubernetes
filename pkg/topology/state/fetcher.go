@@ -20,6 +20,7 @@ import (
 
 // Fetcher fetches Kubernetes resources and converts them into a filtered and simplified state.
 type Fetcher struct {
+	clusterID     string
 	serverVersion *version.Version
 
 	k8s           informers.SharedInformerFactory
@@ -29,7 +30,7 @@ type Fetcher struct {
 }
 
 // NewFetcher creates a new Fetcher.
-func NewFetcher(ctx context.Context) (*Fetcher, error) {
+func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 	var (
 		config *rest.Config
 		err    error
@@ -64,10 +65,10 @@ func NewFetcher(ctx context.Context) (*Fetcher, error) {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	return watchAll(ctx, clientSet, acpClientSet, serverVersion.GitVersion)
+	return watchAll(ctx, clientSet, acpClientSet, serverVersion.GitVersion, clusterID)
 }
 
-func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet acpclient.Interface, serverVersion string) (*Fetcher, error) {
+func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet acpclient.Interface, serverVersion, clusterID string) (*Fetcher, error) {
 	serverSemVer, err := version.NewVersion(serverVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
@@ -140,6 +141,7 @@ func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet 
 	}
 
 	return &Fetcher{
+		clusterID:     clusterID,
 		serverVersion: serverSemVer,
 		k8s:           kubernetesFactory,
 		acp:           acpFactory,
@@ -151,17 +153,13 @@ func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet 
 // FetchState assembles a cluster state from Kubernetes resources.
 func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 	cluster := &Cluster{
+		ID:            f.clusterID,
 		ExternalDNSes: make(map[string]*ExternalDNS),
 	}
 
 	var err error
 
 	cluster.Namespaces, err = f.getNamespaces()
-	if err != nil {
-		return nil, err
-	}
-
-	cluster.ID, err = f.getClusterID()
 	if err != nil {
 		return nil, err
 	}

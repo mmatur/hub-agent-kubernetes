@@ -49,7 +49,7 @@ func Test_WatchAllHandlesUnsupportedVersions(t *testing.T) {
 			kubeClient := kubemock.NewSimpleClientset()
 			acpClient := acpfake.NewSimpleClientset()
 
-			_, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion)
+			_, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion, "cluster-id")
 
 			test.wantErr(t, err)
 		})
@@ -131,7 +131,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
 			acpClient := acpfake.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion)
+			f, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion, "cluster-id")
 			require.NoError(t, err)
 
 			got, err := f.getIngresses("myClusterID")

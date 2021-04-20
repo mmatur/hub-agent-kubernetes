@@ -95,7 +95,7 @@ func TestFetcher_GetServices(t *testing.T) {
 	kubeClient := kubemock.NewSimpleClientset(objects...)
 	acpClient := acpfake.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
+	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
 	got, err := f.getServices(apps)

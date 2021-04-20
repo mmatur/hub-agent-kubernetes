@@ -7,18 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
+	"path"
 
 	"github.com/hamba/avro"
 	"github.com/traefik/neo-agent/pkg/metrics/protocol"
 )
-
-// Config represents the neo agent configuration.
-type Config struct {
-	Interval     time.Duration               `avro:"interval"`
-	Tables       []string                    `avro:"tables"`
-	PreviousData map[string][]DataPointGroup `avro:"previous_data"`
-}
 
 // Client for the token service.
 type Client struct {
@@ -52,7 +45,7 @@ func NewClient(client *http.Client, baseURL, token string) (*Client, error) {
 
 // GetPreviousData gets the agent configuration.
 func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string][]DataPointGroup, error) {
-	endpoint, err := c.baseURL.Parse("/agent/data")
+	endpoint, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "data"))
 	if err != nil {
 		return nil, fmt.Errorf("creating metrics previous data url: %w", err)
 	}
@@ -90,7 +83,7 @@ func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string]
 
 // Send sends metrics to the metrics service.
 func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) error {
-	endpoint, err := c.baseURL.Parse("/agent/metrics")
+	endpoint, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "metrics"))
 	if err != nil {
 		return fmt.Errorf("creating metrics url: %w", err)
 	}

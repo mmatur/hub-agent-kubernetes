@@ -29,7 +29,7 @@ func TestFetcher_GetNamespaces(t *testing.T) {
 	}...)
 	acpClient := acpfake.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
+	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
 	got, err := f.getNamespaces()
@@ -38,24 +38,4 @@ func TestFetcher_GetNamespaces(t *testing.T) {
 	sort.Strings(got)
 
 	assert.Equal(t, []string{"myns", "otherns"}, got)
-}
-
-func TestFetcher_GetClusterID(t *testing.T) {
-	kubeClient := kubemock.NewSimpleClientset([]runtime.Object{
-		&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: metav1.NamespaceSystem,
-				UID:  "uid",
-			},
-		},
-	}...)
-	acpClient := acpfake.NewSimpleClientset()
-
-	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1")
-	require.NoError(t, err)
-
-	got, err := f.getClusterID()
-	assert.NoError(t, err)
-
-	assert.Equal(t, "uid", got)
 }

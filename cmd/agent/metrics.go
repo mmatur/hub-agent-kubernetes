@@ -6,13 +6,13 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/neo-agent/pkg/agent"
 	"github.com/traefik/neo-agent/pkg/logger"
 	"github.com/traefik/neo-agent/pkg/metrics"
 	"github.com/traefik/neo-agent/pkg/topology"
-	"github.com/urfave/cli/v2"
 )
 
-func runMetrics(ctx context.Context, cliCtx *cli.Context, watch *topology.Watcher) error {
+func runMetrics(ctx context.Context, watch *topology.Watcher, token, platformURL string, cfg agent.MetricsConfig) error {
 	rc := retryablehttp.NewClient()
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second
@@ -21,7 +21,7 @@ func runMetrics(ctx context.Context, cliCtx *cli.Context, watch *topology.Watche
 
 	httpClient := rc.StandardClient()
 
-	client, err := metrics.NewClient(httpClient, cliCtx.String("platform-url"), cliCtx.String("token"))
+	client, err := metrics.NewClient(httpClient, platformURL, token)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func runMetrics(ctx context.Context, cliCtx *cli.Context, watch *topology.Watche
 	mgr := metrics.NewManager(client, store, scraper)
 	defer func() { _ = mgr.Close() }()
 
-	mgr.SetConfig(time.Minute, []string{"1m", "10m", "1h", "1d"})
+	mgr.SetConfig(cfg.Interval, cfg.Tables)
 
 	watch.AddListener(mgr.TopologyStateChanged)
 

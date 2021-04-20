@@ -18,7 +18,7 @@ func TestClient_GetPreviousData(t *testing.T) {
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/agent/data", r.URL.Path)
+		assert.Equal(t, "/data", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
 		assert.Equal(t, "avro/binary;v1", r.Header.Get("Accept"))
 
@@ -102,7 +102,7 @@ func TestClient_Send(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/agent/metrics", r.URL.Path)
+		assert.Equal(t, "/metrics", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
 		assert.Equal(t, "avro/binary;v1", r.Header.Get("Content-Type"))
 
