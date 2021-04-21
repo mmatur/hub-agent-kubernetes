@@ -19,7 +19,7 @@ type APIError struct {
 }
 
 func (a APIError) Error() string {
-	return fmt.Sprintf("failed with code %q: %s", a.StatusCode, a.Message)
+	return fmt.Sprintf("failed with code %d: %s", a.StatusCode, a.Message)
 }
 
 type linkClusterReq struct {
