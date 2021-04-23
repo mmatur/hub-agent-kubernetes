@@ -34,6 +34,11 @@ image-dev: export GOARCH := amd64
 image-dev: build
 	docker build -t $(BIN_NAME):dev . -f ./dev.Dockerfile
 
+dev: image-dev
+	k3d image import $(BIN_NAME):dev --cluster=k3s-default-neo
+	kubectl patch deployment -n neo-agent neo-agent -p '{"spec":{"template":{"spec":{"containers":[{"name":"neo-agent","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl rollout restart deployment -n neo-agent neo-agent
+
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)
 
