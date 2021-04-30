@@ -6,7 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	acpfake "github.com/traefik/neo-agent/pkg/crd/generated/client/clientset/versioned/fake"
+	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,11 +17,18 @@ import (
 func TestFetcher_GetIngresses(t *testing.T) {
 	want := map[string]*Ingress{
 		"myIngress@myns": {
-			Name:      "myIngress",
-			Namespace: "myns",
-			ClusterID: "myClusterID",
-			Annotations: map[string]string{
-				"cert-manager.io/cluster-issuer": "foo",
+			ResourceMeta: ResourceMeta{
+				Kind:      "Ingress",
+				Group:     "networking.k8s.io",
+				Name:      "myIngress",
+				Namespace: "myns",
+			},
+			IngressMeta: IngressMeta{
+				ClusterID: "cluster-id",
+				Annotations: map[string]string{
+					"cert-manager.io/cluster-issuer": "foo",
+				},
+				Controller: "myIngressController",
 			},
 			TLS: []netv1.IngressTLS{
 				{
@@ -46,25 +54,25 @@ func TestFetcher_GetIngresses(t *testing.T) {
 					},
 				},
 			},
-			DefaultService: &netv1.IngressBackend{
+			DefaultBackend: &netv1.IngressBackend{
 				Service: &netv1.IngressServiceBackend{
 					Name: "myDefaultService",
 				},
 			},
-			Controller: "myIngressController",
-			Services:   []string{"myDefaultService@myns", "myService@myns"},
+			Services: []string{"myDefaultService@myns", "myService@myns"},
 		},
 	}
 
 	objects := loadK8sObjects(t, "fixtures/ingress/one-ingress-matches-ingress-class.yml")
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
-	acpClient := acpfake.NewSimpleClientset()
+	neoClient := neokubemock.NewSimpleClientset()
+	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1", "cluster-id")
+	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
-	got, err := f.getIngresses("myClusterID")
+	got, err := f.getIngresses("cluster-id")
 	require.NoError(t, err)
 
 	assert.Equal(t, want, got)
@@ -139,9 +147,10 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 	objects := loadK8sObjects(t, "fixtures/ingress/v1.18-ingress.yml")
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
-	acpClient := acpfake.NewSimpleClientset()
+	neoClient := neokubemock.NewSimpleClientset()
+	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.18", "cluster-id")
+	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.18", "cluster-id")
 	require.NoError(t, err)
 
 	got, err := f.fetchIngresses()

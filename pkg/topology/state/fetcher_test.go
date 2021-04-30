@@ -6,7 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	acpfake "github.com/traefik/neo-agent/pkg/crd/generated/client/clientset/versioned/fake"
+	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,9 +48,10 @@ func Test_WatchAllHandlesUnsupportedVersions(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := kubemock.NewSimpleClientset()
-			acpClient := acpfake.NewSimpleClientset()
+			neoClient := neokubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			_, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion, "cluster-id")
+			_, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, test.serverVersion, "cluster-id")
 
 			test.wantErr(t, err)
 		})
@@ -67,9 +69,15 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			serverVersion: "v1.16",
 			want: map[string]*Ingress{
 				"myIngress_netv1beta1@myns": {
-					Namespace: "myns",
-					Name:      "myIngress_netv1beta1",
-					ClusterID: "myClusterID",
+					ResourceMeta: ResourceMeta{
+						Kind:      "Ingress",
+						Group:     "networking.k8s.io",
+						Name:      "myIngress_netv1beta1",
+						Namespace: "myns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID: "cluster-id",
+					},
 				},
 			},
 		},
@@ -78,9 +86,15 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			serverVersion: "v1.18",
 			want: map[string]*Ingress{
 				"myIngress_netv1beta1@myns": {
-					Name:      "myIngress_netv1beta1",
-					Namespace: "myns",
-					ClusterID: "myClusterID",
+					ResourceMeta: ResourceMeta{
+						Kind:      "Ingress",
+						Group:     "networking.k8s.io",
+						Name:      "myIngress_netv1beta1",
+						Namespace: "myns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID: "cluster-id",
+					},
 				},
 			},
 		},
@@ -89,9 +103,15 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			serverVersion: "v1.19",
 			want: map[string]*Ingress{
 				"myIngress_netv1@myns": {
-					Name:      "myIngress_netv1",
-					Namespace: "myns",
-					ClusterID: "myClusterID",
+					ResourceMeta: ResourceMeta{
+						Kind:      "Ingress",
+						Group:     "networking.k8s.io",
+						Name:      "myIngress_netv1",
+						Namespace: "myns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID: "cluster-id",
+					},
 				},
 			},
 		},
@@ -100,9 +120,15 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			serverVersion: "v1.22",
 			want: map[string]*Ingress{
 				"myIngress_netv1@myns": {
-					Name:      "myIngress_netv1",
-					Namespace: "myns",
-					ClusterID: "myClusterID",
+					ResourceMeta: ResourceMeta{
+						Kind:      "Ingress",
+						Group:     "networking.k8s.io",
+						Name:      "myIngress_netv1",
+						Namespace: "myns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID: "cluster-id",
+					},
 				},
 			},
 		},
@@ -129,12 +155,13 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			}
 
 			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
-			acpClient := acpfake.NewSimpleClientset()
+			neoClient := neokubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, acpClient, test.serverVersion, "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, test.serverVersion, "cluster-id")
 			require.NoError(t, err)
 
-			got, err := f.getIngresses("myClusterID")
+			got, err := f.getIngresses("cluster-id")
 			require.NoError(t, err)
 
 			assert.Equal(t, test.want, got)

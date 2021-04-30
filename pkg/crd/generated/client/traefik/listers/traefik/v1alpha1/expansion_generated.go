@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// IngressRouteListerExpansion allows custom methods to be added to
+// IngressRouteLister.
+type IngressRouteListerExpansion interface{}
+
+// IngressRouteNamespaceListerExpansion allows custom methods to be added to
+// IngressRouteNamespaceLister.
+type IngressRouteNamespaceListerExpansion interface{}
+
 // MiddlewareListerExpansion allows custom methods to be added to
 // MiddlewareLister.
 type MiddlewareListerExpansion interface{}
@@ -25,3 +33,11 @@ type MiddlewareListerExpansion interface{}
 // MiddlewareNamespaceListerExpansion allows custom methods to be added to
 // MiddlewareNamespaceLister.
 type MiddlewareNamespaceListerExpansion interface{}
+
+// TraefikServiceListerExpansion allows custom methods to be added to
+// TraefikServiceLister.
+type TraefikServiceListerExpansion interface{}
+
+// TraefikServiceNamespaceListerExpansion allows custom methods to be added to
+// TraefikServiceNamespaceLister.
+type TraefikServiceNamespaceListerExpansion interface{}

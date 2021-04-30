@@ -80,6 +80,22 @@ func (s *Store) write(st *state.Cluster) error {
 		return nil
 	}
 
+	entries, err := os.ReadDir(s.workingDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.Name() == ".git" || entry.Name() == "README.md" {
+			continue
+		}
+
+		err = os.RemoveAll(filepath.Join(s.workingDir, entry.Name()))
+		if err != nil {
+			return err
+		}
+	}
+
 	t := reflect.TypeOf(*st)
 	v := reflect.ValueOf(*st)
 	for i := 0; i < t.NumField(); i++ {
@@ -111,19 +127,30 @@ func (s *Store) write(st *state.Cluster) error {
 // It uses the following path pattern: field.Name/value (e.g.: Ingresses/myingress@default.json).
 func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 	dir := field.Name
-
-	if err := os.RemoveAll(filepath.Join(s.workingDir, dir)); err != nil {
-		return err
+	if field.Tag.Get("dir") != "" {
+		dir = field.Tag.Get("dir")
 	}
 
 	for _, index := range value.MapKeys() {
-		val := value.MapIndex(index)
+		val := reflect.Indirect(value.MapIndex(index))
+
 		data, err := json.MarshalIndent(val.Interface(), "", "\t")
 		if err != nil {
 			return fmt.Errorf("marshal resource: %s %w", index, err)
 		}
 
-		fileName := fmt.Sprintf("%s/%s.json", dir, index)
+		var suffix string
+		for i := 0; i < val.NumField(); i++ {
+			fieldType := val.Type().Field(i).Type
+
+			if fieldType.AssignableTo(reflect.TypeOf(state.ResourceMeta{})) {
+				rm := val.Field(i).Interface().(state.ResourceMeta)
+				suffix = fmt.Sprintf(".%s.%s", strings.ToLower(rm.Kind), rm.Group)
+				break
+			}
+		}
+
+		fileName := fmt.Sprintf("%s/%s%s.json", dir, index, suffix)
 		if err = writeFile(filepath.Join(s.workingDir, fileName), data); err != nil {
 			return fmt.Errorf("write file: %w", err)
 		}
@@ -136,9 +163,8 @@ func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 // It uses the following path pattern: field.Name/value (e.g.: Namespaces/default).
 func (s *Store) writeSlice(field reflect.StructField, value reflect.Value) error {
 	dir := field.Name
-
-	if err := os.RemoveAll(filepath.Join(s.workingDir, dir)); err != nil {
-		return err
+	if field.Tag.Get("dir") != "" {
+		dir = field.Tag.Get("dir")
 	}
 
 	for i := 0; i < value.Len(); i++ {

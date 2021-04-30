@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-	acpfake "github.com/traefik/neo-agent/pkg/crd/generated/client/clientset/versioned/fake"
+	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubemock "k8s.io/client-go/kubernetes/fake"
@@ -164,9 +165,10 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 
 			clusterID := "cluster-id"
 			kubeClient := kubemock.NewSimpleClientset()
-			acpClient := acpfake.NewSimpleClientset(test.objects...)
+			neoClient := neokubemock.NewSimpleClientset(test.objects...)
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, acpClient, "v1.20.1", clusterID)
+			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", clusterID)
 			require.NoError(t, err)
 
 			got, err := f.getAccessControlPolicies(clusterID)

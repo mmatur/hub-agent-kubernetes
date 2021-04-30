@@ -26,7 +26,9 @@ import (
 
 type TraefikV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	IngressRoutesGetter
 	MiddlewaresGetter
+	TraefikServicesGetter
 }
 
 // TraefikV1alpha1Client is used to interact with features provided by the traefik.containo.us group.
@@ -34,8 +36,16 @@ type TraefikV1alpha1Client struct {
 	restClient rest.Interface
 }
 
+func (c *TraefikV1alpha1Client) IngressRoutes(namespace string) IngressRouteInterface {
+	return newIngressRoutes(c, namespace)
+}
+
 func (c *TraefikV1alpha1Client) Middlewares(namespace string) MiddlewareInterface {
 	return newMiddlewares(c, namespace)
+}
+
+func (c *TraefikV1alpha1Client) TraefikServices(namespace string) TraefikServiceInterface {
+	return newTraefikServices(c, namespace)
 }
 
 // NewForConfig creates a new TraefikV1alpha1Client for the given config.

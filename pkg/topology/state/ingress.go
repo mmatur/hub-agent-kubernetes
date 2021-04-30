@@ -24,15 +24,21 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 		key := objectKey(ingress.Name, ingress.Namespace)
 
 		result[key] = &Ingress{
-			Name:           ingress.Name,
-			Namespace:      ingress.Namespace,
-			ClusterID:      clusterID,
-			Annotations:    sanitizeAnnotations(ingress.Annotations),
+			ResourceMeta: ResourceMeta{
+				Kind:      "Ingress",
+				Group:     netv1.GroupName,
+				Name:      ingress.Name,
+				Namespace: ingress.Namespace,
+			},
+			IngressMeta: IngressMeta{
+				ClusterID:   clusterID,
+				Controller:  getControllerName(ingress, ingressClasses),
+				Annotations: sanitizeAnnotations(ingress.Annotations),
+			},
 			TLS:            ingress.Spec.TLS,
-			DefaultService: ingress.Spec.DefaultBackend,
+			DefaultBackend: ingress.Spec.DefaultBackend,
 			Rules:          ingress.Spec.Rules,
-			Controller:     getControllerName(ingress, ingressClasses),
-			Services:       getServices(ingress),
+			Services:       getIngressServices(ingress),
 		}
 	}
 
@@ -68,24 +74,7 @@ func (f *Fetcher) fetchIngresses() ([]*netv1.Ingress, error) {
 	return result, nil
 }
 
-func sanitizeAnnotations(annotations map[string]string) map[string]string {
-	if annotations == nil {
-		return nil
-	}
-
-	result := make(map[string]string)
-	for name, value := range annotations {
-		if name == "kubectl.kubernetes.io/last-applied-configuration" {
-			continue
-		}
-
-		result[name] = value
-	}
-
-	return result
-}
-
-func getServices(ingress *netv1.Ingress) []string {
+func getIngressServices(ingress *netv1.Ingress) []string {
 	var result []string
 
 	knownServices := make(map[string]struct{})

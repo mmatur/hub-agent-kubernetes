@@ -28,8 +28,16 @@ type FakeTraefikV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeTraefikV1alpha1) IngressRoutes(namespace string) v1alpha1.IngressRouteInterface {
+	return &FakeIngressRoutes{c, namespace}
+}
+
 func (c *FakeTraefikV1alpha1) Middlewares(namespace string) v1alpha1.MiddlewareInterface {
 	return &FakeMiddlewares{c, namespace}
+}
+
+func (c *FakeTraefikV1alpha1) TraefikServices(namespace string) v1alpha1.TraefikServiceInterface {
+	return &FakeTraefikServices{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

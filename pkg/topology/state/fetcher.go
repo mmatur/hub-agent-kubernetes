@@ -9,8 +9,12 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
-	acpclient "github.com/traefik/neo-agent/pkg/crd/generated/client/clientset/versioned"
-	acp "github.com/traefik/neo-agent/pkg/crd/generated/client/informers/externalversions"
+	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
+	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
+	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
+	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	traefikinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -24,7 +28,8 @@ type Fetcher struct {
 	serverVersion *version.Version
 
 	k8s           informers.SharedInformerFactory
-	acp           acp.SharedInformerFactory
+	neo           neoinformer.SharedInformerFactory
+	traefik       traefikinformer.SharedInformerFactory
 	ingressSource source.Source
 	crdSource     source.Source
 }
@@ -55,7 +60,12 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 	}
 
 	// TODO: Handle ingressClasses from Neo as well.
-	acpClientSet, err := acpclient.NewForConfig(config)
+	neoClientSet, err := neoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	traefikClientSet, err := traefikclientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +75,10 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	return watchAll(ctx, clientSet, acpClientSet, serverVersion.GitVersion, clusterID)
+	return watchAll(ctx, clientSet, neoClientSet, traefikClientSet, serverVersion.GitVersion, clusterID)
 }
 
-func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet acpclient.Interface, serverVersion, clusterID string) (*Fetcher, error) {
+func watchAll(ctx context.Context, clientSet kubernetes.Interface, neoClientSet neoclientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion, clusterID string) (*Fetcher, error) {
 	serverSemVer, err := version.NewVersion(serverVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
@@ -103,30 +113,42 @@ func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet 
 		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
 	}
 
+	traefikFactory := traefikinformer.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)
+
+	hasTraefikCRDs, err := hasTraefikCRDs(clientSet.Discovery())
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to check if Traefik CRDs are installed")
+	}
+	if hasTraefikCRDs {
+		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
+		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
+	}
+
 	ingressSource, err := source.NewIngressSource(clientSet, "", "", "", false, false, false)
 	if err != nil {
-		log.Error().Err(err).Msg("fetch DNS endpoints from Kubernetes API")
+		log.Error().Err(err).Msg("Unable to create external DNS IngressSource")
 	}
 
 	restClient, scheme, err := source.NewCRDClientForAPIVersionKind(clientSet, "", "", "externaldns.k8s.io/v1alpha1", "DNSEndpoint")
 	if err != nil && !strings.Contains(err.Error(), "the server could not find the requested resource") {
 		// The second condition above is due to the extensions package not wrapping the error correctly.
-		log.Error().Err(err).Msg("fetch DNS endpoints from Kubernetes REST API")
+		log.Error().Err(err).Msg("Unable to fetch DNS endpoints from Kubernetes REST API")
 	}
 
 	crdSource := source.NewEmptySource()
 	if restClient != nil {
 		crdSource, err = source.NewCRDSource(restClient, "", "DNSEndpoint", "", "", scheme)
 		if err != nil {
-			log.Error().Err(err).Msg("fetch DNS endpoints from Kubernetes CRDs")
+			log.Error().Err(err).Msg("Unable to create external DNS CRDSource")
 		}
 	}
 
-	acpFactory := acp.NewSharedInformerFactoryWithOptions(acpClientSet, 5*time.Minute)
-	acpFactory.Neo().V1alpha1().AccessControlPolicies().Informer()
+	neoFactory := neoinformer.NewSharedInformerFactoryWithOptions(neoClientSet, 5*time.Minute)
+	neoFactory.Neo().V1alpha1().AccessControlPolicies().Informer()
 
 	kubernetesFactory.Start(ctx.Done())
-	acpFactory.Start(ctx.Done())
+	neoFactory.Start(ctx.Done())
+	traefikFactory.Start(ctx.Done())
 
 	for typ, ok := range kubernetesFactory.WaitForCacheSync(ctx.Done()) {
 		if !ok {
@@ -134,9 +156,15 @@ func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet 
 		}
 	}
 
-	for typ, ok := range acpFactory.WaitForCacheSync(ctx.Done()) {
+	for typ, ok := range neoFactory.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return nil, fmt.Errorf("timed out waiting for access control policies caches to sync %s", typ)
+		}
+	}
+
+	for typ, ok := range traefikFactory.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return nil, fmt.Errorf("timed out waiting for Traefik CRD caches to sync %s", typ)
 		}
 	}
 
@@ -144,7 +172,8 @@ func watchAll(ctx context.Context, clientSet kubernetes.Interface, acpClientSet 
 		clusterID:     clusterID,
 		serverVersion: serverSemVer,
 		k8s:           kubernetesFactory,
-		acp:           acpFactory,
+		neo:           neoFactory,
+		traefik:       traefikFactory,
 		ingressSource: ingressSource,
 		crdSource:     crdSource,
 	}, nil
@@ -185,6 +214,11 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 		return nil, err
 	}
 
+	cluster.IngressRoutes, err = f.getIngressRoutes(cluster.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	ingressExternalDNSes, err := getExternalDNS(ctx, f.ingressSource)
 	if err != nil {
 		return nil, err
@@ -211,6 +245,46 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 	return cluster, nil
 }
 
+func hasTraefikCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
+	crdList, err := clientSet.ServerResourcesForGroupVersion(traefikv1alpha1.SchemeGroupVersion.String())
+	if err != nil {
+		return false, err
+	}
+
+	for _, kind := range []string{ResourceKindIngressRoute, ResourceKindTraefikService} {
+		var exists bool
+		for _, resource := range crdList.APIResources {
+			if resource.Kind == kind {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 func objectKey(name, ns string) string {
-	return strings.Join([]string{name, ns}, "@")
+	return name + "@" + ns
+}
+
+func sanitizeAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for name, value := range annotations {
+		if name == "kubectl.kubernetes.io/last-applied-configuration" {
+			continue
+		}
+
+		result[name] = value
+	}
+
+	return result
 }

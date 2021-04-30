@@ -1,6 +1,7 @@
 package state
 
 import (
+	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"sigs.k8s.io/external-dns/endpoint"
@@ -8,14 +9,23 @@ import (
 
 // Cluster describes a Cluster.
 type Cluster struct {
-	ID                    string                          `json:"id"`
-	Namespaces            []string                        `json:"namespaces,omitempty"`
-	Apps                  map[string]*App                 `json:"apps,omitempty"`
-	Ingresses             map[string]*Ingress             `json:"ingresses,omitempty"`
-	Services              map[string]*Service             `json:"services,omitempty"`
-	IngressControllers    map[string]*IngressController   `json:"ingressControllers,omitempty"`
-	ExternalDNSes         map[string]*ExternalDNS         `json:"externalDNSes,omitempty"`
-	AccessControlPolicies map[string]*AccessControlPolicy `json:"accessControlPolicies,omitempty"`
+	ID                    string
+	Namespaces            []string
+	Apps                  map[string]*App
+	Ingresses             map[string]*Ingress
+	IngressRoutes         map[string]*IngressRoute `dir:"Ingresses"`
+	Services              map[string]*Service
+	IngressControllers    map[string]*IngressController
+	ExternalDNSes         map[string]*ExternalDNS
+	AccessControlPolicies map[string]*AccessControlPolicy
+}
+
+// ResourceMeta represents the metadata which identify a Kubernetes resource.
+type ResourceMeta struct {
+	Kind      string `json:"kind"`
+	Group     string `json:"group"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // App is an abstraction of Deployments/ReplicaSets/DaemonSets/StatefulSets.
@@ -53,17 +63,52 @@ type Service struct {
 	status corev1.ServiceStatus
 }
 
-// Ingress describes an Ingress.
+// IngressMeta represents the common Ingress metadata properties.
+type IngressMeta struct {
+	ClusterID   string            `json:"clusterId"`
+	Controller  string            `json:"controller,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Ingress describes an Kubernetes Ingress.
 type Ingress struct {
-	Name           string                `json:"name"`
-	Namespace      string                `json:"namespace"`
-	ClusterID      string                `json:"clusterId"`
-	Controller     string                `json:"controller,omitempty"`
-	Annotations    map[string]string     `json:"annotations,omitempty"`
+	ResourceMeta
+	IngressMeta
+
 	TLS            []netv1.IngressTLS    `json:"tls,omitempty"`
 	Rules          []netv1.IngressRule   `json:"rules,omitempty"`
-	DefaultService *netv1.IngressBackend `json:"defaultService,omitempty"`
+	DefaultBackend *netv1.IngressBackend `json:"defaultBackend,omitempty"`
 	Services       []string              `json:"services,omitempty"`
+}
+
+// IngressRoute describes a Traefik IngressRoute.
+type IngressRoute struct {
+	ResourceMeta
+	IngressMeta
+
+	TLS      *IngressRouteTLS `json:"tls,omitempty"`
+	Routes   []Route          `json:"routes,omitempty"`
+	Services []string         `json:"services,omitempty"`
+}
+
+// IngressRouteTLS represents a simplified Traefik IngressRoute TLS configuration.
+type IngressRouteTLS struct {
+	Domains    []traefikv1alpha1.Domain `json:"domains,omitempty"`
+	SecretName string                   `json:"secretName,omitempty"`
+}
+
+// Route represents a Traefik IngressRoute route.
+type Route struct {
+	Match    string         `json:"match"`
+	Services []RouteService `json:"services,omitempty"`
+}
+
+// RouteService represents a Kubernetes service targeted by a Traefik IngressRoute route.
+type RouteService struct {
+	Namespace  string `json:"namespace"`
+	Name       string `json:"name"`
+	PortName   string `json:"portName,omitempty"`
+	PortNumber int32  `json:"portNumber,omitempty"`
 }
 
 // ExternalDNS describes an External DNS configured within a cluster.

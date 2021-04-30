@@ -24,8 +24,12 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// IngressRoutes returns a IngressRouteInformer.
+	IngressRoutes() IngressRouteInformer
 	// Middlewares returns a MiddlewareInformer.
 	Middlewares() MiddlewareInformer
+	// TraefikServices returns a TraefikServiceInformer.
+	TraefikServices() TraefikServiceInformer
 }
 
 type version struct {
@@ -39,7 +43,17 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// IngressRoutes returns a IngressRouteInformer.
+func (v *version) IngressRoutes() IngressRouteInformer {
+	return &ingressRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // Middlewares returns a MiddlewareInformer.
 func (v *version) Middlewares() MiddlewareInformer {
 	return &middlewareInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// TraefikServices returns a TraefikServiceInformer.
+func (v *version) TraefikServices() TraefikServiceInformer {
+	return &traefikServiceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

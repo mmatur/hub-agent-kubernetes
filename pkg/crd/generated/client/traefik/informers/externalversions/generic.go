@@ -53,8 +53,12 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=traefik.containo.us, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("ingressroutes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Traefik().V1alpha1().IngressRoutes().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("middlewares"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Traefik().V1alpha1().Middlewares().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("traefikservices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Traefik().V1alpha1().TraefikServices().Informer()}, nil
 
 	}
 

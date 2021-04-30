@@ -117,12 +117,21 @@ issues:
       linters:
         - funlen
         - noctx
+        - gochecknoinits
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
         - gochecknoglobals
     - path: pkg/acp/admission/reviewer/reviewer.go
       linters:
         - goconst
+    - path: pkg/topology/state/fetcher.go
+      text: "Function 'watchAll' has too many statements"
+      linters:
+        - funlen
+    - path: pkg/topology/state/fetcher.go
+      text: "cyclomatic complexity 19 of func `watchAll` is high"
+      linters:
+        - gocyclo
     # False positive.
     - path: pkg/acp/admission/reviewer/ingress_nginx_snippet.go
       text: "G101: Potential hardcoded credentials"
