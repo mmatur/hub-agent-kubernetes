@@ -709,17 +709,15 @@ func TestGuessMetricsURL(t *testing.T) {
 	}
 }
 
-func TestGetControllerType(t *testing.T) {
+func TestGetIngressControllerType(t *testing.T) {
 	tests := []struct {
-		desc               string
-		pod                *corev1.Pod
-		expected           bool
-		expectedController string
+		desc     string
+		pod      *corev1.Pod
+		wantType string
 	}{
 		{
 			desc: "No containers",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{},
@@ -728,11 +726,11 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
+			wantType: IngressControllerTypeNone,
 		},
 		{
 			desc: "Not a controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -745,11 +743,11 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
+			wantType: IngressControllerTypeNone,
 		},
 		{
 			desc: "Valid Traefik controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -762,18 +760,16 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			expected:           true,
-			expectedController: "traefik",
+			wantType: IngressControllerTypeTraefik,
 		},
 		{
 			desc: "Another valid Traefik controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: "traefik",
+							Image: "traefik/traefik:latest",
 						},
 					},
 				},
@@ -781,13 +777,11 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			expected:           true,
-			expectedController: "traefik",
+			wantType: IngressControllerTypeTraefik,
 		},
 		{
 			desc: "Valid nginx official controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -800,13 +794,11 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			expected:           true,
-			expectedController: "nginx",
+			wantType: IngressControllerTypeNginxOfficial,
 		},
 		{
 			desc: "Valid nginx community controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -819,13 +811,28 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			expected:           true,
-			expectedController: "nginx-community",
+			wantType: IngressControllerTypeNginxCommunity,
+		},
+		{
+			desc: "Another valid nginx community controller image",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "docker.io/ingress-nginx/controller:latest",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeNginxCommunity,
 		},
 		{
 			desc: "Valid haproxy community controller image",
 			pod: &corev1.Pod{
-				TypeMeta:   metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -838,8 +845,66 @@ func TestGetControllerType(t *testing.T) {
 					Phase: corev1.PodRunning,
 				},
 			},
-			expected:           true,
-			expectedController: "haproxy-community",
+			wantType: IngressControllerTypeHAProxyCommunity,
+		},
+		{
+			desc: "Another valid haproxy community controller image",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeHAProxyCommunity,
+		},
+		{
+			desc: "Ingress controller type defined by annotation",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationNeoIngressController: IngressControllerTypeTraefik,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeTraefik,
+		},
+		{
+			desc: "Ingress controller type detection disabled",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationNeoIngressController: IngressControllerTypeNone,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeNone,
 		},
 	}
 
@@ -848,9 +913,111 @@ func TestGetControllerType(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			controller := getControllerType(test.pod)
+			kubeClient := kubemock.NewSimpleClientset()
+			neoClient := neokubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			assert.Equal(t, test.expectedController, controller)
+			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			require.NoError(t, err)
+
+			controller, err := f.getIngressControllerType(test.pod)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.wantType, controller)
+		})
+	}
+}
+
+func TestGetAnnotation(t *testing.T) {
+	tests := []struct {
+		desc      string
+		fixture   string
+		key       string
+		wantValue string
+	}{
+		{
+			desc:      "Annotation from Pod",
+			fixture:   "get-annotation-from-pod.yml",
+			key:       "foo",
+			wantValue: "bar",
+		},
+		{
+			desc:      "Missing annotation from Pod",
+			fixture:   "get-annotation-from-pod.yml",
+			key:       "bar",
+			wantValue: "",
+		},
+		{
+			desc:      "Annotation from ReplicaSet",
+			fixture:   "get-annotation-from-replicaset.yml",
+			key:       "foo",
+			wantValue: "bar",
+		},
+		{
+			desc:      "Missing annotation from ReplicaSet",
+			fixture:   "get-annotation-from-replicaset.yml",
+			key:       "bar",
+			wantValue: "",
+		},
+		{
+			desc:      "Annotation from Deployment",
+			fixture:   "get-annotation-from-deployment.yml",
+			key:       "foo",
+			wantValue: "bar",
+		},
+		{
+			desc:      "Missing annotation from Deployment",
+			fixture:   "get-annotation-from-deployment.yml",
+			key:       "bar",
+			wantValue: "",
+		},
+		{
+			desc:      "Annotation from DaemonSet",
+			fixture:   "get-annotation-from-daemonset.yml",
+			key:       "foo",
+			wantValue: "bar",
+		},
+		{
+			desc:      "Missing annotation from DaemonSet",
+			fixture:   "get-annotation-from-daemonset.yml",
+			key:       "bar",
+			wantValue: "",
+		},
+		{
+			desc:      "Annotation from StatefulSet",
+			fixture:   "get-annotation-from-statefulset.yml",
+			key:       "foo",
+			wantValue: "bar",
+		},
+		{
+			desc:      "Missing annotation from StatefulSet",
+			fixture:   "get-annotation-from-statefulset.yml",
+			key:       "bar",
+			wantValue: "",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			objects := loadK8sObjects(t, filepath.Join("fixtures", "ingress-controller", test.fixture))
+
+			kubeClient := kubemock.NewSimpleClientset(objects...)
+			neoClient := neokubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
+
+			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			require.NoError(t, err)
+
+			pod, err := kubeClient.CoreV1().Pods("ns").Get(context.Background(), "whoami", metav1.GetOptions{})
+			require.NoError(t, err)
+
+			gotValue, err := f.getAnnotation(pod, test.key)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.wantValue, gotValue)
 		})
 	}
 }
@@ -1046,6 +1213,49 @@ func TestFindPublicIPs(t *testing.T) {
 			svs := findPublicIPs(test.services, test.pod)
 
 			assert.Equal(t, test.wantIPs, svs)
+		})
+	}
+}
+
+func TestIsSupportedIngressControllerType(t *testing.T) {
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{
+			value: IngressControllerTypeTraefik,
+			want:  true,
+		},
+		{
+			value: IngressControllerTypeHAProxyCommunity,
+			want:  true,
+		},
+		{
+			value: IngressControllerTypeNginxCommunity,
+			want:  true,
+		},
+		{
+			value: IngressControllerTypeNginxOfficial,
+			want:  true,
+		},
+		{
+			value: IngressControllerTypeNone,
+			want:  true,
+		},
+		{
+			value: "plop",
+			want:  false,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.value, func(t *testing.T) {
+			t.Parallel()
+
+			got := isSupportedIngressControllerType(test.value)
+
+			assert.Equal(t, test.want, got)
 		})
 	}
 }

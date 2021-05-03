@@ -7,10 +7,23 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+// AnnotationNeoIngressController is the annotation to add to a Deployment/ReplicaSet/StatefulSet/DaemonSet to specify the Ingress controller type.
+const AnnotationNeoIngressController = "neo.traefik.io/ingress-controller"
+
+// Supported Ingress controller types.
+const (
+	IngressControllerTypeNone             = "none"
+	IngressControllerTypeTraefik          = "traefik"
+	IngressControllerTypeNginxOfficial    = "nginx"
+	IngressControllerTypeNginxCommunity   = "nginx-community"
+	IngressControllerTypeHAProxyCommunity = "haproxy-community"
 )
 
 // Supported Ingress Controllers.
@@ -20,14 +33,6 @@ const (
 	ControllerTypeNginxCommunity   = "k8s.io/ingress-nginx"
 	ControllerTypeHAProxyCommunity = "haproxy-ingress.github.io/controller"
 	ControllerTypeTraefik          = "traefik.io/ingress-controller"
-)
-
-// Supported Ingress controller types.
-const (
-	IngressControllerTypeTraefik          = "traefik"
-	IngressControllerTypeNginxOfficial    = "nginx"
-	IngressControllerTypeNginxCommunity   = "nginx-community"
-	IngressControllerTypeHAProxyCommunity = "haproxy-community"
 )
 
 func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[string]*App) (map[string]*IngressController, error) {
@@ -47,8 +52,16 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 			continue
 		}
 
-		controller := getControllerType(pod)
-		if controller == "" {
+		var ctrlType string
+		ctrlType, err = f.getIngressControllerType(pod)
+		if err != nil {
+			return nil, err
+		}
+		if !isSupportedIngressControllerType(ctrlType) {
+			log.Error().Msgf("Ingress controller type %s is not supported", ctrlType)
+			continue
+		}
+		if ctrlType == IngressControllerTypeNone {
 			continue
 		}
 
@@ -59,7 +72,7 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 		if !exists {
 			ic = &IngressController{
 				App:  app,
-				Type: controller,
+				Type: ctrlType,
 
 				// TODO What should we do if an IngressController does not have a service, log, status field?
 				PublicIPs: findPublicIPs(services, pod),
@@ -68,7 +81,7 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 			result[key] = ic
 		}
 
-		metricsURL := guessMetricsURL(controller, pod)
+		metricsURL := guessMetricsURL(ctrlType, pod)
 		if metricsURL != "" {
 			ic.MetricsURLs = append(ic.MetricsURLs, metricsURL)
 		}
@@ -189,27 +202,100 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(pod.Status.PodIP, port), path)
 }
 
-func getControllerType(pod *corev1.Pod) string {
+func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
+	value, err := f.getAnnotation(pod, AnnotationNeoIngressController)
+	if err != nil {
+		return "", fmt.Errorf("get %s annotation: %w", AnnotationNeoIngressController, err)
+	}
+	if value != "" {
+		return value, nil
+	}
+
 	for _, container := range pod.Spec.Containers {
 		// A container image has the form image:tag and the tag is optional.
 		parts := strings.Split(container.Image, ":")
 
-		switch parts[0] {
-		case "traefik":
-			return IngressControllerTypeTraefik
+		if strings.HasSuffix(parts[0], "traefik") {
+			return IngressControllerTypeTraefik, nil
+		}
 
-		case "nginx/nginx-ingress":
-			return IngressControllerTypeNginxOfficial
+		if strings.Contains(parts[0], "nginx/nginx-ingress") {
+			return IngressControllerTypeNginxOfficial, nil
+		}
 
-		case "k8s.gcr.io/ingress-nginx/controller":
-			return IngressControllerTypeNginxCommunity
+		if strings.Contains(parts[0], "ingress-nginx/controller") {
+			return IngressControllerTypeNginxCommunity, nil
+		}
 
-		case "quay.io/jcmoraisjr/haproxy-ingress":
-			return IngressControllerTypeHAProxyCommunity
+		if strings.Contains(parts[0], "jcmoraisjr/haproxy-ingress") {
+			return IngressControllerTypeHAProxyCommunity, nil
 		}
 	}
 
-	return ""
+	return IngressControllerTypeNone, nil
+}
+
+// getAnnotation returns the value for the given annotation key from the given pod.
+// If the annotation is not found on the pod, the annotation value will be retrieved from the corresponding Deployment/DaemonSet/ReplicaSet or StatefulSet.
+func (f *Fetcher) getAnnotation(pod *corev1.Pod, key string) (string, error) {
+	if value := pod.Annotations[key]; value != "" {
+		return value, nil
+	}
+
+	for _, owner := range pod.OwnerReferences {
+		switch owner.Kind {
+		case "DaemonSet":
+			ds, err := f.k8s.Apps().V1().DaemonSets().Lister().DaemonSets(pod.Namespace).Get(owner.Name)
+			if err != nil {
+				return "", err
+			}
+			return ds.Annotations[key], nil
+
+		case "StatefulSet":
+			sts, err := f.k8s.Apps().V1().StatefulSets().Lister().StatefulSets(pod.Namespace).Get(owner.Name)
+			if err != nil {
+				return "", err
+			}
+			return sts.Annotations[key], nil
+
+		case "ReplicaSet":
+			rs, err := f.k8s.Apps().V1().ReplicaSets().Lister().ReplicaSets(pod.Namespace).Get(owner.Name)
+			if err != nil {
+				return "", err
+			}
+
+			if value := rs.Annotations[key]; value != "" {
+				return value, nil
+			}
+
+			for _, owr := range rs.OwnerReferences {
+				if owr.Kind != "Deployment" {
+					continue
+				}
+
+				deploy, err := f.k8s.Apps().V1().Deployments().Lister().Deployments(pod.Namespace).Get(owr.Name)
+				if err != nil {
+					return "", err
+				}
+				return deploy.Annotations[key], nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func isSupportedIngressControllerType(value string) bool {
+	switch value {
+	case IngressControllerTypeNginxOfficial:
+	case IngressControllerTypeNginxCommunity:
+	case IngressControllerTypeHAProxyCommunity:
+	case IngressControllerTypeTraefik:
+	case IngressControllerTypeNone:
+	default:
+		return false
+	}
+	return true
 }
 
 // TODO: Check if this might cause issues with multiple apps with the same pod labels, or if it is an expected config error.
