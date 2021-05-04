@@ -24,7 +24,9 @@ import (
 
 func TestTraefikIngress_HandleACPName(t *testing.T) {
 	factory := func(policies reviewer.PolicyGetter) admission.Reviewer {
-		return reviewer.NewTraefikIngress("", ingressClassesMock{}, policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
+		fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
+
+		return reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 	}
 
 	ingressHandleACPName(t, factory)
@@ -124,7 +126,8 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			review := reviewer.NewTraefikIngress("", i, policyGetterMock(policies), nil)
+			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
+			review := reviewer.NewTraefikIngress(i, fwdAuthMdlwrs)
 
 			var ing netv1.Ingress
 			b, err := json.Marshal(ing)
@@ -225,7 +228,8 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			review := reviewer.NewTraefikIngress("", i, policyGetterMock(policies), nil)
+			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
+			review := reviewer.NewTraefikIngress(i, fwdAuthMdlwrs)
 
 			ing := netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -343,7 +347,8 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return test.config
 			}
-			rev := reviewer.NewTraefikIngress("", ingressClassesMock{}, policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			rev := reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 
 			oldIng := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -380,7 +385,6 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				},
 			}
 
-			// We run the test twice to check if reviewing the same resource twice is ok.
 			p, err := rev.Review(context.Background(), ar)
 			assert.NoError(t, err)
 			assert.NotNil(t, p)
@@ -461,7 +465,8 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return test.config
 			}
-			rev := reviewer.NewTraefikIngress("", ingressClassesMock{}, policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			rev := reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -488,7 +493,6 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			assert.NotNil(t, m)
 			assert.Equal(t, []string{"fwdHeader"}, m.Spec.ForwardAuth.AuthResponseHeaders)
 
-			// We run the test twice to check if reviewing the same resource twice is ok.
 			p, err := rev.Review(context.Background(), ar)
 			assert.NoError(t, err)
 			assert.NotNil(t, p)

@@ -148,9 +148,12 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 
 	polGetter := reviewer.NewPolGetter(neoInformer)
 
+	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
+
 	reviewers := []admission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
-		reviewer.NewTraefikIngress(authServerAddr, ingClassWatcher, polGetter, traefikClientSet.TraefikV1alpha1()),
+		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
+		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
 		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 

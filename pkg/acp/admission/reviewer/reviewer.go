@@ -22,3 +22,7 @@ func isNetV1Beta1Ingress(resource metav1.GroupVersionKind) bool {
 func isExtV1Beta1Ingress(resource metav1.GroupVersionKind) bool {
 	return resource.Group == "extensions" && resource.Version == "v1beta1" && resource.Kind == "Ingress"
 }
+
+func isTraefikV1Alpha1IngressRoute(resource metav1.GroupVersionKind) bool {
+	return resource.Group == "traefik.containo.us" && resource.Version == "v1alpha1" && resource.Kind == "IngressRoute"
+}
