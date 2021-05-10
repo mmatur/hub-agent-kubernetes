@@ -19,7 +19,7 @@ func TestScraper_ScrapeNginx(t *testing.T) {
 
 	s := metrics.NewScraper(http.DefaultClient)
 
-	got, err := s.Scrape(context.Background(), metrics.ParserNginx, []string{srvURL}, nil)
+	got, err := s.Scrape(context.Background(), metrics.ParserNginx, []string{srvURL}, metrics.ScrapeState{})
 	require.NoError(t, err)
 
 	require.Len(t, got, 12)
@@ -55,12 +55,14 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 
 	s := metrics.NewScraper(http.DefaultClient)
 
-	got, err := s.Scrape(context.Background(), metrics.ParserTraefik, []string{srvURL}, map[string][]string{
-		"whoami@default": {"myIngress"}, "whoami2@default": {"myIngress"},
+	got, err := s.Scrape(context.Background(), metrics.ParserTraefik, []string{srvURL}, metrics.ScrapeState{
+		ServiceIngresses:     map[string][]string{"whoami@default": {"myIngress"}, "whoami2@default": {"myIngress"}},
+		ServiceIngressRoutes: map[string][]string{"whoami3@default": {"myIngressRoute@default"}},
+		TraefikServiceNames:  map[string]string{"default-whoami-80": "whoami@default", "default-whoami2-80": "whoami2@default", "default-whoami-sdfsdfsdsd": "whoami@default", "default-whoami3-80": "whoami3@default"},
 	})
 	require.NoError(t, err)
 
-	require.Len(t, got, 6)
+	require.Len(t, got, 10)
 
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngress", Service: "whoami@default", Value: 12})
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngress", Service: "whoami@default", Value: 14})
@@ -74,6 +76,10 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 		Sum:     0.021072671000000005,
 		Count:   12,
 	})
+	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngressRoute@default", Service: "whoami3@default", Value: 15})
+	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "myIngressRoute@default", Service: "whoami3@default", Value: 17})
+	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Ingress: "myIngressRoute@default", Service: "whoami3@default", Value: 15})
+	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Ingress: "myIngressRoute@default", Service: "whoami3@default", Value: 17})
 }
 
 func TestScraper_ScrapeHAProxy(t *testing.T) {
@@ -81,8 +87,10 @@ func TestScraper_ScrapeHAProxy(t *testing.T) {
 
 	s := metrics.NewScraper(http.DefaultClient)
 
-	got, err := s.Scrape(context.Background(), metrics.ParserHAProxy, []string{srvURL}, map[string][]string{
-		"whoami@default": {"myIngress"}, "whoami2@default": {"myIngress"},
+	got, err := s.Scrape(context.Background(), metrics.ParserHAProxy, []string{srvURL}, metrics.ScrapeState{
+		ServiceIngresses:     map[string][]string{"whoami@default": {"myIngress"}, "whoami2@default": {"myIngress"}},
+		ServiceIngressRoutes: nil,
+		TraefikServiceNames:  nil,
 	})
 	require.NoError(t, err)
 

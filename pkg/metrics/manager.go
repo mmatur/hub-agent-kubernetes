@@ -164,7 +164,11 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 }
 
 func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-chan struct{}) {
-	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), m.getSvcIngresses())
+	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+		ServiceIngresses:     m.getSvcIngresses(),
+		ServiceIngressRoutes: m.getSvcIngressRoutes(),
+		TraefikServiceNames:  m.getTraefikServiceNames(),
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to scrape metrics")
 		return
@@ -182,7 +186,11 @@ func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-
 			return
 
 		case <-tick.C:
-			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), m.getSvcIngresses())
+			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+				ServiceIngresses:     m.getSvcIngresses(),
+				ServiceIngressRoutes: m.getSvcIngressRoutes(),
+				TraefikServiceNames:  m.getTraefikServiceNames(),
+			})
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to scrape metrics")
 				return
@@ -223,6 +231,27 @@ func (m *Manager) getSvcIngresses() map[string][]string {
 	}
 
 	return svcIngresses
+}
+
+func (m *Manager) getSvcIngressRoutes() map[string][]string {
+	cluster := m.state.Load().(*state.Cluster)
+
+	svcIngressRoute := map[string][]string{}
+	for ingrRouteName, ingr := range cluster.IngressRoutes {
+		for _, svc := range ingr.Services {
+			ingrs := svcIngressRoute[svc]
+			ingrs = append(ingrs, ingrRouteName)
+			svcIngressRoute[svc] = ingrs
+		}
+	}
+
+	return svcIngressRoute
+}
+
+func (m *Manager) getTraefikServiceNames() map[string]string {
+	cluster := m.state.Load().(*state.Cluster)
+
+	return cluster.TraefikServiceNames
 }
 
 func (m *Manager) getIngressURLs(name string) []string {

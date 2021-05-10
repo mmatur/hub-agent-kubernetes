@@ -96,4 +96,5 @@ traefik_service_request_duration_seconds_count{code="200",method="GET",protocol=
 traefik_service_requests_total{code="200",method="GET",protocol="http",service="default-whoami-sdfsdfsdsd@kubernetes"} 12
 traefik_service_requests_total{code="400",method="GET",protocol="http",service="default-whoami-80@kubernetes"} 14
 traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-whoami2-80@kubernetes"} 16
-
+traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-whoami3-80@kubernetescrd"} 15
+traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-myIngressRoute-6f97418635c7e18853da@kubernetescrd"} 17

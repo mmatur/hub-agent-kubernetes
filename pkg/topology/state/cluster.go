@@ -18,6 +18,8 @@ type Cluster struct {
 	IngressControllers    map[string]*IngressController
 	ExternalDNSes         map[string]*ExternalDNS
 	AccessControlPolicies map[string]*AccessControlPolicy
+
+	TraefikServiceNames map[string]string `dir:"-"`
 }
 
 // ResourceMeta represents the metadata which identify a Kubernetes resource.

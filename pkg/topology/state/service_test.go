@@ -15,7 +15,7 @@ import (
 )
 
 func TestFetcher_GetServices(t *testing.T) {
-	want := map[string]*Service{
+	wantSvcs := map[string]*Service{
 		"myService@myns": {
 			Name:      "myService",
 			Namespace: "myns",
@@ -41,6 +41,10 @@ func TestFetcher_GetServices(t *testing.T) {
 				},
 			},
 		},
+	}
+	wantNames := map[string]string{
+		"myns-myService-443":   "myService@myns",
+		"myns-myService-https": "myService@myns",
 	}
 
 	apps := map[string]*App{
@@ -73,6 +77,12 @@ func TestFetcher_GetServices(t *testing.T) {
 				Selector: map[string]string{
 					"my.label": "foo",
 				},
+				Ports: []corev1.ServicePort{
+					{
+						Port: 443,
+						Name: "https",
+					},
+				},
 			},
 			Status: corev1.ServiceStatus{
 				LoadBalancer: corev1.LoadBalancerStatus{
@@ -100,10 +110,11 @@ func TestFetcher_GetServices(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
-	got, err := f.getServices(apps)
+	gotSvcs, gotNames, err := f.getServices(apps)
 	require.NoError(t, err)
 
-	assert.Equal(t, want, got)
+	assert.Equal(t, wantSvcs, gotSvcs)
+	assert.Equal(t, wantNames, gotNames)
 }
 
 func TestFetcher_SelectApps(t *testing.T) {

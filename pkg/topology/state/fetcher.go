@@ -198,7 +198,7 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 		return nil, err
 	}
 
-	cluster.Services, err = f.getServices(cluster.Apps)
+	cluster.Services, cluster.TraefikServiceNames, err = f.getServices(cluster.Apps)
 	if err != nil {
 		return nil, err
 	}

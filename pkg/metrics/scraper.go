@@ -99,9 +99,16 @@ func (h Histogram) ServiceName() string {
 	return h.Service
 }
 
+// ScrapeState contains the state used while scraping.
+type ScrapeState struct {
+	ServiceIngresses     map[string][]string
+	ServiceIngressRoutes map[string][]string
+	TraefikServiceNames  map[string]string
+}
+
 // Parser represents a platform-specific metrics parser.
 type Parser interface {
-	Parse(m *dto.MetricFamily, svcs map[string][]string) []Metric
+	Parse(m *dto.MetricFamily, state ScrapeState) []Metric
 }
 
 // Scraper scrapes metrics from Prometheus.
@@ -116,12 +123,14 @@ type Scraper struct {
 // NewScraper returns a scraper instance with parser p.
 func NewScraper(c *http.Client) *Scraper {
 	return &Scraper{
-		client: c,
+		client:        c,
+		traefikParser: NewTraefikParser(),
+		haproxyParser: NewHAProxyParser(),
 	}
 }
 
 // Scrape returns metrics scraped from all targets.
-func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, svcIngresses map[string][]string) ([]Metric, error) {
+func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, state ScrapeState) ([]Metric, error) {
 	// This is a naive approach and should be dealt with
 	// as an iterator later to control the amount of RAM
 	// used while scraping many targets with many services.
@@ -149,7 +158,7 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, s
 		}
 
 		for _, v := range raw {
-			m = append(m, p.Parse(v, svcIngresses)...)
+			m = append(m, p.Parse(v, state)...)
 		}
 	}
 

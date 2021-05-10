@@ -10,7 +10,7 @@ import (
 type NginxParser struct{}
 
 // Parse parses metrics into a common form.
-func (p NginxParser) Parse(m *dto.MetricFamily, _ map[string][]string) []Metric {
+func (p NginxParser) Parse(m *dto.MetricFamily, _ ScrapeState) []Metric {
 	if m == nil || m.Name == nil {
 		return nil
 	}
@@ -87,10 +87,19 @@ func (p NginxParser) names(lbls []*dto.LabelPair) (ingress, service string) {
 }
 
 // TraefikParser parses Traefik metrics into a common form.
-type TraefikParser struct{}
+type TraefikParser struct {
+	cache map[string][]string
+}
+
+// NewTraefikParser returns an Traefik metrics parser.
+func NewTraefikParser() TraefikParser {
+	return TraefikParser{
+		cache: map[string][]string{},
+	}
+}
 
 // Parse parses metrics into a common form.
-func (p TraefikParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Metric {
+func (p TraefikParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 	if m == nil || m.Name == nil {
 		return nil
 	}
@@ -105,7 +114,7 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, svcs)
+			svc, ingresses := p.guessService(mtrc.Label, state)
 			if svc == "" || len(ingresses) == 0 {
 				continue
 			}
@@ -120,7 +129,7 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, svcs)
+			svc, ingresses := p.guessService(mtrc.Label, state)
 			if svc == "" || len(ingresses) == 0 {
 				continue
 			}
@@ -132,36 +141,79 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 	return metrics
 }
 
-func (p TraefikParser) guessService(lbls []*dto.LabelPair, svcs map[string][]string) (service string, ingresses []string) {
+func (p TraefikParser) guessService(lbls []*dto.LabelPair, state ScrapeState) (service string, ingresses []string) {
 	name := getLabel(lbls, "service")
 
-	if ingrs, ok := svcs["guessed@"+name]; ok {
+	parts := strings.SplitN(name, "@", 2)
+	if len(parts) != 2 {
+		return "", nil
+	}
+	name, typ := parts[0], parts[1]
+
+	if typ == "kubernetes" {
+		svcName, hasSvc := state.TraefikServiceNames[name]
+		if !hasSvc {
+			return "", nil
+		}
+
+		ingrs, hasIngrs := state.ServiceIngresses[svcName]
+		if !hasIngrs {
+			return "", nil
+		}
+
+		return svcName, ingrs
+	}
+
+	if svcName, hasSvc := state.TraefikServiceNames[name]; hasSvc {
+		routes, hasRoutes := state.ServiceIngressRoutes[svcName]
+		if !hasRoutes {
+			return "", nil
+		}
+
+		return svcName, routes
+	}
+
+	return p.guessIngressRoute(name, state.ServiceIngressRoutes)
+}
+
+func (p TraefikParser) guessIngressRoute(name string, svcs map[string][]string) (service string, ingresses []string) {
+	if ingrs, ok := p.cache[name]; ok {
 		svc := ingrs[0]
 		return svc, ingrs[1:]
 	}
 
 	for svc, ingrs := range svcs {
-		parts := strings.SplitN(svc, "@", 2)
-		if len(parts) != 2 {
-			continue
-		}
+		for _, ingr := range ingrs {
+			parts := strings.SplitN(ingr, "@", 2)
+			if len(parts) != 2 {
+				continue
+			}
 
-		guess := parts[1] + "-" + parts[0] + "-"
-		if strings.HasPrefix(name, guess) {
-			svcs["guessed@"+name] = append([]string{svc}, ingrs...)
+			guess := parts[1] + "-" + parts[0] + "-"
+			if strings.HasPrefix(name, guess) {
+				p.cache[name] = append([]string{svc}, ingr)
 
-			return svc, ingrs
+				return svc, []string{ingr}
+			}
 		}
 	}
-
 	return "", nil
 }
 
 // HAProxyParser parses HAProxy metrics into a common form.
-type HAProxyParser struct{}
+type HAProxyParser struct {
+	cache map[string][]string
+}
+
+// NewHAProxyParser returns an HAProxy metrics parser.
+func NewHAProxyParser() HAProxyParser {
+	return HAProxyParser{
+		cache: map[string][]string{},
+	}
+}
 
 // Parse parses metrics into a common form.
-func (p HAProxyParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Metric {
+func (p HAProxyParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 	if m == nil || m.Name == nil {
 		return nil
 	}
@@ -175,7 +227,7 @@ func (p HAProxyParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, svcs)
+			svc, ingresses := p.guessService(mtrc.Label, state)
 			if svc == "" || len(ingresses) == 0 {
 				continue
 			}
@@ -195,7 +247,7 @@ func (p HAProxyParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, svcs)
+			svc, ingresses := p.guessService(mtrc.Label, state)
 			if svc == "" || len(ingresses) == 0 {
 				continue
 			}
@@ -207,15 +259,15 @@ func (p HAProxyParser) Parse(m *dto.MetricFamily, svcs map[string][]string) []Me
 	return metrics
 }
 
-func (p HAProxyParser) guessService(lbls []*dto.LabelPair, svcs map[string][]string) (service string, ingresses []string) {
+func (p HAProxyParser) guessService(lbls []*dto.LabelPair, state ScrapeState) (service string, ingresses []string) {
 	name := getLabel(lbls, "proxy")
 
-	if ingrs, ok := svcs["guessed@"+name]; ok {
+	if ingrs, ok := p.cache[name]; ok {
 		svc := ingrs[0]
 		return svc, ingrs[1:]
 	}
 
-	for svc, ingrs := range svcs {
+	for svc, ingrs := range state.ServiceIngresses {
 		parts := strings.SplitN(svc, "@", 2)
 		if len(parts) != 2 {
 			continue
@@ -224,7 +276,7 @@ func (p HAProxyParser) guessService(lbls []*dto.LabelPair, svcs map[string][]str
 		for _, sep := range []string{"_", "-"} {
 			guess := parts[1] + sep + parts[0] + sep
 			if strings.HasPrefix(name, guess) {
-				svcs["guessed@"+name] = append([]string{svc}, ingrs...)
+				p.cache[name] = append([]string{svc}, ingrs...)
 
 				return svc, ingrs
 			}

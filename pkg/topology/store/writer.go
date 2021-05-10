@@ -127,8 +127,14 @@ func (s *Store) write(st *state.Cluster) error {
 // It uses the following path pattern: field.Name/value (e.g.: Ingresses/myingress@default.json).
 func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 	dir := field.Name
-	if field.Tag.Get("dir") != "" {
-		dir = field.Tag.Get("dir")
+
+	switch tag := field.Tag.Get("dir"); tag {
+	case "":
+		// Use the field name.
+	case "-":
+		return nil
+	default:
+		dir = tag
 	}
 
 	for _, index := range value.MapKeys() {
