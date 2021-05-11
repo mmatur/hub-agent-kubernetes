@@ -15,7 +15,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 				return fmt.Errorf("create Kubernetes in-agent configuration: %w", err)
 			}
 
-			kubeClient, err := kubernetes.NewForConfig(kubeCfg)
+			kubeClient, err := clientset.NewForConfig(kubeCfg)
 			if err != nil {
 				return fmt.Errorf("create Kubernetes client set: %w", err)
 			}
@@ -80,7 +80,7 @@ func main() {
 	}
 }
 
-func setup(ctx context.Context, agentClient *agent.Client, kubeClient kubernetes.Interface) (neoClusterID string, cfg agent.Config, err error) {
+func setup(ctx context.Context, agentClient *agent.Client, kubeClient clientset.Interface) (neoClusterID string, cfg agent.Config, err error) {
 	ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, metav1.NamespaceSystem, metav1.GetOptions{})
 	if err != nil {
 		return "", agent.Config{}, fmt.Errorf("get namespace: %w", err)

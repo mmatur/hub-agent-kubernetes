@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
-	"k8s.io/api/networking/v1beta1"
+	netv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -370,7 +370,7 @@ func findPublicIPs(svcs map[string]*Service, pod *corev1.Pod) []string {
 	return ips
 }
 
-func marshalToIngressClassNetworkingV1(ing *v1beta1.IngressClass) (*netv1.IngressClass, error) {
+func marshalToIngressClassNetworkingV1(ing *netv1beta1.IngressClass) (*netv1.IngressClass, error) {
 	data, err := ing.Marshal()
 	if err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ import (
 	traefikinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/external-dns/source"
@@ -54,7 +54,7 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 		return nil, fmt.Errorf("create k8s configuration: %w", err)
 	}
 
-	clientSet, err := kubernetes.NewForConfig(config)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 	return watchAll(ctx, clientSet, neoClientSet, traefikClientSet, serverVersion.GitVersion, clusterID)
 }
 
-func watchAll(ctx context.Context, clientSet kubernetes.Interface, neoClientSet neoclientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion, clusterID string) (*Fetcher, error) {
+func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet neoclientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion, clusterID string) (*Fetcher, error) {
 	serverSemVer, err := version.NewVersion(serverVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)

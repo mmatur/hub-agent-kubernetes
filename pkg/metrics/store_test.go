@@ -176,7 +176,7 @@ func TestStore_CleanupDoesntRemoveUnmarked(t *testing.T) {
 func genDataPoints(t *testing.T, now time.Time, n int, gran time.Duration) []DataPoint {
 	t.Helper()
 
-	start := now.Truncate(gran).Add(-1 * time.Duration(n) * gran) //nolint:durationcheck // False positive
+	start := now.Truncate(gran).Add(-1 * time.Duration(n) * gran)
 
 	var pnts []DataPoint
 	for i := 0; i < n; i++ {

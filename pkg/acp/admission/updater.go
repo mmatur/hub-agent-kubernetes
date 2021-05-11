@@ -11,13 +11,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 // IngressUpdater handles ingress updates when ACP configurations are modified.
 type IngressUpdater struct {
 	informer  informers.SharedInformerFactory
-	clientSet kubernetes.Interface
+	clientSet clientset.Interface
 
 	cancelUpd map[string]context.CancelFunc
 
@@ -27,7 +27,7 @@ type IngressUpdater struct {
 }
 
 // NewIngressUpdater return a new IngressUpdater.
-func NewIngressUpdater(informer informers.SharedInformerFactory, clientSet kubernetes.Interface, kubeVersion string) *IngressUpdater {
+func NewIngressUpdater(informer informers.SharedInformerFactory, clientSet clientset.Interface, kubeVersion string) *IngressUpdater {
 	return &IngressUpdater{
 		informer:               informer,
 		clientSet:              clientSet,

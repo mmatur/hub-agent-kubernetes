@@ -17,11 +17,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func setupEnv(clientSet kubernetes.Interface, neoClientSet neoclientset.Interface, watcher *Watcher) error {
+func setupEnv(clientSet clientset.Interface, neoClientSet neoclientset.Interface, watcher *Watcher) error {
 	kubeInformer := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 	kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(watcher)
 	kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(watcher)

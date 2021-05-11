@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
 type fakeUpdater struct {
@@ -19,7 +19,7 @@ func (f *fakeUpdater) Update(polName string) {
 
 func createPolicy(uid, name, ns string, sah bool) *neov1alpha1.AccessControlPolicy {
 	return &neov1alpha1.AccessControlPolicy{
-		ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid), Name: name, Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name, Namespace: ns},
 		Spec: neov1alpha1.AccessControlPolicySpec{
 			JWT: &neov1alpha1.AccessControlPolicyJWT{
 				SigningSecret:            "secret",

@@ -49,34 +49,57 @@ linters-settings:
   gomoddirectives:
     replace-allow-list:
       - github.com/abbot/go-http-auth
-  #  ifshort:
-  #    max-decl-lines: 1
-  #    max-decl-chars: 20
+
   importas:
+    no-unaliased: true
+    alias:
     # Standard Kubernetes rewrites:
-    corev1: "k8s.io/api/core/v1"
-    netv1: "k8s.io/api/networking/v1"
-    netv1beta1: "k8s.io/api/networking/v1beta1"
-    admv1: "k8s.io/api/admission/v1"
-    admv1beta1: "k8s.io/api/admission/v1beta1"
-    extv1beta1: "k8s.io/api/extensions/v1beta1"
-    metav1: "k8s.io/apimachinery/pkg/apis/meta/v1"
-    ktypes: "k8s.io/apimachinery/pkg/types"
-    kerror: "k8s.io/apimachinery/pkg/api/errors"
-    clientset: "k8s.io/client-go/kubernetes"
-    kubemock: "k8s.io/client-go/kubernetes/fake"
+    - alias: corev1
+      pkg: "k8s.io/api/core/v1"
+    - alias: netv1
+      pkg: "k8s.io/api/networking/v1"
+    - alias: netv1beta1
+      pkg: "k8s.io/api/networking/v1beta1"
+    - alias: admv1
+      pkg: "k8s.io/api/admission/v1"
+    - alias: admv1beta1
+      pkg: "k8s.io/api/admission/v1beta1"
+    - alias: extv1beta1
+      pkg: "k8s.io/api/extensions/v1beta1"
+    - alias: metav1
+      pkg: "k8s.io/apimachinery/pkg/apis/meta/v1"
+    - alias: ktypes
+      pkg: "k8s.io/apimachinery/pkg/types"
+    - alias: kerror
+      pkg: "k8s.io/apimachinery/pkg/api/errors"
+    - alias: clientset
+      pkg: "k8s.io/client-go/kubernetes"
+    - alias: kubemock
+      pkg: "k8s.io/client-go/kubernetes/fake"
+
     # Traefik Kubernetes rewrites:
-    traefikv1alpha1: "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-    traefikclientset: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-    traefikinformer: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
-    traefikkubemock: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+    - alias: traefikv1alpha1
+      pkg: "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
+    - alias: traefikclientset
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+    - alias: traefikinformer
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+    - alias: traefikkubemock
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+
     # Neo Kubernetes rewrites:
-    neov1alpha1: "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-    neoclientset: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-    neoinformer: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
-    neokubemock: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+    - alias: neov1alpha1
+      pkg: "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+    - alias: neoclientset
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
+    - alias: neoinformer
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
+    - alias: neokubemock
+      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+
     # Misc:
-    jwtreq: "github.com/dgrijalva/jwt-go/request"
+    - alias: jwtreq
+      pkg: "github.com/dgrijalva/jwt-go/request"
 
 linters:
   enable-all: true
@@ -143,3 +166,9 @@ issues:
     - path: pkg/acp/digestauth/digest_auth_request_test.go
       linters:
         - gosec
+    # False positive.
+    - path: pkg/metrics/store_test.go
+      text: 'Multiplication of durations: `-1 \* time\.Duration\(n\) \* gran`'
+    # Keep for historical reason
+    - path: pkg/topology/state/cluster.go
+      text: "json\\(camel\\): got '(metricsURLs)' want '(metricsUrLs)'"

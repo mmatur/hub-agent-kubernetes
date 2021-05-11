@@ -9,7 +9,7 @@ import (
 	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
-	"k8s.io/api/networking/v1beta1"
+	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubemock "k8s.io/client-go/kubernetes/fake"
@@ -140,7 +140,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			t.Parallel()
 
 			k8sObjects := []runtime.Object{
-				&v1beta1.Ingress{
+				&netv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "myns",
 						Name:      "myIngress_netv1beta1",

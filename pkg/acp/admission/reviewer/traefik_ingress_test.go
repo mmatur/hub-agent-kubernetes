@@ -14,7 +14,7 @@ import (
 	"github.com/traefik/neo-agent/pkg/acp/basicauth"
 	"github.com/traefik/neo-agent/pkg/acp/digestauth"
 	"github.com/traefik/neo-agent/pkg/acp/jwt"
-	"github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
 	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -450,13 +450,13 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			middleware := v1alpha1.Middleware{
+			middleware := traefikv1alpha1.Middleware{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "zz-my-policy-test",
 					Namespace: "test",
 				},
-				Spec: v1alpha1.MiddlewareSpec{
-					ForwardAuth: &v1alpha1.ForwardAuth{
+				Spec: traefikv1alpha1.MiddlewareSpec{
+					ForwardAuth: &traefikv1alpha1.ForwardAuth{
 						AuthResponseHeaders: []string{"fwdHeader"},
 					},
 				},
