@@ -1,6 +1,8 @@
 package state
 
 import (
+	"strings"
+
 	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -84,6 +86,11 @@ func (f *Fetcher) getRouteServices(ingressRouteNamespace string, route traefikv1
 }
 
 func (f *Fetcher) getRouteServicesFromTraefikService(parentNamespace, namespace, name string) ([]RouteService, error) {
+	// Here we have to ignore TraefikServices with the cross-provider syntax (containing an @ in the name) as they don't exist in Kubernetes.
+	if strings.Contains(name, "@") {
+		return nil, nil
+	}
+
 	if namespace == "" {
 		namespace = parentNamespace
 	}

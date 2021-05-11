@@ -69,6 +69,29 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			},
 		},
 		{
+			desc:    "One service with an internal Traefik service",
+			fixture: "ingress-route-one-internal-traefik-service.yml",
+			want: map[string]*IngressRoute{
+				"name@ns": {
+					ResourceMeta: ResourceMeta{
+						Kind:      ResourceKindIngressRoute,
+						Group:     traefikv1alpha1.GroupName,
+						Name:      "name",
+						Namespace: "ns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID:  "cluster-id",
+						Controller: IngressControllerTypeTraefik,
+					},
+					Routes: []Route{
+						{
+							Match: "Host(`api.localhost`)",
+						},
+					},
+				},
+			},
+		},
+		{
 			desc:    "One Weighted Traefik service",
 			fixture: "ingress-route-one-weighted-traefik-service.yml",
 			want: map[string]*IngressRoute{
