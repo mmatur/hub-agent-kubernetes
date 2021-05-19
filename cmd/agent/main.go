@@ -29,6 +29,8 @@ func main() {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
+			platformURL, token := cliCtx.String("platform-url"), cliCtx.String("token")
+
 			kubeCfg, err := kube.InClusterConfigWithRetrier(2)
 			if err != nil {
 				return fmt.Errorf("create Kubernetes in-agent configuration: %w", err)
@@ -39,7 +41,7 @@ func main() {
 				return fmt.Errorf("create Kubernetes client set: %w", err)
 			}
 
-			agentClient := agent.NewClient(cliCtx.String("platform-url"), cliCtx.String("token"))
+			agentClient := agent.NewClient(platformURL, token)
 
 			neoClusterID, agentCfg, err := setup(ctx, agentClient, kubeClient)
 			if err != nil {
@@ -55,10 +57,16 @@ func main() {
 				return err
 			}
 
+			mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, agentCfg.Metrics)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = mtrcsMgr.Close() }()
+
 			group, ctx := errgroup.WithContext(ctx)
 
 			group.Go(func() error {
-				return runMetrics(ctx, topoWatch, cliCtx.String("token"), cliCtx.String("platform-url"), agentCfg.Metrics)
+				return mtrcsMgr.Run(ctx)
 			})
 
 			group.Go(func() error {
@@ -69,6 +77,8 @@ func main() {
 			group.Go(func() error { return accessControl(ctx, cliCtx) })
 
 			group.Go(func() error { return runAuth(ctx, cliCtx) })
+
+			group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore) })
 
 			return group.Wait()
 		},

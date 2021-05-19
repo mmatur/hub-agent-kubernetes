@@ -8,9 +8,10 @@ import (
 )
 
 type tableInfo struct {
-	Name   string
-	RollUp time.Duration
-	Next   string
+	Name     string
+	MinCount int
+	RollUp   time.Duration
+	Next     string
 }
 
 type tableKey struct {
@@ -45,10 +46,10 @@ type Store struct {
 // NewStore returns metrics store.
 func NewStore() *Store {
 	tables := []tableInfo{
-		{Name: "1m", RollUp: 10 * time.Minute, Next: "10m"},
-		{Name: "10m", RollUp: time.Hour, Next: "1h"},
-		{Name: "1h", RollUp: 24 * time.Hour, Next: "1d"},
-		{Name: "1d", RollUp: 30 * 24 * time.Hour},
+		{Name: "1m", MinCount: 10, RollUp: 10 * time.Minute, Next: "10m"},
+		{Name: "10m", MinCount: 6, RollUp: time.Hour, Next: "1h"},
+		{Name: "1h", MinCount: 24, RollUp: 24 * time.Hour, Next: "1d"},
+		{Name: "1d", MinCount: 30, RollUp: 30 * 24 * time.Hour},
 	}
 
 	tbls := make(map[string]map[tableKey]DataPoints, len(tables))
@@ -112,6 +113,21 @@ func (s *Store) Insert(ic string, svcs map[SetKey]DataPoint) {
 // Each time this function is called, a unique ingress controller and service will
 // be given with their set of points.
 type ForEachFunc func(ic, ingr, svc string, pnts DataPoints)
+
+// ForEach iterates over a table, executing fn for each row.
+func (s *Store) ForEach(tbl string, fn ForEachFunc) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	table, ok := s.data[tbl]
+	if !ok {
+		return
+	}
+
+	for k, v := range table {
+		fn(k.IngressController, k.Ingress, k.Service, v)
+	}
+}
 
 // ForEachUnmarked iterates over a table, executing fn for each row that
 // has not been marked.
@@ -217,14 +233,14 @@ func (s *Store) Cleanup() {
 	defer s.mu.Unlock()
 
 	for _, tblInfo := range s.tables {
-		tbl, gran := tblInfo.Name, tblInfo.RollUp
+		tbl, count := tblInfo.Name, tblInfo.MinCount
 
-		keep := s.nowFunc().UTC().Truncate(gran).Unix()
 		for k, data := range s.data[tbl] {
 			pnts := data
-			idx := sort.Search(len(pnts), func(i int) bool {
-				return pnts[i].Timestamp >= keep
-			})
+			idx := len(pnts) - count
+			if idx < 1 {
+				continue
+			}
 
 			mark := s.marks[tbl][k]
 			if idx > mark {

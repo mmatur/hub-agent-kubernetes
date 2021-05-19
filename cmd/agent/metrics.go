@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
@@ -12,7 +11,7 @@ import (
 	"github.com/traefik/neo-agent/pkg/topology"
 )
 
-func runMetrics(ctx context.Context, watch *topology.Watcher, token, platformURL string, cfg agent.MetricsConfig) error {
+func newMetrics(watch *topology.Watcher, token, platformURL string, cfg agent.MetricsConfig) (*metrics.Manager, *metrics.Store, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second
@@ -23,7 +22,7 @@ func runMetrics(ctx context.Context, watch *topology.Watcher, token, platformURL
 
 	client, err := metrics.NewClient(httpClient, platformURL, token)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	store := metrics.NewStore()
@@ -31,11 +30,10 @@ func runMetrics(ctx context.Context, watch *topology.Watcher, token, platformURL
 	scraper := metrics.NewScraper(httpClient)
 
 	mgr := metrics.NewManager(client, store, scraper)
-	defer func() { _ = mgr.Close() }()
 
 	mgr.SetConfig(cfg.Interval, cfg.Tables)
 
 	watch.AddListener(mgr.TopologyStateChanged)
 
-	return mgr.Run(ctx)
+	return mgr, store, nil
 }

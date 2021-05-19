@@ -62,7 +62,7 @@ func TestStore_Insert(t *testing.T) {
 	})
 
 	var got []DataPoint
-	_ = store.ForEachUnmarked("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
 		got = append(got, pnts...)
 	})
 
@@ -100,15 +100,15 @@ func TestStore_RollUp(t *testing.T) {
 
 	store.RollUp()
 
-	_ = store.ForEachUnmarked("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, numPnts)
 	})
 
-	_ = store.ForEachUnmarked("10m", func(ic, ingr, svc string, pnts DataPoints) {
-		assert.Len(t, pnts, 1)
+	store.ForEach("10m", func(ic, ingr, svc string, pnts DataPoints) {
+		assert.Len(t, pnts, 11)
 	})
 
-	_ = store.ForEachUnmarked("1h", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1h", func(ic, ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 2)
 	})
 }
@@ -142,12 +142,12 @@ func TestStore_Cleanup(t *testing.T) {
 
 	store.Cleanup()
 
-	_ = store.ForEachUnmarked("1m", func(ic, ingr, svc string, pnts DataPoints) {
-		assert.Len(t, pnts, 9)
+	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
+		assert.Len(t, pnts, 10)
 	})
 
-	_ = store.ForEachUnmarked("10m", func(ic, ingr, svc string, pnts DataPoints) {
-		assert.Len(t, pnts, 5)
+	store.ForEach("10m", func(ic, ingr, svc string, pnts DataPoints) {
+		assert.Len(t, pnts, 6)
 	})
 }
 
@@ -168,7 +168,7 @@ func TestStore_CleanupDoesntRemoveUnmarked(t *testing.T) {
 
 	store.Cleanup()
 
-	_ = store.ForEachUnmarked("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 103)
 	})
 }

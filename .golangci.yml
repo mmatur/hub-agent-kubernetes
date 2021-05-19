@@ -45,7 +45,7 @@ linters-settings:
       - unnamedResult
     settings:
       hugeParam:
-        sizeThreshold: 100
+        sizeThreshold: 110
   gomoddirectives:
     replace-allow-list:
       - github.com/abbot/go-http-auth
