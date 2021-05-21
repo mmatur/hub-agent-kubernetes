@@ -11,6 +11,7 @@ import (
 	"github.com/traefik/neo-agent/pkg/agent"
 	"github.com/traefik/neo-agent/pkg/kube"
 	"github.com/traefik/neo-agent/pkg/logger"
+	"github.com/traefik/neo-agent/pkg/topology/state"
 	"github.com/traefik/neo-agent/pkg/topology/store"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
@@ -52,7 +53,11 @@ func main() {
 				TopologyConfig: agentCfg.Topology,
 				Token:          cliCtx.String("token"),
 			}
-			topoWatch, err := newTopologyWatcher(ctx, neoClusterID, storeCfg)
+			topoFetcher, err := state.NewFetcher(ctx, neoClusterID)
+			if err != nil {
+				return err
+			}
+			topoWatch, err := newTopologyWatcher(ctx, topoFetcher, storeCfg)
 			if err != nil {
 				return err
 			}
@@ -78,7 +83,7 @@ func main() {
 
 			group.Go(func() error { return runAuth(ctx, cliCtx) })
 
-			group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore) })
+			group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
 
 			return group.Wait()
 		},

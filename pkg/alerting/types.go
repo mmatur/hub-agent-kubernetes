@@ -76,8 +76,9 @@ type Alert struct {
 	RuleID  string  `json:"ruleId"`
 	Ingress string  `json:"ingress"`
 	Service string  `json:"service"`
-	Points  []Point `json:"points"`
 	State   int     `json:"state"`
+	Points  []Point `json:"points"`
+	Logs    []byte  `json:"logs"`
 }
 
 // Point contains a point and its timestamp.

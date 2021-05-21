@@ -15,7 +15,7 @@ const (
 
 // Processor represents a rule processor.
 type Processor interface {
-	Process(rule *Rule) (*Alert, error)
+	Process(ctx context.Context, rule *Rule) (*Alert, error)
 }
 
 // Manager manages rule synchronization and scheduling.
@@ -110,7 +110,7 @@ func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
 					continue
 				}
 
-				alert, err := proc.Process(&rule)
+				alert, err := proc.Process(ctx, &rule)
 				if err != nil {
 					log.Error().Err(err).Str("ruleID", rule.ID).Msg("Unable to process the rule")
 				}

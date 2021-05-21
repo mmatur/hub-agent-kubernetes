@@ -26,8 +26,8 @@ func TestManager_SendsAlerts(t *testing.T) {
 
 	store := mockThresholdStore{
 		group: metrics.DataPointGroup{
-			Ingress: "ing",
-			Service: "svc",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
 			DataPoints: []metrics.DataPoint{
 				{
 					Timestamp: now.Add(-3 * time.Minute).Unix(),
@@ -44,8 +44,16 @@ func TestManager_SendsAlerts(t *testing.T) {
 			},
 		},
 	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			assert.Equal(t, "svc", name)
+			assert.Equal(t, "ns", namespace)
+
+			return []byte("fake logs"), nil
+		},
+	}
 	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store),
+		ThresholdType: NewThresholdProcessor(store, logs),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -79,8 +87,8 @@ func TestManager_IgnoresStateUnchangedOK(t *testing.T) {
 
 	store := mockThresholdStore{
 		group: metrics.DataPointGroup{
-			Ingress: "ing",
-			Service: "svc",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
 			DataPoints: []metrics.DataPoint{
 				{
 					Timestamp: now.Add(-3 * time.Minute).Unix(),
@@ -97,8 +105,9 @@ func TestManager_IgnoresStateUnchangedOK(t *testing.T) {
 			},
 		},
 	}
+	logs := mockLogProvider{}
 	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store),
+		ThresholdType: NewThresholdProcessor(store, logs),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -132,8 +141,8 @@ func TestManager_IgnoresStateUnchangedCritical(t *testing.T) {
 
 	store := mockThresholdStore{
 		group: metrics.DataPointGroup{
-			Ingress: "ing",
-			Service: "svc",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
 			DataPoints: []metrics.DataPoint{
 				{
 					Timestamp: now.Add(-3 * time.Minute).Unix(),
@@ -150,8 +159,16 @@ func TestManager_IgnoresStateUnchangedCritical(t *testing.T) {
 			},
 		},
 	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			assert.Equal(t, "svc", name)
+			assert.Equal(t, "ns", namespace)
+
+			return []byte("fake logs"), nil
+		},
+	}
 	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store),
+		ThresholdType: NewThresholdProcessor(store, logs),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -180,8 +197,8 @@ func platformServer(t *testing.T, handler http.Handler, state int) *httptest.Ser
 		rules := []Rule{
 			{
 				ID:      "123",
-				Ingress: "ing",
-				Service: "svc",
+				Ingress: "ing@ns",
+				Service: "svc@ns",
 				Threshold: &Threshold{
 					Metric: "requestsPerSecond",
 					Condition: ThresholdCondition{

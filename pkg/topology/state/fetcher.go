@@ -32,6 +32,7 @@ type Fetcher struct {
 	traefik       traefikinformer.SharedInformerFactory
 	ingressSource source.Source
 	crdSource     source.Source
+	clientSet     clientset.Interface
 }
 
 // NewFetcher creates a new Fetcher.
@@ -176,6 +177,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet n
 		traefik:       traefikFactory,
 		ingressSource: ingressSource,
 		crdSource:     crdSource,
+		clientSet:     clientSet,
 	}, nil
 }
 

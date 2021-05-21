@@ -1,10 +1,20 @@
 package alerting
 
 import (
+	"bytes"
+	"compress/gzip"
+	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/traefik/neo-agent/pkg/metrics"
+)
+
+const (
+	logLines         = 50
+	logMaxLineLength = 200
 )
 
 // ThresholdStore represents a metric storage engine.
@@ -12,23 +22,30 @@ type ThresholdStore interface {
 	ForEach(tbl string, fn metrics.ForEachFunc)
 }
 
+// LogProvider implements an object that can provide logs for a service.
+type LogProvider interface {
+	GetServiceLogs(ctx context.Context, namespace, name string, lines, maxLen int) ([]byte, error)
+}
+
 // ThresholdProcessor processes threshold rules.
 type ThresholdProcessor struct {
 	store ThresholdStore
+	logs  LogProvider
 
 	nowFunc func() time.Time
 }
 
 // NewThresholdProcessor returns a threshold processor.
-func NewThresholdProcessor(t ThresholdStore) *ThresholdProcessor {
+func NewThresholdProcessor(t ThresholdStore, logs LogProvider) *ThresholdProcessor {
 	return &ThresholdProcessor{
 		store:   t,
+		logs:    logs,
 		nowFunc: time.Now,
 	}
 }
 
 // Process processes a threshold rule returning an alert or nil.
-func (p *ThresholdProcessor) Process(rule *Rule) (*Alert, error) {
+func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule) (*Alert, error) {
 	tbl := rule.Threshold.Table()
 	gran := rule.Threshold.Granularity()
 
@@ -70,16 +87,14 @@ func (p *ThresholdProcessor) Process(rule *Rule) (*Alert, error) {
 		return nil, nil
 	}
 
-	count := 0
-	for _, pnt := range newPnts {
-		if rule.Threshold.Condition.Above && pnt.Value > rule.Threshold.Condition.Value {
-			count++
-		} else if !rule.Threshold.Condition.Above && pnt.Value < rule.Threshold.Condition.Value {
-			count++
-		}
-	}
+	count := p.countOccurrences(rule, newPnts)
 	if count < rule.Threshold.Occurrence {
 		return nil, nil
+	}
+
+	logs, err := p.getLogs(ctx, rule.Service)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Alert{
@@ -87,8 +102,47 @@ func (p *ThresholdProcessor) Process(rule *Rule) (*Alert, error) {
 		Ingress: group.Ingress,
 		Service: group.Service,
 		Points:  newPnts,
+		Logs:    logs,
 		State:   stateCritical,
 	}, nil
+}
+
+func (p *ThresholdProcessor) countOccurrences(rule *Rule, pnts []Point) int {
+	var count int
+	for _, pnt := range pnts {
+		if rule.Threshold.Condition.Above && pnt.Value > rule.Threshold.Condition.Value {
+			count++
+		} else if !rule.Threshold.Condition.Above && pnt.Value < rule.Threshold.Condition.Value {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (p *ThresholdProcessor) getLogs(ctx context.Context, service string) ([]byte, error) {
+	if service == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(service, "@")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid service name %q", service)
+	}
+
+	logs, err := p.logs.GetServiceLogs(ctx, parts[1], parts[0], logLines, logMaxLineLength)
+	if err != nil {
+		log.Error().Err(err).Str("service", service).Msg("Unable to get logs")
+		return nil, nil
+	}
+
+	logs, err = compress(logs)
+	if err != nil {
+		log.Error().Err(err).Str("service", service).Msg("Unable to compress logs")
+		return nil, nil
+	}
+
+	return logs, nil
 }
 
 func getValue(metric string, pnt metrics.DataPoint) (float64, error) {
@@ -104,4 +158,19 @@ func getValue(metric string, pnt metrics.DataPoint) (float64, error) {
 	default:
 		return 0, fmt.Errorf("invalid metric type: %s", metric)
 	}
+}
+
+func compress(b []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+
+	_, err := w.Write(b)
+	if err != nil {
+		return nil, err
+	}
+	if err = w.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

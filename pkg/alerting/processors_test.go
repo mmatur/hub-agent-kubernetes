@@ -1,6 +1,7 @@
 package alerting
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -15,14 +16,15 @@ func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
 	store := mockThresholdStore{
 		group: generateData(t, now, 3, 10, 3),
 	}
+	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store)
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc2",
+		Ingress: "ing@ns",
+		Service: "svc2@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -43,14 +45,15 @@ func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
 	store := mockThresholdStore{
 		group: generateData(t, now, 2, 10, 2),
 	}
+	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store)
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc2",
+		Ingress: "ing@ns",
+		Service: "svc2@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -71,14 +74,15 @@ func TestThresholdProcessor_NoAlert(t *testing.T) {
 	store := mockThresholdStore{
 		group: generateData(t, now, 3, 10, 2),
 	}
+	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store)
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc2",
+		Ingress: "ing@ns",
+		Service: "svc2@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -125,14 +129,15 @@ func TestThresholdProcessor_NoAlert10Minute(t *testing.T) {
 			DataPoints: data,
 		},
 	}
+	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store)
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -154,14 +159,22 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 	store := mockThresholdStore{
 		group: metricsData,
 	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			assert.Equal(t, "svc", name)
+			assert.Equal(t, "ns", namespace)
 
-	threshProc := NewThresholdProcessor(store)
+			return []byte("fake logs"), nil
+		},
+	}
+
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -178,11 +191,15 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 	for i, pnt := range metricsData.DataPoints {
 		newPnts[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
 	}
+	logBytes, err := compress([]byte("fake logs"))
+	require.NoError(t, err)
+
 	want := &Alert{
 		RuleID:  "123",
-		Ingress: "ing",
-		Service: "svc",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
 		Points:  newPnts,
+		Logs:    logBytes,
 		State:   stateCritical,
 	}
 	assert.Equal(t, want, got)
@@ -214,19 +231,27 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 	}
 	store := mockThresholdStore{
 		group: metrics.DataPointGroup{
-			Ingress:    "ing",
-			Service:    "svc",
+			Ingress:    "ing@ns",
+			Service:    "svc@ns",
 			DataPoints: data,
 		},
 	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			assert.Equal(t, "svc", name)
+			assert.Equal(t, "ns", namespace)
 
-	threshProc := NewThresholdProcessor(store)
+			return []byte("fake logs"), nil
+		},
+	}
+
+	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(&Rule{
+	got, err := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
-		Ingress: "ing",
-		Service: "svc",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -244,11 +269,15 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 	for _, pnt := range data[:4] {
 		newPnts = append(newPnts, Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS})
 	}
+	logBytes, err := compress([]byte("fake logs"))
+	require.NoError(t, err)
+
 	want := &Alert{
 		RuleID:  "123",
-		Ingress: "ing",
-		Service: "svc",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
 		Points:  newPnts,
+		Logs:    logBytes,
 		State:   stateCritical,
 	}
 	assert.Equal(t, want, got)
@@ -262,12 +291,20 @@ func (t mockThresholdStore) ForEach(table string, fn metrics.ForEachFunc) {
 	fn(table, t.group.Ingress, t.group.Service, t.group.DataPoints)
 }
 
+type mockLogProvider struct {
+	getServiceLogsFn func(namespace, name string, lines, maxLen int) ([]byte, error)
+}
+
+func (m mockLogProvider) GetServiceLogs(_ context.Context, namespace, name string, lines, maxLen int) ([]byte, error) {
+	return m.getServiceLogsFn(namespace, name, lines, maxLen)
+}
+
 func generateData(t *testing.T, now time.Time, points, threshold, occurrences int) metrics.DataPointGroup {
 	t.Helper()
 
 	group := metrics.DataPointGroup{
-		Ingress:    "ing",
-		Service:    "svc",
+		Ingress:    "ing@ns",
+		Service:    "svc@ns",
 		DataPoints: metrics.DataPoints{},
 	}
 
