@@ -85,6 +85,8 @@ func main() {
 
 			group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
 
+			group.Go(func() error { return runACME(ctx, platformURL, token) })
+
 			return group.Wait()
 		},
 	}
