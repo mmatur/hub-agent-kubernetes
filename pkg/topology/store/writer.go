@@ -145,18 +145,7 @@ func (s *Store) writeMap(field reflect.StructField, value reflect.Value) error {
 			return fmt.Errorf("marshal resource: %s %w", index, err)
 		}
 
-		var suffix string
-		for i := 0; i < val.NumField(); i++ {
-			fieldType := val.Type().Field(i).Type
-
-			if fieldType.AssignableTo(reflect.TypeOf(state.ResourceMeta{})) {
-				rm := val.Field(i).Interface().(state.ResourceMeta)
-				suffix = fmt.Sprintf(".%s.%s", strings.ToLower(rm.Kind), rm.Group)
-				break
-			}
-		}
-
-		fileName := fmt.Sprintf("%s/%s%s.json", dir, index, suffix)
+		fileName := fmt.Sprintf("%s/%s.json", dir, index)
 		if err = writeFile(filepath.Join(s.workingDir, fileName), data); err != nil {
 			return fmt.Errorf("write file: %w", err)
 		}

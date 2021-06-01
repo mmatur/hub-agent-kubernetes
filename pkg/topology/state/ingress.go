@@ -21,9 +21,7 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 
 	result := make(map[string]*Ingress)
 	for _, ingress := range ingresses {
-		key := objectKey(ingress.Name, ingress.Namespace)
-
-		result[key] = &Ingress{
+		ing := &Ingress{
 			ResourceMeta: ResourceMeta{
 				Kind:      "Ingress",
 				Group:     netv1.GroupName,
@@ -40,6 +38,8 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 			Rules:          ingress.Spec.Rules,
 			Services:       getIngressServices(ingress),
 		}
+
+		result[ingressKey(ing.ResourceMeta)] = ing
 	}
 
 	return result, nil

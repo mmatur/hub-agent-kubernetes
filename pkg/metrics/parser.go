@@ -6,6 +6,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+const ingressKind = ".ingress.networking.k8s.io"
+
 // NginxParser parses Nginx metrics into a common form.
 type NginxParser struct{}
 
@@ -83,7 +85,7 @@ func (p NginxParser) names(lbls []*dto.LabelPair) (ingress, service string) {
 	if namespace == "" || svc == "" || ingr == "" {
 		return "", ""
 	}
-	return ingr + "@" + namespace, svc + "@" + namespace
+	return ingr + "@" + namespace + ingressKind, svc + "@" + namespace
 }
 
 // TraefikParser parses Traefik metrics into a common form.
@@ -188,6 +190,8 @@ func (p TraefikParser) guessIngressRoute(name string, svcs map[string][]string) 
 			if len(parts) != 2 {
 				continue
 			}
+			// Remove the `.kind.group` from the namespace.
+			parts[1] = strings.SplitN(parts[1], ".", 2)[0]
 
 			guess := parts[1] + "-" + parts[0] + "-"
 			if strings.HasPrefix(name, guess) {

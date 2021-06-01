@@ -32,7 +32,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "One service",
 			fixture: "ingress-route-one-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,
@@ -72,7 +72,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "One service with an internal Traefik service",
 			fixture: "ingress-route-one-internal-traefik-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,
@@ -95,7 +95,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "One Weighted Traefik service",
 			fixture: "ingress-route-one-weighted-traefik-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,
@@ -140,7 +140,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "One Mirroring Traefik service",
 			fixture: "ingress-route-one-mirroring-traefik-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,
@@ -180,7 +180,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "Two Weighted Traefik service",
 			fixture: "ingress-route-two-weighted-traefik-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,
@@ -230,7 +230,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			desc:    "Two Mirroring Traefik service",
 			fixture: "ingress-route-two-mirroring-traefik-service.yml",
 			want: map[string]*IngressRoute{
-				"name@ns": {
+				"name@ns.ingressroute.traefik.containo.us": {
 					ResourceMeta: ResourceMeta{
 						Kind:      ResourceKindIngressRoute,
 						Group:     traefikv1alpha1.GroupName,

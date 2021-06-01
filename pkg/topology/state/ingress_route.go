@@ -22,8 +22,6 @@ func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, 
 
 	result := make(map[string]*IngressRoute)
 	for _, ingressRoute := range ingressRoutes {
-		key := objectKey(ingressRoute.Name, ingressRoute.Namespace)
-
 		var routes []Route
 		for _, route := range ingressRoute.Spec.Routes {
 			services, err := f.getRouteServices(ingressRoute.Namespace, route)
@@ -45,7 +43,7 @@ func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, 
 			}
 		}
 
-		result[key] = &IngressRoute{
+		ing := &IngressRoute{
 			ResourceMeta: ResourceMeta{
 				Kind:      ResourceKindIngressRoute,
 				Group:     traefikv1alpha1.GroupName,
@@ -61,6 +59,8 @@ func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, 
 			Routes:   routes,
 			Services: getIngressRouteServices(routes),
 		}
+
+		result[ingressKey(ing.ResourceMeta)] = ing
 	}
 
 	return result, nil

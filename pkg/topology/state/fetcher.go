@@ -274,6 +274,10 @@ func objectKey(name, ns string) string {
 	return name + "@" + ns
 }
 
+func ingressKey(meta ResourceMeta) string {
+	return fmt.Sprintf("%s.%s.%s", objectKey(meta.Name, meta.Namespace), strings.ToLower(meta.Kind), meta.Group)
+}
+
 func sanitizeAnnotations(annotations map[string]string) map[string]string {
 	if annotations == nil {
 		return nil

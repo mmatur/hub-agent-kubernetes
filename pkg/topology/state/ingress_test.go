@@ -16,7 +16,7 @@ import (
 
 func TestFetcher_GetIngresses(t *testing.T) {
 	want := map[string]*Ingress{
-		"myIngress@myns": {
+		"myIngress@myns.ingress.networking.k8s.io": {
 			ResourceMeta: ResourceMeta{
 				Kind:      "Ingress",
 				Group:     "networking.k8s.io",

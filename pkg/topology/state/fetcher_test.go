@@ -68,7 +68,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			desc:          "v1.16",
 			serverVersion: "v1.16",
 			want: map[string]*Ingress{
-				"myIngress_netv1beta1@myns": {
+				"myIngress_netv1beta1@myns.ingress.networking.k8s.io": {
 					ResourceMeta: ResourceMeta{
 						Kind:      "Ingress",
 						Group:     "networking.k8s.io",
@@ -85,7 +85,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			desc:          "v1.18",
 			serverVersion: "v1.18",
 			want: map[string]*Ingress{
-				"myIngress_netv1beta1@myns": {
+				"myIngress_netv1beta1@myns.ingress.networking.k8s.io": {
 					ResourceMeta: ResourceMeta{
 						Kind:      "Ingress",
 						Group:     "networking.k8s.io",
@@ -102,7 +102,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			desc:          "v1.19",
 			serverVersion: "v1.19",
 			want: map[string]*Ingress{
-				"myIngress_netv1@myns": {
+				"myIngress_netv1@myns.ingress.networking.k8s.io": {
 					ResourceMeta: ResourceMeta{
 						Kind:      "Ingress",
 						Group:     "networking.k8s.io",
@@ -119,7 +119,7 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			desc:          "v1.22",
 			serverVersion: "v1.22",
 			want: map[string]*Ingress{
-				"myIngress_netv1@myns": {
+				"myIngress_netv1@myns.ingress.networking.k8s.io": {
 					ResourceMeta: ResourceMeta{
 						Kind:      "Ingress",
 						Group:     "networking.k8s.io",

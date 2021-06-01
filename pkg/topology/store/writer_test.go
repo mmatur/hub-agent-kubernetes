@@ -191,7 +191,7 @@ func TestWrite_Ingresses(t *testing.T) {
 	err := s.Write(context.Background(), &state.Cluster{
 		ID: "cluster-id",
 		Ingresses: map[string]*state.Ingress{
-			"name@namespace": testIngress,
+			"name@namespace.kind.group": testIngress,
 		},
 	})
 	require.NoError(t, err)
@@ -253,7 +253,7 @@ func TestWrite_IngressRoutes(t *testing.T) {
 	err := s.Write(context.Background(), &state.Cluster{
 		ID: "cluster-id",
 		IngressRoutes: map[string]*state.IngressRoute{
-			"name@namespace": testIngressRoute,
+			"name@namespace.kind.group": testIngressRoute,
 		},
 	})
 	require.NoError(t, err)
