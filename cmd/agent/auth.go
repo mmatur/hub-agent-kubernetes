@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdlog "log"
 	"net/http"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/neo-agent/pkg/acp/auth"
 	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
@@ -54,7 +56,12 @@ func runAuth(ctx context.Context, cliCtx *cli.Context) error {
 
 	go acpWatcher.Run(ctx)
 
-	server := &http.Server{Addr: listenAddr, Handler: switcher}
+	server := &http.Server{
+		Addr:     listenAddr,
+		Handler:  switcher,
+		ErrorLog: stdlog.New(log.Logger.Level(zerolog.DebugLevel), "", 0),
+	}
+
 	srvDone := make(chan struct{})
 
 	go func() {

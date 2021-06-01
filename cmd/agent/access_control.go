@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdlog "log"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/neo-agent/pkg/acp/admission"
 	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
@@ -69,7 +71,11 @@ func accessControl(ctx context.Context, cliCtx *cli.Context) error {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
 
-	server := &http.Server{Addr: listenAddr, Handler: h}
+	server := &http.Server{
+		Addr:     listenAddr,
+		Handler:  h,
+		ErrorLog: stdlog.New(log.Logger.Level(zerolog.DebugLevel), "", 0),
+	}
 	srvDone := make(chan struct{})
 
 	go func() {
