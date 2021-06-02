@@ -6,7 +6,7 @@ PROJECT_MODULE="github.com/traefik/neo-agent"
 IMAGE_NAME="kubernetes-codegen:latest"
 
 echo "Building codegen Docker image..."
-docker build --build-arg USER=$USER -f "./scripts/codegen.Dockerfile" \
+docker build --build-arg KUBE_VERSION=v0.20.2 --build-arg USER=$USER -f "./scripts/codegen.Dockerfile" \
              -t "${IMAGE_NAME}" \
              "."
 
