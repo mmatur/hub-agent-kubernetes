@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/metrics"
 )
 
 func TestDataPoints_Get(t *testing.T) {

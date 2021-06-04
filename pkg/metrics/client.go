@@ -10,7 +10,7 @@ import (
 	"path"
 
 	"github.com/hamba/avro"
-	"github.com/traefik/neo-agent/pkg/metrics/protocol"
+	"github.com/traefik/hub-agent/pkg/metrics/protocol"
 )
 
 // Client for the token service.

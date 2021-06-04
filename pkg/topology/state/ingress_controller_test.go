@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -621,10 +621,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 			objects := loadK8sObjects(t, filepath.Join("fixtures", "ingress-controller", test.fixture))
 
 			kubeClient := kubemock.NewSimpleClientset(objects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 			require.NoError(t, err)
 
 			got, err := f.getIngressControllers(test.services, test.apps)
@@ -869,7 +869,7 @@ func TestGetIngressControllerType(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationNeoIngressController: IngressControllerTypeTraefik,
+						AnnotationHubIngressController: IngressControllerTypeTraefik,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -890,7 +890,7 @@ func TestGetIngressControllerType(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationNeoIngressController: IngressControllerTypeNone,
+						AnnotationHubIngressController: IngressControllerTypeNone,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -914,10 +914,10 @@ func TestGetIngressControllerType(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := kubemock.NewSimpleClientset()
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 			require.NoError(t, err)
 
 			controller, err := f.getIngressControllerType(test.pod)
@@ -1005,10 +1005,10 @@ func TestGetAnnotation(t *testing.T) {
 			objects := loadK8sObjects(t, filepath.Join("fixtures", "ingress-controller", test.fixture))
 
 			kubeClient := kubemock.NewSimpleClientset(objects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 			require.NoError(t, err)
 
 			pod, err := kubeClient.CoreV1().Pods("ns").Get(context.Background(), "whoami", metav1.GetOptions{})

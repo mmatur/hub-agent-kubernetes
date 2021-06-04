@@ -2,7 +2,7 @@
 
 set -e -o pipefail
 
-PROJECT_MODULE="github.com/traefik/neo-agent"
+PROJECT_MODULE="github.com/traefik/hub-agent"
 IMAGE_NAME="kubernetes-codegen:latest"
 
 echo "Building codegen Docker image..."
@@ -10,9 +10,9 @@ docker build --build-arg KUBE_VERSION=v0.20.2 --build-arg USER=$USER -f "./scrip
              -t "${IMAGE_NAME}" \
              "."
 
-cmd="/go/src/k8s.io/code-generator/generate-groups.sh all $PROJECT_MODULE/pkg/crd/generated/client/neo $PROJECT_MODULE/pkg/crd/api neo:v1alpha1"
+cmd="/go/src/k8s.io/code-generator/generate-groups.sh all $PROJECT_MODULE/pkg/crd/generated/client/hub $PROJECT_MODULE/pkg/crd/api hub:v1alpha1"
 
-echo "Generating Neo clientSet code ..."
+echo "Generating Hub clientSet code ..."
 echo $(pwd)
 docker run --rm \
            -v "$(pwd):/go/src/${PROJECT_MODULE}" \

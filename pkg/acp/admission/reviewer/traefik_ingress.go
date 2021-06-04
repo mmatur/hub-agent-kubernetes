@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,8 +87,8 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([
 			return nil, fmt.Errorf("unmarshal reviewed old ingress metadata: %w", err)
 		}
 	}
-	prevPolName := oldIng.Metadata.Annotations[AnnotationNeoAuth]
-	polName := ing.Metadata.Annotations[AnnotationNeoAuth]
+	prevPolName := oldIng.Metadata.Annotations[AnnotationHubAuth]
+	polName := ing.Metadata.Annotations[AnnotationHubAuth]
 
 	if prevPolName == "" && polName == "" {
 		log.Ctx(ctx).Debug().Msg("No ACP defined")

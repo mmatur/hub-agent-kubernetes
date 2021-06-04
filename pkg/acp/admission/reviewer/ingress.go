@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/traefik/neo-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp"
 )
 
-// AnnotationNeoAuth is the annotation to add to an Ingress resource in order to enable Neo authentication.
-const AnnotationNeoAuth = "neo.traefik.io/access-control-policy"
+// AnnotationHubAuth is the annotation to add to an Ingress resource in order to enable Hub authentication.
+const AnnotationHubAuth = "hub.traefik.io/access-control-policy"
 
 // Ingress controller default annotations.
 const (

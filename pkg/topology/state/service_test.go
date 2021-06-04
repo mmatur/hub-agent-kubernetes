@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,10 +105,10 @@ func TestFetcher_GetServices(t *testing.T) {
 	}
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
-	neoClient := neokubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
 	gotSvcs, gotNames, err := f.getServices(apps)
@@ -313,10 +313,10 @@ func TestFetcher_GetServiceLogs(t *testing.T) {
 		return true, nil, nil
 	})
 
-	neoClient := neokubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
 	got, err := f.GetServiceLogs(context.Background(), "myns", "myService", 20, 200)
@@ -398,10 +398,10 @@ func TestFetcher_GetServiceLogsHandlesTooManyPods(t *testing.T) {
 		return true, nil, nil
 	})
 
-	neoClient := neokubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
 	got, err := f.GetServiceLogs(context.Background(), "myns", "myService", 2, 200)

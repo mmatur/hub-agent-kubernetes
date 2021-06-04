@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/topology/state"
-	"github.com/traefik/neo-agent/pkg/topology/store"
+	"github.com/traefik/hub-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent/pkg/topology/store"
 )
 
 // ListenerFunc is a function called by the watcher with the
 // current state.
 type ListenerFunc func(ctx context.Context, state *state.Cluster)
 
-// Watcher is a process from the Neo agent that watches the topology for changes and
+// Watcher is a process from the Hub agent that watches the topology for changes and
 // stores them over time to make them accessible from the SaaS.
 type Watcher struct {
 	k8s   *state.Fetcher

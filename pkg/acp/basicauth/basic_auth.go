@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const defaultRealm = "neo"
+const defaultRealm = "hub"
 
 // Users holds a list of users.
 type Users []string

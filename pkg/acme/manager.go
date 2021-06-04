@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acme/client"
+	"github.com/traefik/hub-agent/pkg/acme/client"
 	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,9 +25,9 @@ const labelManagedBy = "app.kubernetes.io/managed-by"
 
 // Annotations used to store metadata about the certificate stored in a secret.
 const (
-	annotationCertificateNotAfter  = "neo.traefik.io/certificate-not-after"
-	annotationCertificateNotBefore = "neo.traefik.io/certificate-not-before"
-	annotationCertificateDomains   = "neo.traefik.io/certificate-domains"
+	annotationCertificateNotAfter  = "hub.traefik.io/certificate-not-after"
+	annotationCertificateNotBefore = "hub.traefik.io/certificate-not-before"
+	annotationCertificateDomains   = "hub.traefik.io/certificate-domains"
 )
 
 // maxRetries is the number of times a certificate request will be retried before it is dropped out of the queue.

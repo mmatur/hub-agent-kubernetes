@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
-	"github.com/traefik/neo-agent/pkg/acp/digestauth"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -20,7 +20,7 @@ type Config struct {
 }
 
 // ConfigFromPolicy returns an ACP configuration for the given policy.
-func ConfigFromPolicy(policy *neov1alpha1.AccessControlPolicy) *Config {
+func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 	switch {
 	case policy.Spec.JWT != nil:
 		jwtCfg := policy.Spec.JWT

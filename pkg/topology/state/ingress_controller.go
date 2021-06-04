@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// AnnotationNeoIngressController is the annotation to add to a Deployment/ReplicaSet/StatefulSet/DaemonSet to specify the Ingress controller type.
-const AnnotationNeoIngressController = "neo.traefik.io/ingress-controller"
+// AnnotationHubIngressController is the annotation to add to a Deployment/ReplicaSet/StatefulSet/DaemonSet to specify the Ingress controller type.
+const AnnotationHubIngressController = "hub.traefik.io/ingress-controller"
 
 // Supported Ingress controller types.
 const (
@@ -203,9 +203,9 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 }
 
 func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
-	value, err := f.getAnnotation(pod, AnnotationNeoIngressController)
+	value, err := f.getAnnotation(pod, AnnotationHubIngressController)
 	if err != nil {
-		return "", fmt.Errorf("get %s annotation: %w", AnnotationNeoIngressController, err)
+		return "", fmt.Errorf("get %s annotation: %w", AnnotationHubIngressController, err)
 	}
 	if value != "" {
 		return value, nil

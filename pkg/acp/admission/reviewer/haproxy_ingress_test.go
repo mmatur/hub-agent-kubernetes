@@ -7,13 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
-	"github.com/traefik/neo-agent/pkg/acp/digestauth"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -278,12 +278,12 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "X-Header:req.auth_response_header.x-header",
 				"custom-annotation":                    "foobar",
 			},
@@ -298,12 +298,12 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy@myns",
+				"hub.traefik.io/access-control-policy": "my-policy@myns",
 				"custom-annotation":                    "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy@myns",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@myns",
+				"hub.traefik.io/access-control-policy": "my-policy@myns",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@myns",
 				"ingress.kubernetes.io/auth-headers":   "X-Header:req.auth_response_header.x-header",
 				"custom-annotation":                    "foobar",
 			},
@@ -316,32 +316,32 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "Authorization:req.auth_response_header.authorization",
 				"custom-annotation":                    "foobar",
 			},
 		},
 		{
-			desc: "Remove neo authentication",
+			desc: "Remove hub authentication",
 			config: acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
 				},
 			},
 			oldIngAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "Authorization:req.auth_response_header.authorization",
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                  "foobar",
-				"ingress.kubernetes.io/auth-url":     "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"ingress.kubernetes.io/auth-url":     "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers": "Authorization:req.auth_response_header.authorization",
 			},
 			wantPatch: map[string]string{
@@ -376,14 +376,14 @@ func TestHAProxyIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                    "foobar",
-				"neo.traefik.io/access-control-policy": "my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy@test",
 				"ingress.kubernetes.io/auth-url":       "http://custom",
 				"ingress.kubernetes.io/auth-headers":   "Custom:req.auth_response_header.custom",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                    "foobar",
-				"neo.traefik.io/access-control-policy": "my-policy@test",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy@test",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "Authorization:req.auth_response_header.authorization",
 			},
 		},
@@ -395,9 +395,9 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "Authorization:req.auth_response_header.authorization",
 			},
 			noPatch: true,
@@ -410,15 +410,15 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "Authorization:req.auth_response_header.authorization",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 			},
 		},
 		{
@@ -432,12 +432,12 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "User:req.auth_response_header.user,Authorization:req.auth_response_header.authorization",
 				"custom-annotation":                    "foobar",
 			},
@@ -453,12 +453,12 @@ func TestHAProxyIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
+				"hub.traefik.io/access-control-policy": "my-policy",
 				"custom-annotation":                    "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy": "my-policy",
-				"ingress.kubernetes.io/auth-url":       "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				"hub.traefik.io/access-control-policy": "my-policy",
+				"ingress.kubernetes.io/auth-url":       "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"ingress.kubernetes.io/auth-headers":   "User:req.auth_response_header.user,Authorization:req.auth_response_header.authorization",
 				"custom-annotation":                    "foobar",
 			},
@@ -473,7 +473,7 @@ func TestHAProxyIngress_Review(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return &test.config
 			}
-			rev := reviewer.NewHAProxyIngress("http://neo-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies))
+			rev := reviewer.NewHAProxyIngress("http://hub-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies))
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`

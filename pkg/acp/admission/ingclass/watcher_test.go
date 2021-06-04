@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +21,7 @@ import (
 	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func setupEnv(clientSet clientset.Interface, neoClientSet neoclientset.Interface, watcher *Watcher) error {
+func setupEnv(clientSet clientset.Interface, hubClientSet hubclientset.Interface, watcher *Watcher) error {
 	kubeInformer := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 	kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(watcher)
 	kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(watcher)
@@ -36,13 +36,13 @@ func setupEnv(clientSet clientset.Interface, neoClientSet neoclientset.Interface
 		}
 	}
 
-	neoInformer := neoinformer.NewSharedInformerFactory(neoClientSet, 5*time.Minute)
-	neoInformer.Neo().V1alpha1().IngressClasses().Informer().AddEventHandler(watcher)
-	neoInformer.Start(ctx.Done())
+	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(watcher)
+	hubInformer.Start(ctx.Done())
 
 	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	for _, ok := range neoInformer.WaitForCacheSync(syncCtx.Done()) {
+	for _, ok := range hubInformer.WaitForCacheSync(syncCtx.Done()) {
 		if !ok {
 			return errors.New("informer failed to start")
 		}
@@ -64,17 +64,17 @@ func TestWatcher_GetController(t *testing.T) {
 			Controller: ControllerTypeNginxOfficial,
 		},
 	}
-	customIng := neov1alpha1.IngressClass{
+	customIng := hubv1alpha1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{UID: "3", Name: "ing-class-3"},
-		Spec: neov1alpha1.IngressClassSpec{
+		Spec: hubv1alpha1.IngressClassSpec{
 			Controller: ControllerTypeTraefik,
 		},
 	}
 	clientSet := kubemock.NewSimpleClientset(&ing, &legacyIng)
-	neoClientSet := neokubemock.NewSimpleClientset(&customIng)
+	hubClientSet := hubkubemock.NewSimpleClientset(&customIng)
 	watcher := NewWatcher()
 
-	err := setupEnv(clientSet, neoClientSet, watcher)
+	err := setupEnv(clientSet, hubClientSet, watcher)
 	require.NoError(t, err)
 
 	err = waitForIngressClasses(watcher, 3)
@@ -88,7 +88,7 @@ func TestWatcher_GetController(t *testing.T) {
 	require.NoError(t, err)
 	err = clientSet.NetworkingV1beta1().IngressClasses().Delete(context.Background(), "ing-class-2", metav1.DeleteOptions{})
 	require.NoError(t, err)
-	err = neoClientSet.NeoV1alpha1().IngressClasses().Delete(context.Background(), "ing-class-3", metav1.DeleteOptions{})
+	err = hubClientSet.HubV1alpha1().IngressClasses().Delete(context.Background(), "ing-class-3", metav1.DeleteOptions{})
 	require.NoError(t, err)
 
 	err = waitForIngressClasses(watcher, 0)
@@ -160,20 +160,20 @@ func TestWatcher_GetDefaultController(t *testing.T) {
 				})
 			}
 			if test.customIngClass {
-				customResources = append(customResources, &neov1alpha1.IngressClass{
+				customResources = append(customResources, &hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						UID:         "3",
 						Name:        "ing-class-3",
 						Annotations: map[string]string{annotationDefaultIngressClass: "true"},
 					},
-					Spec: neov1alpha1.IngressClassSpec{Controller: ControllerTypeTraefik},
+					Spec: hubv1alpha1.IngressClassSpec{Controller: ControllerTypeTraefik},
 				})
 			}
 
 			clientSet := kubemock.NewSimpleClientset(resources...)
-			neoClientSet := neokubemock.NewSimpleClientset(customResources...)
+			hubClientSet := hubkubemock.NewSimpleClientset(customResources...)
 			watcher := NewWatcher()
-			err := setupEnv(clientSet, neoClientSet, watcher)
+			err := setupEnv(clientSet, hubClientSet, watcher)
 			require.NoError(t, err)
 
 			err = waitForIngressClasses(watcher, len(resources)+len(customResources))

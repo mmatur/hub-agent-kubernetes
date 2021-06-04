@@ -12,7 +12,7 @@ import (
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
 	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/agent"
+	"github.com/traefik/hub-agent/pkg/agent"
 )
 
 // Config represents the topology store config.
@@ -65,7 +65,7 @@ func (s *Store) cloneRepository(ctx context.Context) error {
 		}
 	}
 
-	// Setup local repo for topology files, by cloning neo distant repository
+	// Setup local repo for topology files, by cloning hub distant repository
 	output, err := git.CloneWithContext(ctx, clone.Repository(s.gitRepo))
 	if err != nil {
 		if !strings.Contains(output, "already exists and is not an empty directory") {
@@ -73,12 +73,12 @@ func (s *Store) cloneRepository(ctx context.Context) error {
 		}
 	}
 
-	output, err = git.Config(config.Local, config.Add("user.email", "neoagent@traefik.io"), git.CmdExecutor(s.gitExecutor))
+	output, err = git.Config(config.Local, config.Add("user.email", "hubagent@traefik.io"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, output)
 	}
 
-	output, err = git.Config(config.Local, config.Add("user.name", "Neo Agent"), git.CmdExecutor(s.gitExecutor))
+	output, err = git.Config(config.Local, config.Add("user.name", "Hub Agent"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, output)
 	}

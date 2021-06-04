@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/traefik/neo-agent/pkg/acp"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/acp"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 )
 
 // PolicyGetter allow to get an access control policy configuration.
@@ -15,11 +15,11 @@ type PolicyGetter interface {
 
 // PolGetter implementation the PolicyGetter interface.
 type PolGetter struct {
-	informer neoinformer.SharedInformerFactory
+	informer hubinformer.SharedInformerFactory
 }
 
 // NewPolGetter creates new PolGetter.
-func NewPolGetter(informer neoinformer.SharedInformerFactory) *PolGetter {
+func NewPolGetter(informer hubinformer.SharedInformerFactory) *PolGetter {
 	return &PolGetter{informer: informer}
 }
 
@@ -30,7 +30,7 @@ func (p PolGetter) GetConfig(canonicalName string) (*acp.Config, error) {
 		return nil, fmt.Errorf("invalid canonical name %q", canonicalName)
 	}
 
-	policy, err := p.informer.Neo().V1alpha1().AccessControlPolicies().Lister().AccessControlPolicies(parts[1]).Get(parts[0])
+	policy, err := p.informer.Hub().V1alpha1().AccessControlPolicies().Lister().AccessControlPolicies(parts[1]).Get(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("get ACP: %w", err)
 	}

@@ -7,15 +7,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
-	"github.com/traefik/neo-agent/pkg/acp/digestauth"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -282,17 +282,17 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				},
 			}},
 			oldIngAnno: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-old-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-old-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "test-zz-my-old-policy-test@kubernetescrd",
 			},
 			ingAnno: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
@@ -306,12 +306,12 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
@@ -325,12 +325,12 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationNeoAuth:                         "my-policy@test",
+				reviewer.AnnotationHubAuth:                         "my-policy@test",
 				"custom-annotation":                                "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
@@ -474,7 +474,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				Metadata: metav1.ObjectMeta{
 					Name:        "name",
 					Namespace:   "test",
-					Annotations: map[string]string{reviewer.AnnotationNeoAuth: "my-policy@test"},
+					Annotations: map[string]string{reviewer.AnnotationHubAuth: "my-policy@test"},
 				},
 			}
 			b, err := json.Marshal(ing)

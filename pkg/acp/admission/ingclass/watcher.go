@@ -6,14 +6,14 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
 // ingressClass is an internal representation of either a netv1.IngressClass,
-// netv1beta1.IngressClass or a neov1alpha1.IngressClass.
+// netv1beta1.IngressClass or a hubv1alpha1.IngressClass.
 type ingressClass struct {
 	Name       string
 	Controller string
@@ -32,7 +32,7 @@ const (
 
 // Watcher watches for IngressClass resources, maintaining a local cache of these resources,
 // updated as they are created, modified or deleted.
-// It watches for netv1.IngressClass, netv1beta1.IngressClass and neov1alpha1.IngressClass.
+// It watches for netv1.IngressClass, netv1beta1.IngressClass and hubv1alpha1.IngressClass.
 type Watcher struct {
 	mu             sync.RWMutex
 	ingressClasses map[ktypes.UID]ingressClass
@@ -65,7 +65,7 @@ func (w *Watcher) OnDelete(obj interface{}) {
 		delete(w.ingressClasses, v.ObjectMeta.UID)
 	case *netv1beta1.IngressClass:
 		delete(w.ingressClasses, v.ObjectMeta.UID)
-	case *neov1alpha1.IngressClass:
+	case *hubv1alpha1.IngressClass:
 		delete(w.ingressClasses, v.ObjectMeta.UID)
 	default:
 		log.Error().
@@ -92,7 +92,7 @@ func (w *Watcher) upsert(obj interface{}) {
 			Controller: v.Spec.Controller,
 			IsDefault:  v.ObjectMeta.Annotations[annotationDefaultIngressClass] == "true",
 		}
-	case *neov1alpha1.IngressClass:
+	case *hubv1alpha1.IngressClass:
 		w.ingressClasses[v.ObjectMeta.UID] = ingressClass{
 			Name:       v.ObjectMeta.Name,
 			Controller: v.Spec.Controller,

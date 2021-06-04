@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +64,7 @@ func ingressHandleACPName(t *testing.T, factory func(policies reviewer.PolicyGet
 					Name:      "name",
 					Namespace: test.ingNamespace,
 					Annotations: map[string]string{
-						"neo.traefik.io/access-control-policy": test.acpName,
+						"hub.traefik.io/access-control-policy": test.acpName,
 					},
 				},
 			}

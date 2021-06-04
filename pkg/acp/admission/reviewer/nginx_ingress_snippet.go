@@ -5,12 +5,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/traefik/neo-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp"
 )
 
 const (
-	neoSnippetTokenStart = "##neo-snippet-start"
-	neoSnippetTokenEnd   = "##neo-snippet-end"
+	hubSnippetTokenStart = "##hub-snippet-start"
+	hubSnippetTokenEnd   = "##hub-snippet-end"
 )
 
 type nginxSnippets struct {
@@ -32,9 +32,9 @@ func genSnippets(polName string, polCfg *acp.Config, agentAddr string) (nginxSni
 
 	return nginxSnippets{
 		AuthURL:              fmt.Sprintf("%s/%s", agentAddr, polName),
-		ConfigurationSnippet: wrapNeoSnippet(locSnip),
-		LocationSnippets:     wrapNeoSnippet(fmt.Sprintf("auth_request /auth;\n%s", locSnip)),
-		ServerSnippets:       wrapNeoSnippet(fmt.Sprintf("location /auth {proxy_pass %s/%s;}", agentAddr, polName)),
+		ConfigurationSnippet: wrapHubSnippet(locSnip),
+		LocationSnippets:     wrapHubSnippet(fmt.Sprintf("auth_request /auth;\n%s", locSnip)),
+		ServerSnippets:       wrapHubSnippet(fmt.Sprintf("location /auth {proxy_pass %s/%s;}", agentAddr, polName)),
 	}, nil
 }
 
@@ -47,11 +47,11 @@ func generateLocationSnippet(headerToForward []string) string {
 	return location
 }
 
-func wrapNeoSnippet(s string) string {
+func wrapHubSnippet(s string) string {
 	if s == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s\n%s\n%s", neoSnippetTokenStart, strings.TrimSpace(s), neoSnippetTokenEnd)
+	return fmt.Sprintf("%s\n%s\n%s", hubSnippetTokenStart, strings.TrimSpace(s), hubSnippetTokenEnd)
 }
 
 func mergeSnippets(snippets nginxSnippets, anno map[string]string) nginxSnippets {
@@ -63,16 +63,16 @@ func mergeSnippets(snippets nginxSnippets, anno map[string]string) nginxSnippets
 	}
 }
 
-var re = regexp.MustCompile(fmt.Sprintf(`(?ms)^(.*)(%s.*%s)(.*)$`, neoSnippetTokenStart, neoSnippetTokenEnd))
+var re = regexp.MustCompile(fmt.Sprintf(`(?ms)^(.*)(%s.*%s)(.*)$`, hubSnippetTokenStart, hubSnippetTokenEnd))
 
-func mergeSnippet(oldSnippet, neoSnippet string) string {
+func mergeSnippet(oldSnippet, hubSnippet string) string {
 	matches := re.FindStringSubmatch(oldSnippet)
 	if len(matches) == 4 {
-		return matches[1] + neoSnippet + matches[3]
+		return matches[1] + hubSnippet + matches[3]
 	}
 
-	if oldSnippet != "" && neoSnippet != "" {
-		return oldSnippet + "\n" + neoSnippet
+	if oldSnippet != "" && hubSnippet != "" {
+		return oldSnippet + "\n" + hubSnippet
 	}
-	return oldSnippet + neoSnippet
+	return oldSnippet + hubSnippet
 }

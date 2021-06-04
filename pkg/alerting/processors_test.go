@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/metrics"
 )
 
 func TestThresholdProcessor_NoMatchingRule(t *testing.T) {

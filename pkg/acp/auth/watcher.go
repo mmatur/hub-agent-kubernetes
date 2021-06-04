@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
-	"github.com/traefik/neo-agent/pkg/acp/digestauth"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -83,7 +83,7 @@ func (w *Watcher) Run(ctx context.Context) {
 
 // OnAdd implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnAdd(obj interface{}) {
-	v, ok := obj.(*neov1alpha1.AccessControlPolicy)
+	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -104,7 +104,7 @@ func (w *Watcher) OnAdd(obj interface{}) {
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnUpdate(_, newObj interface{}) {
-	v, ok := newObj.(*neov1alpha1.AccessControlPolicy)
+	v, ok := newObj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -128,7 +128,7 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnDelete(obj interface{}) {
-	v, ok := obj.(*neov1alpha1.AccessControlPolicy)
+	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").

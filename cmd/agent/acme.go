@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acme"
-	"github.com/traefik/neo-agent/pkg/acme/client"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent/pkg/acme"
+	"github.com/traefik/hub-agent/pkg/acme/client"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	"golang.org/x/sync/errgroup"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -27,9 +27,9 @@ func runACME(ctx context.Context, platformURL, token string) error {
 		return fmt.Errorf("create Kubernetes clientset: %w", err)
 	}
 
-	neoClient, err := neoclientset.NewForConfig(config)
+	hubClient, err := hubclientset.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("create Neo clientset")
+		return fmt.Errorf("create Hub clientset")
 	}
 
 	traefikClient, err := traefikclientset.NewForConfig(config)
@@ -40,7 +40,7 @@ func runACME(ctx context.Context, platformURL, token string) error {
 	certs := client.New(platformURL, token)
 	mgr := acme.NewManager(certs, kubeClient)
 
-	ctrl, err := acme.NewController(mgr, kubeClient, neoClient, traefikClient)
+	ctrl, err := acme.NewController(mgr, kubeClient, hubClient, traefikClient)
 	if err != nil {
 		return fmt.Errorf("create controller: %w", err)
 	}

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/neo-agent/pkg/kubevers"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/kubevers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -95,7 +95,7 @@ func (u *IngressUpdater) updateV1Ingresses(ctx context.Context, polName string) 
 		}
 
 		var ok bool
-		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationNeoAuth], ing.Namespace, polName)
+		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], ing.Namespace, polName)
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to determine if ingress should be updated")
 			continue
@@ -104,7 +104,7 @@ func (u *IngressUpdater) updateV1Ingresses(ctx context.Context, polName string) 
 			continue
 		}
 
-		_, err = u.clientSet.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{FieldManager: "neo-auth"})
+		_, err = u.clientSet.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{FieldManager: "hub-auth"})
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to update ingress")
 			continue
@@ -132,7 +132,7 @@ func (u *IngressUpdater) updateV1beta1Ingresses(ctx context.Context, polName str
 		}
 
 		var ok bool
-		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationNeoAuth], ing.Namespace, polName)
+		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], ing.Namespace, polName)
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to determine if legacy ingress should be updated")
 			continue
@@ -141,7 +141,7 @@ func (u *IngressUpdater) updateV1beta1Ingresses(ctx context.Context, polName str
 			continue
 		}
 
-		_, err = u.clientSet.NetworkingV1beta1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{FieldManager: "neo-auth"})
+		_, err = u.clientSet.NetworkingV1beta1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{FieldManager: "hub-auth"})
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to update legacy ingress")
 			continue
@@ -150,12 +150,12 @@ func (u *IngressUpdater) updateV1beta1Ingresses(ctx context.Context, polName str
 	return nil
 }
 
-func shouldUpdate(neoAuthAnno, ns, polName string) (bool, error) {
-	if neoAuthAnno == "" {
+func shouldUpdate(hubAuthAnno, ns, polName string) (bool, error) {
+	if hubAuthAnno == "" {
 		return false, nil
 	}
 
-	name, err := acp.CanonicalName(neoAuthAnno, ns)
+	name, err := acp.CanonicalName(hubAuthAnno, ns)
 	if err != nil {
 		return false, err
 	}

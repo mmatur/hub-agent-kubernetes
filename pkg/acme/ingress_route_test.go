@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -132,7 +132,7 @@ func TestController_syncIngressRoute(t *testing.T) {
 				issuerCallReq = req
 			}
 
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
 			kubeClient := newFakeKubeClient(t, &corev1.Secret{
@@ -148,7 +148,7 @@ func TestController_syncIngressRoute(t *testing.T) {
 				},
 			})
 
-			ctrl := newController(t, issuer, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, issuer, kubeClient, hubClient, traefikClient)
 
 			ctrl.syncIngressRoute(test.ingRoute)
 

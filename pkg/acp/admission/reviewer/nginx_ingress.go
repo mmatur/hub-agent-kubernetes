@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -75,7 +75,7 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([]b
 		return nil, fmt.Errorf("unmarshal reviewed ingress metadata: %w", err)
 	}
 
-	polName := ing.Metadata.Annotations[AnnotationNeoAuth]
+	polName := ing.Metadata.Annotations[AnnotationHubAuth]
 
 	var snippets nginxSnippets
 

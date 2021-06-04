@@ -7,13 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
-	"github.com/traefik/neo-agent/pkg/acp/digestauth"
-	"github.com/traefik/neo-agent/pkg/acp/jwt"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent/pkg/acp/jwt"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -285,15 +285,15 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				reviewer.AnnotationNeoAuth: "my-policy@test",
+				reviewer.AnnotationHubAuth: "my-policy@test",
 				"custom-annotation":        "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy":              "my-policy@test",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_X_Header; proxy_set_header X-Header $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_X_Header; proxy_set_header X-Header $value_0;\n##neo-snippet-end",
+				"hub.traefik.io/access-control-policy":              "my-policy@test",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_X_Header; proxy_set_header X-Header $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_X_Header; proxy_set_header X-Header $value_0;\n##hub-snippet-end",
 				"custom-annotation":                                 "foobar",
 			},
 		},
@@ -305,15 +305,15 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				reviewer.AnnotationNeoAuth: "my-policy@test",
+				reviewer.AnnotationHubAuth: "my-policy@test",
 				"custom-annotation":        "foobar",
 			},
 			wantPatch: map[string]string{
-				"neo.traefik.io/access-control-policy":              "my-policy@test",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"hub.traefik.io/access-control-policy":              "my-policy@test",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
 				"custom-annotation":                                 "foobar",
 			},
 		},
@@ -326,10 +326,10 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation": "foobar",
@@ -343,12 +343,12 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				reviewer.AnnotationNeoAuth:                          "my-policy",
+				reviewer.AnnotationHubAuth:                          "my-policy",
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
 			},
 			noPatch: true,
 		},
@@ -361,17 +361,17 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
+				reviewer.AnnotationHubAuth:                          "my-policy",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
 				"nginx.org/location-snippets":                       "# Stuff before.",
 				"nginx.org/server-snippets":                         "# Stuff before.",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
 			},
 		},
@@ -383,24 +383,24 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				reviewer.AnnotationNeoAuth:                          "my-policy",
+				reviewer.AnnotationHubAuth:                          "my-policy",
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-bad-policy@test;}\n##neo-snippet-end\n# Stuff after.",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end\n# Stuff after.",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-bad-policy@test;}\n##hub-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end\n# Stuff after.",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end\n# Stuff after.",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "\n# Stuff after.",
 			},
 		},
 		{
-			desc: "Remove neo authentication with custom snippets present",
+			desc: "Remove hub authentication with custom snippets present",
 			config: acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
@@ -408,10 +408,10 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":         "foobar",
@@ -429,15 +429,15 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":        "foobar",
-				reviewer.AnnotationNeoAuth: "my-policy",
+				reviewer.AnnotationHubAuth: "my-policy",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##hub-snippet-end",
 			},
 		},
 		{
@@ -451,15 +451,15 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":        "foobar",
-				reviewer.AnnotationNeoAuth: "my-policy",
+				reviewer.AnnotationHubAuth: "my-policy",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##neo-snippet-end",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##hub-snippet-end",
 			},
 		},
 		{
@@ -471,17 +471,17 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
+				reviewer.AnnotationHubAuth:                          "my-policy",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
 				"nginx.org/location-snippets":                       "# Stuff before.",
 				"nginx.org/server-snippets":                         "# Stuff before.",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "# Stuff before.",
 			},
 		},
@@ -493,24 +493,24 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			},
 			ingAnnotation: map[string]string{
-				reviewer.AnnotationNeoAuth:                          "my-policy",
+				reviewer.AnnotationHubAuth:                          "my-policy",
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-bad-policy@test;}\n##neo-snippet-end\n# Stuff after.",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##neo-snippet-end\n# Stuff after.",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-bad-policy@test;}\n##hub-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization; proxy_set_header Authorization $value_0;\n##hub-snippet-end\n# Stuff after.",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":                                 "foobar",
-				reviewer.AnnotationNeoAuth:                          "my-policy",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end\n# Stuff after.",
-				"nginx.org/location-snippets":                       "# Stuff before.\n##neo-snippet-start\nauth_request /auth;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
+				reviewer.AnnotationHubAuth:                          "my-policy",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end\n# Stuff after.",
+				"nginx.org/location-snippets":                       "# Stuff before.\n##hub-snippet-start\nauth_request /auth;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "\n# Stuff after.",
 			},
 		},
 		{
-			desc: "Remove neo authentication with custom snippets present",
+			desc: "Remove hub authentication with custom snippets present",
 			config: acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
@@ -518,10 +518,10 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 			ingAnnotation: map[string]string{
 				"custom-annotation":                                 "foobar",
-				"nginx.org/server-snippets":                         "# Stuff before.\n##neo-snippet-start\nlocation /auth {proxy_pass http://neo-agent.default.svc.cluster.local/my-policy@test;}\n##neo-snippet-end",
-				"nginx.org/location-snippets":                       "##neo-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
-				"nginx.ingress.kubernetes.io/auth-url":              "http://neo-agent.default.svc.cluster.local/my-policy@test",
-				"nginx.ingress.kubernetes.io/configuration-snippet": "##neo-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##neo-snippet-end",
+				"nginx.org/server-snippets":                         "# Stuff before.\n##hub-snippet-start\nlocation /auth {proxy_pass http://hub-agent.default.svc.cluster.local/my-policy@test;}\n##hub-snippet-end",
+				"nginx.org/location-snippets":                       "##hub-snippet-start\nauth_request /auth;auth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy@test",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_Authorization;proxy_set_header Authorization $value_0;\n##hub-snippet-end",
 			},
 			wantPatch: map[string]string{
 				"custom-annotation":         "foobar",
@@ -538,7 +538,7 @@ func TestNginxIngress_Review(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return &test.config
 			}
-			rev := reviewer.NewNginxIngress("http://neo-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies))
+			rev := reviewer.NewNginxIngress("http://hub-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies))
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`

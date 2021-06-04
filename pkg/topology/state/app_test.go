@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -130,10 +130,10 @@ func TestFetcher_GetApps(t *testing.T) {
 			objects := loadK8sObjects(t, filepath.Join("fixtures", "app", test.fixture))
 
 			kubeClient := kubemock.NewSimpleClientset(objects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 			require.NoError(t, err)
 
 			got, err := f.getApps()

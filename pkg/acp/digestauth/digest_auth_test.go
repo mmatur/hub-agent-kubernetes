@@ -34,21 +34,21 @@ func TestDigestAuthUsers(t *testing.T) {
 	}{
 		{
 			desc:               "Should authenticate users",
-			givenUsers:         []string{"test2:neo:c7a89caf0a2251b3e046e03115fa5afe", "test3:neo:4932cae9e61280f22b4c8d44f9cefe8e"},
+			givenUsers:         []string{"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36"},
 			username:           "test2",
 			password:           "test2",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
 			desc:               "Should not authenticate unknown user",
-			givenUsers:         []string{"test2:neo:c7a89caf0a2251b3e046e03115fa5afe", "test3:neo:4932cae9e61280f22b4c8d44f9cefe8e"},
+			givenUsers:         []string{"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36"},
 			username:           "foo",
 			password:           "bar",
 			expectedStatusCode: http.StatusUnauthorized,
 		},
 		{
 			desc:               "Should authenticate the correct user based on the realm",
-			givenUsers:         []string{"test:neo:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
+			givenUsers:         []string{"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
 			username:           "test",
 			password:           "test2",
 			realm:              "traefiker",
@@ -56,7 +56,7 @@ func TestDigestAuthUsers(t *testing.T) {
 		},
 		{
 			desc:               "Should not authenticate user from unknown realm",
-			givenUsers:         []string{"test:neo:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
+			givenUsers:         []string{"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
 			username:           "test",
 			password:           "test2",
 			realm:              "otherRealm",
@@ -95,7 +95,7 @@ func TestDigestAuthUsers(t *testing.T) {
 
 func TestDigestAuthUserHeader(t *testing.T) {
 	cfg := &Config{
-		Users:                 []string{"test2:neo:c7a89caf0a2251b3e046e03115fa5afe"},
+		Users:                 []string{"test2:hub:5bbbb797a1cc41589e591ed7be86f951"},
 		ForwardUsernameHeader: "User",
 	}
 

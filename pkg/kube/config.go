@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/logger"
+	"github.com/traefik/hub-agent/pkg/logger"
 	"k8s.io/client-go/rest"
 )
 

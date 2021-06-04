@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubemock "k8s.io/client-go/kubernetes/fake"
@@ -27,13 +27,13 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 		{
 			desc: "JWT access control policy",
 			objects: []runtime.Object{
-				&neov1alpha1.AccessControlPolicy{
+				&hubv1alpha1.AccessControlPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "myacp",
 						Namespace: "myns",
 					},
-					Spec: neov1alpha1.AccessControlPolicySpec{
-						JWT: &neov1alpha1.AccessControlPolicyJWT{
+					Spec: hubv1alpha1.AccessControlPolicySpec{
+						JWT: &hubv1alpha1.AccessControlPolicyJWT{
 							SigningSecret:              "titi",
 							SigningSecretBase64Encoded: true,
 							PublicKey:                  "toto",
@@ -70,13 +70,13 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 		{
 			desc: "Obfuscation doesn't run when fields are empty",
 			objects: []runtime.Object{
-				&neov1alpha1.AccessControlPolicy{
+				&hubv1alpha1.AccessControlPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "myacp",
 						Namespace: "myns",
 					},
-					Spec: neov1alpha1.AccessControlPolicySpec{
-						JWT: &neov1alpha1.AccessControlPolicyJWT{
+					Spec: hubv1alpha1.AccessControlPolicySpec{
+						JWT: &hubv1alpha1.AccessControlPolicyJWT{
 							Claims: "iss=titi",
 						},
 					},
@@ -97,13 +97,13 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 		{
 			desc: "Basic Auth access control policy",
 			objects: []runtime.Object{
-				&neov1alpha1.AccessControlPolicy{
+				&hubv1alpha1.AccessControlPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "myacp",
 						Namespace: "myns",
 					},
-					Spec: neov1alpha1.AccessControlPolicySpec{
-						BasicAuth: &neov1alpha1.AccessControlPolicyBasicAuth{
+					Spec: hubv1alpha1.AccessControlPolicySpec{
+						BasicAuth: &hubv1alpha1.AccessControlPolicyBasicAuth{
 							Users:                    "toto:secret,titi:secret",
 							Realm:                    "realm",
 							StripAuthorizationHeader: true,
@@ -128,13 +128,13 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 		{
 			desc: "Digest Auth access control policy",
 			objects: []runtime.Object{
-				&neov1alpha1.AccessControlPolicy{
+				&hubv1alpha1.AccessControlPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "myacp",
 						Namespace: "myns",
 					},
-					Spec: neov1alpha1.AccessControlPolicySpec{
-						DigestAuth: &neov1alpha1.AccessControlPolicyDigestAuth{
+					Spec: hubv1alpha1.AccessControlPolicySpec{
+						DigestAuth: &hubv1alpha1.AccessControlPolicyDigestAuth{
 							Users:                    "toto:realm:secret,titi:realm:secret",
 							Realm:                    "myrealm",
 							StripAuthorizationHeader: true,
@@ -165,10 +165,10 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 
 			clusterID := "cluster-id"
 			kubeClient := kubemock.NewSimpleClientset()
-			neoClient := neokubemock.NewSimpleClientset(test.objects...)
+			hubClient := hubkubemock.NewSimpleClientset(test.objects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, "v1.20.1", clusterID)
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", clusterID)
 			require.NoError(t, err)
 
 			got, err := f.getAccessControlPolicies(clusterID)

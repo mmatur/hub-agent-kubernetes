@@ -6,9 +6,9 @@ import (
 	"reflect"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	"github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
+	"github.com/traefik/hub-agent/pkg/acp"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	"github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -88,7 +88,7 @@ func (m *FwdAuthMiddlewares) setupMiddleware(ctx context.Context, name, namespac
 
 	currentMiddleware.Spec = newSpec
 
-	_, err = m.traefikClientSet.Middlewares(namespace).Update(ctx, currentMiddleware, metav1.UpdateOptions{FieldManager: "neo-auth"})
+	_, err = m.traefikClientSet.Middlewares(namespace).Update(ctx, currentMiddleware, metav1.UpdateOptions{FieldManager: "hub-auth"})
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (m *FwdAuthMiddlewares) createMiddleware(ctx context.Context, name, namespa
 		Spec: spec,
 	}
 
-	_, err = m.traefikClientSet.Middlewares(namespace).Create(ctx, mdlwr, metav1.CreateOptions{FieldManager: "neo-auth"})
+	_, err = m.traefikClientSet.Middlewares(namespace).Create(ctx, mdlwr, metav1.CreateOptions{FieldManager: "hub-auth"})
 	if err != nil {
 		return fmt.Errorf("create middleware: %w", err)
 	}

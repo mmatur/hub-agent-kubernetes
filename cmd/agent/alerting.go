@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
-	"github.com/traefik/neo-agent/pkg/alerting"
-	"github.com/traefik/neo-agent/pkg/metrics"
-	"github.com/traefik/neo-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent/pkg/alerting"
+	"github.com/traefik/hub-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/topology/state"
 )
 
 const (

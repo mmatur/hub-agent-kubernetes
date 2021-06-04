@@ -79,23 +79,23 @@ linters-settings:
 
     # Traefik Kubernetes rewrites:
     - alias: traefikv1alpha1
-      pkg: "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
+      pkg: "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
     - alias: traefikclientset
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
     - alias: traefikinformer
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
     - alias: traefikkubemock
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 
-    # Neo Kubernetes rewrites:
-    - alias: neov1alpha1
-      pkg: "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-    - alias: neoclientset
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-    - alias: neoinformer
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
-    - alias: neokubemock
-      pkg: "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
+    # Hub Kubernetes rewrites:
+    - alias: hubv1alpha1
+      pkg: "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+    - alias: hubclientset
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+    - alias: hubinformer
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+    - alias: hubkubemock
+      pkg: "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
 
     # Misc:
     - alias: jwtreq

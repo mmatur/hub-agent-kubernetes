@@ -1,4 +1,4 @@
-module github.com/traefik/neo-agent
+module github.com/traefik/hub-agent
 
 go 1.16
 

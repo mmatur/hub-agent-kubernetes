@@ -17,7 +17,7 @@ import (
 	"github.com/ldez/go-git-cmd-wrapper/v2/pull"
 	"github.com/ldez/go-git-cmd-wrapper/v2/push"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent/pkg/topology/state"
 )
 
 // Write writes the given cluster state in the current git repository.

@@ -5,7 +5,7 @@
     "items": {
       "type": "record",
       "name": "data_point_group",
-      "namespace": "org.traefik.neo",
+      "namespace": "org.traefik.hub",
       "fields": [
         {
           "name": "ingress_controller",
@@ -26,7 +26,7 @@
             "items": {
               "type": "record",
               "name": "data_point",
-              "namespace": "org.traefik.neo",
+              "namespace": "org.traefik.hub",
               "fields": [
                 {
                   "name": "timestamp",

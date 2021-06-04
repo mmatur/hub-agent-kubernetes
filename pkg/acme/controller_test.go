@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -101,10 +101,10 @@ func TestController_secretDeleted(t *testing.T) {
 			}
 
 			kubeClient := newFakeKubeClient(t, test.objects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			ctrl := newController(t, issuer, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, issuer, kubeClient, hubClient, traefikClient)
 
 			secret, err := kubeClient.CoreV1().Secrets("ns").Get(context.Background(), "secret", metav1.GetOptions{})
 			require.NoError(t, err)
@@ -180,9 +180,9 @@ func TestController_deleteUnusedSecret(t *testing.T) {
 		},
 	)
 
-	neoClient := neokubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 
-	ctrl := newController(t, nil, kubeClient, neoClient, traefikClient)
+	ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
 
 	ctrl.deleteUnusedSecrets("ns", "ingress-secret", "ingressroute-secret", "user-secret", "unused-secret")
 
@@ -416,10 +416,10 @@ func TestController_isSupportedIngressClassController(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := newFakeKubeClient(t, test.objects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			ctrl := newController(t, nil, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
 
 			ing, err := kubeClient.NetworkingV1().Ingresses("ns").Get(context.Background(), "name", metav1.GetOptions{})
 			require.NoError(t, err)
@@ -435,7 +435,7 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 		desc        string
 		want        string
 		kubeObjects []runtime.Object
-		neoObjects  []runtime.Object
+		hubObjects  []runtime.Object
 	}{
 		{
 			desc: "Default v1beta1 IngressClass",
@@ -488,25 +488,25 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "Default neo IngressClass",
+			desc: "Default hub IngressClass",
 			want: "default",
-			neoObjects: []runtime.Object{
-				&neov1alpha1.IngressClass{
+			hubObjects: []runtime.Object{
+				&hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name",
 					},
-					Spec: neov1alpha1.IngressClassSpec{
+					Spec: hubv1alpha1.IngressClassSpec{
 						Controller: "controller",
 					},
 				},
-				&neov1alpha1.IngressClass{
+				&hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name2",
 						Annotations: map[string]string{
 							annotationDefaultIngressClass: "true",
 						},
 					},
-					Spec: neov1alpha1.IngressClassSpec{
+					Spec: hubv1alpha1.IngressClassSpec{
 						Controller: "default",
 					},
 				},
@@ -521,10 +521,10 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := newFakeKubeClient(t, test.kubeObjects...)
-			neoClient := neokubemock.NewSimpleClientset(test.neoObjects...)
+			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			ctrl := newController(t, nil, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
 
 			got, err := ctrl.getDefaultIngressClassController()
 			require.NoError(t, err)
@@ -539,7 +539,7 @@ func TestController_getIngressClassController(t *testing.T) {
 		desc       string
 		want       string
 		k8sObjects []runtime.Object
-		neoObjects []runtime.Object
+		hubObjects []runtime.Object
 	}{
 		{
 			desc: "IngressClass not found",
@@ -574,15 +574,15 @@ func TestController_getIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "IngressClass neo",
-			want: "neo",
-			neoObjects: []runtime.Object{
-				&neov1alpha1.IngressClass{
+			desc: "IngressClass hub",
+			want: "hub",
+			hubObjects: []runtime.Object{
+				&hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name",
 					},
-					Spec: neov1alpha1.IngressClassSpec{
-						Controller: "neo",
+					Spec: hubv1alpha1.IngressClassSpec{
+						Controller: "hub",
 					},
 				},
 			},
@@ -596,10 +596,10 @@ func TestController_getIngressClassController(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := newFakeKubeClient(t, test.k8sObjects...)
-			neoClient := neokubemock.NewSimpleClientset(test.neoObjects...)
+			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			ctrl := newController(t, nil, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
 
 			got, err := ctrl.getIngressClassController("name")
 			require.NoError(t, err)
@@ -639,9 +639,9 @@ func TestController_isSecretUsed(t *testing.T) {
 		},
 	})
 
-	neoClient := neokubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 
-	ctrl := newController(t, nil, kubeClient, neoClient, traefikClient)
+	ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
 
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -749,10 +749,10 @@ func Test_hasDefaultIngressClassAnnotation(t *testing.T) {
 	}
 }
 
-func newController(t *testing.T, issuer issuerMock, kubeClient clientset.Interface, neoClient neoclientset.Interface, traefikClient traefikclientset.Interface) *Controller {
+func newController(t *testing.T, issuer issuerMock, kubeClient clientset.Interface, hubClient hubclientset.Interface, traefikClient traefikclientset.Interface) *Controller {
 	t.Helper()
 
-	ctrl, err := NewController(issuer, kubeClient, neoClient, traefikClient)
+	ctrl, err := NewController(issuer, kubeClient, hubClient, traefikClient)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

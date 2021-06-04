@@ -9,11 +9,11 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
-	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	traefikinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -28,7 +28,7 @@ type Fetcher struct {
 	serverVersion *version.Version
 
 	k8s           informers.SharedInformerFactory
-	neo           neoinformer.SharedInformerFactory
+	hub           hubinformer.SharedInformerFactory
 	traefik       traefikinformer.SharedInformerFactory
 	ingressSource source.Source
 	crdSource     source.Source
@@ -60,8 +60,8 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 		return nil, err
 	}
 
-	// TODO: Handle ingressClasses from Neo as well.
-	neoClientSet, err := neoclientset.NewForConfig(config)
+	// TODO: Handle ingressClasses from Hub as well.
+	hubClientSet, err := hubclientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +76,10 @@ func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	return watchAll(ctx, clientSet, neoClientSet, traefikClientSet, serverVersion.GitVersion, clusterID)
+	return watchAll(ctx, clientSet, hubClientSet, traefikClientSet, serverVersion.GitVersion, clusterID)
 }
 
-func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet neoclientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion, clusterID string) (*Fetcher, error) {
+func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet hubclientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion, clusterID string) (*Fetcher, error) {
 	serverSemVer, err := version.NewVersion(serverVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
@@ -144,11 +144,11 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet n
 		}
 	}
 
-	neoFactory := neoinformer.NewSharedInformerFactoryWithOptions(neoClientSet, 5*time.Minute)
-	neoFactory.Neo().V1alpha1().AccessControlPolicies().Informer()
+	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
+	hubFactory.Hub().V1alpha1().AccessControlPolicies().Informer()
 
 	kubernetesFactory.Start(ctx.Done())
-	neoFactory.Start(ctx.Done())
+	hubFactory.Start(ctx.Done())
 	traefikFactory.Start(ctx.Done())
 
 	for typ, ok := range kubernetesFactory.WaitForCacheSync(ctx.Done()) {
@@ -157,7 +157,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet n
 		}
 	}
 
-	for typ, ok := range neoFactory.WaitForCacheSync(ctx.Done()) {
+	for typ, ok := range hubFactory.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return nil, fmt.Errorf("timed out waiting for access control policies caches to sync %s", typ)
 		}
@@ -173,7 +173,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, neoClientSet n
 		clusterID:     clusterID,
 		serverVersion: serverSemVer,
 		k8s:           kubernetesFactory,
-		neo:           neoFactory,
+		hub:           hubFactory,
 		traefik:       traefikFactory,
 		ingressSource: ingressSource,
 		crdSource:     crdSource,

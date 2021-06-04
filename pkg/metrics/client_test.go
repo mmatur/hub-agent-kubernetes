@@ -9,8 +9,8 @@ import (
 	"github.com/hamba/avro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/metrics"
-	"github.com/traefik/neo-agent/pkg/metrics/protocol"
+	"github.com/traefik/hub-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/metrics/protocol"
 )
 
 func TestClient_GetPreviousData(t *testing.T) {

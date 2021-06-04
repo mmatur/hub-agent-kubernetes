@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pf_pid=$(pgrep -fx "kubectl port-forward -n neo-agent svc/neo-agent 40000")
+pf_pid=$(pgrep -fx "kubectl port-forward -n hub-agent svc/hub-agent 40000")
 
 if [ -n "$pf_pid" ]
 then
@@ -8,4 +8,4 @@ then
   kill -SIGTERM $pf_pid
 fi
 
-kubectl port-forward -n neo-agent svc/neo-agent 40000 &>/dev/null &
+kubectl port-forward -n hub-agent svc/hub-agent 40000 &>/dev/null &

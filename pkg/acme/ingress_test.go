@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -144,7 +144,7 @@ func TestController_syncIngress(t *testing.T) {
 				issuerCallReq = req
 			}
 
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
 			kubeClient := newFakeKubeClient(t, &corev1.Secret{
@@ -160,7 +160,7 @@ func TestController_syncIngress(t *testing.T) {
 				},
 			})
 
-			ctrl := newController(t, issuer, kubeClient, neoClient, traefikClient)
+			ctrl := newController(t, issuer, kubeClient, hubClient, traefikClient)
 
 			ctrl.syncIngress(test.ing)
 

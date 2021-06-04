@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	neokubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikkubemock "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,10 +48,10 @@ func Test_WatchAllHandlesUnsupportedVersions(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := kubemock.NewSimpleClientset()
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			_, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, test.serverVersion, "cluster-id")
+			_, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, test.serverVersion, "cluster-id")
 
 			test.wantErr(t, err)
 		})
@@ -155,10 +155,10 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 			}
 
 			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
-			neoClient := neokubemock.NewSimpleClientset()
+			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, neoClient, traefikClient, test.serverVersion, "cluster-id")
+			f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, test.serverVersion, "cluster-id")
 			require.NoError(t, err)
 
 			got, err := f.getIngresses("cluster-id")

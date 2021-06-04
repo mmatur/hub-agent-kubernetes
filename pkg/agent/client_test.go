@@ -79,12 +79,12 @@ func TestClient_Link(t *testing.T) {
 			c := NewClient(srv.URL, "123")
 			c.httpClient = srv.Client()
 
-			neoClusterID, err := c.Link(context.Background(), "1")
+			hubClusterID, err := c.Link(context.Background(), "1")
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
 
-			assert.Equal(t, test.wantClusterID, neoClusterID)
+			assert.Equal(t, test.wantClusterID, hubClusterID)
 		})
 	}
 }

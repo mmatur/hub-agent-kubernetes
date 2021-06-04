@@ -149,21 +149,21 @@ func TestValidateCustomClaims(t *testing.T) {
 			want:   true,
 		},
 		{
-			desc:   "oneOf expression",
+			desc:   "ohubf expression",
 			claims: `{"grp":"admin"}`,
-			expr:   "OneOf(`grp`, `admin`, `dev`)",
+			expr:   "Ohubf(`grp`, `admin`, `dev`)",
 			want:   true,
 		},
 		{
-			desc:   "oneOf expression with numbers",
+			desc:   "ohubf expression with numbers",
 			claims: `{"gid":500}`,
-			expr:   "OneOf(`gid`, `500`, `900`)",
+			expr:   "Ohubf(`gid`, `500`, `900`)",
 			want:   true,
 		},
 		{
-			desc:   "oneOf expression with nested value",
+			desc:   "ohubf expression with nested value",
 			claims: `{"grp":"dev","user":{"name":"bruce","role": "batman"}}`,
-			expr:   "OneOf(`user.role`, `jocker`, `batman`)",
+			expr:   "Ohubf(`user.role`, `jocker`, `batman`)",
 			want:   true,
 		},
 		{

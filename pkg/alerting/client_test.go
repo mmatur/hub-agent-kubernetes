@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/alerting"
+	"github.com/traefik/hub-agent/pkg/alerting"
 )
 
 func TestClient_GetRules(t *testing.T) {

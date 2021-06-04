@@ -7,7 +7,7 @@ import (
 )
 
 func (f *Fetcher) getAccessControlPolicies(clusterID string) (map[string]*AccessControlPolicy, error) {
-	policies, err := f.neo.Neo().V1alpha1().AccessControlPolicies().Lister().List(labels.Everything())
+	policies, err := f.hub.Hub().V1alpha1().AccessControlPolicies().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}

@@ -11,14 +11,14 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp/admission"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/neo-agent/pkg/acp/admission/reviewer"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
-	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	"github.com/traefik/neo-agent/pkg/kube"
-	"github.com/traefik/neo-agent/pkg/kubevers"
+	"github.com/traefik/hub-agent/pkg/acp/admission"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent/pkg/kube"
+	"github.com/traefik/hub-agent/pkg/kubevers"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -37,19 +37,19 @@ func acpFlags() []cli.Flag {
 			Name:    "acp-server.cert",
 			Usage:   "Certificate used for TLS by the ACP server",
 			EnvVars: []string{"ACP_SERVER_CERT"},
-			Value:   "/var/run/neo-agent/cert.pem",
+			Value:   "/var/run/hub-agent/cert.pem",
 		},
 		&cli.StringFlag{
 			Name:    "acp-server.key",
 			Usage:   "Key used for TLS by the ACP server",
 			EnvVars: []string{"ACP_SERVER_KEY"},
-			Value:   "/var/run/neo-agent/key.pem",
+			Value:   "/var/run/hub-agent/key.pem",
 		},
 		&cli.StringFlag{
 			Name:    "acp-server.auth-server-addr",
 			Usage:   "Address the ACP server can reach the auth server on",
 			EnvVars: []string{"ACP_SERVER_AUTH_SERVER_ADDR"},
-			Value:   "http://neo-agent.neo.svc.cluster.local",
+			Value:   "http://hub-agent.hub.svc.cluster.local",
 		},
 	}
 }
@@ -116,9 +116,9 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 		return nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
-	neoClientSet, err := neoclientset.NewForConfig(config)
+	hubClientSet, err := hubclientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("create Neo client set: %w", err)
+		return nil, fmt.Errorf("create Hub client set: %w", err)
 	}
 
 	kubeVers, err := clientSet.Discovery().ServerVersion()
@@ -127,7 +127,7 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 	}
 
 	kubeInformer := informers.NewSharedInformerFactory(clientSet, 5*time.Minute)
-	neoInformer := neoinformer.NewSharedInformerFactory(neoClientSet, 5*time.Minute)
+	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
 	updater := admission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
 
@@ -142,9 +142,9 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 		return nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	err = startNeoInformer(ctx, neoInformer, eventHandler, ingClassWatcher)
+	err = startHubInformer(ctx, hubInformer, eventHandler, ingClassWatcher)
 	if err != nil {
-		return nil, fmt.Errorf("start Neo informer: %w", err)
+		return nil, fmt.Errorf("start Hub informer: %w", err)
 	}
 
 	traefikClientSet, err := traefikclientset.NewForConfig(config)
@@ -152,7 +152,7 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 		return nil, fmt.Errorf("create Traefik client set: %w", err)
 	}
 
-	polGetter := reviewer.NewPolGetter(neoInformer)
+	polGetter := reviewer.NewPolGetter(hubInformer)
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
@@ -192,15 +192,15 @@ func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer inform
 	return nil
 }
 
-func startNeoInformer(ctx context.Context, neoInformer neoinformer.SharedInformerFactory, acpEventHandler, ingClassEventHandler cache.ResourceEventHandler) error {
-	neoInformer.Neo().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
-	neoInformer.Neo().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
+func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, acpEventHandler, ingClassEventHandler cache.ResourceEventHandler) error {
+	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
+	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
 
-	neoInformer.Start(ctx.Done())
+	hubInformer.Start(ctx.Done())
 
-	for t, ok := range neoInformer.WaitForCacheSync(ctx.Done()) {
+	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
 		if !ok {
-			return fmt.Errorf("wait for Neo cache sync: %s: %w", t, ctx.Err())
+			return fmt.Errorf("wait for Hub cache sync: %s: %w", t, ctx.Err())
 		}
 	}
 

@@ -10,9 +10,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp/auth"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/acp/auth"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/rest"
 )
@@ -36,19 +36,19 @@ func runAuth(ctx context.Context, cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
-	neoClientSet, err := neoclientset.NewForConfig(config)
+	hubClientSet, err := hubclientset.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("create Neo client set: %w", err)
+		return fmt.Errorf("create Hub client set: %w", err)
 	}
 
 	switcher := auth.NewHandlerSwitcher()
 	acpWatcher := auth.NewWatcher(switcher)
 
-	neoInformer := neoinformer.NewSharedInformerFactory(neoClientSet, 5*time.Minute)
-	neoInformer.Neo().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher)
-	neoInformer.Start(ctx.Done())
+	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher)
+	hubInformer.Start(ctx.Done())
 
-	for t, ok := range neoInformer.WaitForCacheSync(ctx.Done()) {
+	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return fmt.Errorf("wait for cache sync: %s: %w", t, ctx.Err())
 		}

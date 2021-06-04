@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	"github.com/traefik/neo-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -86,8 +86,8 @@ func (r HAProxyIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([
 		}
 	}
 
-	polName := ing.Metadata.Annotations[AnnotationNeoAuth]
-	oldPolName := oldIng.Metadata.Annotations[AnnotationNeoAuth]
+	polName := ing.Metadata.Annotations[AnnotationHubAuth]
+	oldPolName := oldIng.Metadata.Annotations[AnnotationHubAuth]
 
 	if polName == "" && oldPolName == "" {
 		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("No patch required")

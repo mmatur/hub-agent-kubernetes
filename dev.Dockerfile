@@ -9,10 +9,10 @@ RUN apk --no-cache --no-progress add ca-certificates tzdata git libc6-compat \
     && rm -rf /var/cache/apk/*
 
 COPY --from=delve-builder /go/bin/dlv .
-COPY neo-agent .
+COPY hub-agent .
 
 EXPOSE 80
 EXPOSE 443
 EXPOSE 40000
 
-ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "--accept-multiclient", "--continue", "--", "./neo-agent"]
+ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "--accept-multiclient", "--continue", "--", "./hub-agent"]

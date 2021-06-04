@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/rs/zerolog/log"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +28,7 @@ func NewEventHandler(listener Updatable) *EventHandler {
 
 // OnAdd implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *EventHandler) OnAdd(obj interface{}) {
-	v, ok := obj.(*neov1alpha1.AccessControlPolicy)
+	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -43,7 +43,7 @@ func (w *EventHandler) OnAdd(obj interface{}) {
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
-	newACP, ok := newObj.(*neov1alpha1.AccessControlPolicy)
+	newACP, ok := newObj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -52,7 +52,7 @@ func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	oldACP, ok := oldObj.(*neov1alpha1.AccessControlPolicy)
+	oldACP, ok := oldObj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -71,7 +71,7 @@ func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *EventHandler) OnDelete(obj interface{}) {
-	v, ok := obj.(*neov1alpha1.AccessControlPolicy)
+	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
 			Str("component", "acpWatcher").
@@ -92,7 +92,7 @@ func canonicalName(name, ns string) string {
 	return name + "@" + ns
 }
 
-func headersChanged(oldCfg, newCfg neov1alpha1.AccessControlPolicySpec) bool {
+func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {
 	switch {
 	case newCfg.JWT != nil:
 		if oldCfg.JWT == nil {

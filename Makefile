@@ -1,7 +1,7 @@
 .PHONY: clean lint test build \
 		publish publish-latest image image-dev
 
-BIN_NAME := neo-agent
+BIN_NAME := hub-agent
 MAIN_DIRECTORY := ./cmd/agent
 
 TAG_NAME := $(shell git tag -l --contains HEAD)
@@ -35,9 +35,9 @@ image-dev: build
 	docker build -t $(BIN_NAME):dev . -f ./dev.Dockerfile
 
 dev: image-dev
-	k3d image import $(BIN_NAME):dev --cluster=k3s-default-neo
-	kubectl patch deployment -n neo-agent neo-agent -p '{"spec":{"template":{"spec":{"containers":[{"name":"neo-agent","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
-	kubectl rollout restart deployment -n neo-agent neo-agent
+	k3d image import $(BIN_NAME):dev --cluster=k3s-default-hub
+	kubectl patch deployment -n hub-agent hub-agent -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl rollout restart deployment -n hub-agent hub-agent
 
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)

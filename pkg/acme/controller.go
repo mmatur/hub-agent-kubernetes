@@ -7,11 +7,11 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
-	neoclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/clientset/versioned"
-	neoinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/neo/informers/externalversions"
-	traefikclientset "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	traefikinformer "github.com/traefik/neo-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -25,7 +25,7 @@ import (
 )
 
 // controllerName is the name of the controller.
-const controllerName = "neo"
+const controllerName = "hub"
 
 // annotationTLSACME is an opt-out annotation which can be added to an Ingress/IngressRoute to indicate that its TLS secrets should not be managed by the agent.
 const annotationTLSACME = "kubernetes.io/tls-acme"
@@ -65,12 +65,12 @@ type Controller struct {
 	cacheSyncChan    chan struct{}
 	kubeClient       clientset.Interface
 	kubeInformers    informers.SharedInformerFactory
-	neoInformers     neoinformer.SharedInformerFactory
+	hubInformers     hubinformer.SharedInformerFactory
 	traefikInformers traefikinformer.SharedInformerFactory
 }
 
 // NewController returns a new Controller instance.
-func NewController(certs CertIssuer, kubeClient clientset.Interface, neoClient neoclientset.Interface, traefikClient traefikclientset.Interface) (*Controller, error) {
+func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient hubclientset.Interface, traefikClient traefikclientset.Interface) (*Controller, error) {
 	serverVersion, err := kubeClient.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
@@ -82,7 +82,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, neoClient n
 	}
 
 	kubeInformers := informers.NewSharedInformerFactory(kubeClient, defaultResync)
-	neoInformers := neoinformer.NewSharedInformerFactory(neoClient, defaultResync)
+	hubInformers := hubinformer.NewSharedInformerFactory(hubClient, defaultResync)
 	traefikInformers := traefikinformer.NewSharedInformerFactory(traefikClient, defaultResync)
 
 	ctrl := &Controller{
@@ -90,7 +90,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, neoClient n
 		cacheSyncChan:    make(chan struct{}),
 		kubeClient:       kubeClient,
 		kubeInformers:    kubeInformers,
-		neoInformers:     neoInformers,
+		hubInformers:     hubInformers,
 		traefikInformers: traefikInformers,
 	}
 
@@ -140,7 +140,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, neoClient n
 		kubeInformers.Networking().V1beta1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
 	}
 
-	neoInformers.Neo().V1alpha1().IngressClasses().Informer()
+	hubInformers.Hub().V1alpha1().IngressClasses().Informer()
 
 	hasIngressRoute, err := hasTraefikIngressRouteCRD(kubeClient)
 	if err != nil {
@@ -171,7 +171,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, neoClient n
 // Run starts the controller routine.
 func (c *Controller) Run(ctx context.Context) error {
 	c.kubeInformers.Start(ctx.Done())
-	c.neoInformers.Start(ctx.Done())
+	c.hubInformers.Start(ctx.Done())
 	c.traefikInformers.Start(ctx.Done())
 
 	for typ, ok := range c.kubeInformers.WaitForCacheSync(ctx.Done()) {
@@ -180,9 +180,9 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 	}
 
-	for typ, ok := range c.neoInformers.WaitForCacheSync(ctx.Done()) {
+	for typ, ok := range c.hubInformers.WaitForCacheSync(ctx.Done()) {
 		if !ok {
-			return fmt.Errorf("timed out waiting for Neo object caches to sync %s", typ)
+			return fmt.Errorf("timed out waiting for Hub object caches to sync %s", typ)
 		}
 	}
 
@@ -293,12 +293,12 @@ func (c *Controller) isSupportedIngressController(ing *netv1.Ingress) bool {
 }
 
 func (c *Controller) getDefaultIngressClassController() (string, error) {
-	neoIngClasses, err := c.neoInformers.Neo().V1alpha1().IngressClasses().Lister().List(labels.Everything())
+	hubIngClasses, err := c.hubInformers.Hub().V1alpha1().IngressClasses().Lister().List(labels.Everything())
 	if err != nil {
-		return "", fmt.Errorf("list neo IngressClasses: %w", err)
+		return "", fmt.Errorf("list hub IngressClasses: %w", err)
 	}
 
-	for _, ingClass := range neoIngClasses {
+	for _, ingClass := range hubIngClasses {
 		if ingClass.Annotations[annotationDefaultIngressClass] == "true" {
 			return ingClass.Spec.Controller, nil
 		}
@@ -330,12 +330,12 @@ func (c *Controller) getDefaultIngressClassController() (string, error) {
 }
 
 func (c *Controller) getIngressClassController(name string) (string, error) {
-	neoIng, err := c.neoInformers.Neo().V1alpha1().IngressClasses().Lister().Get(name)
+	hubIng, err := c.hubInformers.Hub().V1alpha1().IngressClasses().Lister().Get(name)
 	if err != nil && !kerror.IsNotFound(err) {
-		return "", fmt.Errorf("get neo IngressClass: %w", err)
+		return "", fmt.Errorf("get hub IngressClass: %w", err)
 	}
-	if neoIng != nil {
-		return neoIng.Spec.Controller, nil
+	if hubIng != nil {
+		return hubIng.Spec.Controller, nil
 	}
 
 	ing, err := c.kubeInformers.Networking().V1().IngressClasses().Lister().Get(name)

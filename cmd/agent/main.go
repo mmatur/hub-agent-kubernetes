@@ -8,11 +8,11 @@ import (
 	"syscall"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/agent"
-	"github.com/traefik/neo-agent/pkg/kube"
-	"github.com/traefik/neo-agent/pkg/logger"
-	"github.com/traefik/neo-agent/pkg/topology/state"
-	"github.com/traefik/neo-agent/pkg/topology/store"
+	"github.com/traefik/hub-agent/pkg/agent"
+	"github.com/traefik/hub-agent/pkg/kube"
+	"github.com/traefik/hub-agent/pkg/logger"
+	"github.com/traefik/hub-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent/pkg/topology/store"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,8 +21,8 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:  "Neo agent CLI",
-		Usage: "Run neo-agent service",
+		Name:  "Hub agent CLI",
+		Usage: "Run hub-agent service",
 		Flags: allFlags(),
 		Action: func(cliCtx *cli.Context) error {
 			logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
@@ -44,7 +44,7 @@ func main() {
 
 			agentClient := agent.NewClient(platformURL, token)
 
-			neoClusterID, agentCfg, err := setup(ctx, agentClient, kubeClient)
+			hubClusterID, agentCfg, err := setup(ctx, agentClient, kubeClient)
 			if err != nil {
 				return fmt.Errorf("setup agent: %w", err)
 			}
@@ -53,7 +53,7 @@ func main() {
 				TopologyConfig: agentCfg.Topology,
 				Token:          cliCtx.String("token"),
 			}
-			topoFetcher, err := state.NewFetcher(ctx, neoClusterID)
+			topoFetcher, err := state.NewFetcher(ctx, hubClusterID)
 			if err != nil {
 				return err
 			}
@@ -97,13 +97,13 @@ func main() {
 	}
 }
 
-func setup(ctx context.Context, agentClient *agent.Client, kubeClient clientset.Interface) (neoClusterID string, cfg agent.Config, err error) {
+func setup(ctx context.Context, agentClient *agent.Client, kubeClient clientset.Interface) (hubClusterID string, cfg agent.Config, err error) {
 	ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, metav1.NamespaceSystem, metav1.GetOptions{})
 	if err != nil {
 		return "", agent.Config{}, fmt.Errorf("get namespace: %w", err)
 	}
 
-	neoClusterID, err = agentClient.Link(ctx, string(ns.UID))
+	hubClusterID, err = agentClient.Link(ctx, string(ns.UID))
 	if err != nil {
 		return "", agent.Config{}, fmt.Errorf("link agent: %w", err)
 	}
@@ -113,7 +113,7 @@ func setup(ctx context.Context, agentClient *agent.Client, kubeClient clientset.
 		return "", agent.Config{}, fmt.Errorf("fetch agent config: %w", err)
 	}
 
-	return neoClusterID, agentCfg, nil
+	return hubClusterID, agentCfg, nil
 }
 
 func allFlags() []cli.Flag {
@@ -133,14 +133,14 @@ func allFlags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:     "platform-url",
-			Usage:    "The URL at which to reach the Neo platform API",
+			Usage:    "The URL at which to reach the Hub platform API",
 			EnvVars:  []string{"PLATFORM_URL"},
 			Required: true,
 			Hidden:   true,
 		},
 		&cli.StringFlag{
 			Name:     "token",
-			Usage:    "The token to use for Neo platform API calls",
+			Usage:    "The token to use for Hub platform API calls",
 			EnvVars:  []string{"TOKEN"},
 			Required: true,
 		},

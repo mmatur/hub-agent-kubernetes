@@ -25,7 +25,7 @@ func Parse(expr string) (Predicate, error) {
 			"Prefix":        prefix,
 			"Contains":      contains,
 			"SplitContains": splitContains,
-			"OneOf":         oneOf,
+			"Ohubf":         ohubf,
 		},
 	})
 	if err != nil {
@@ -132,7 +132,7 @@ func splitContains(claimName, sep, expected string) Predicate {
 	}
 }
 
-func oneOf(claimName string, expected ...string) Predicate {
+func ohubf(claimName string, expected ...string) Predicate {
 	return func(claims map[string]interface{}) bool {
 		claim, ok := resolve(claimName, claims)
 		if !ok {

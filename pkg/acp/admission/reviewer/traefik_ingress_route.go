@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp"
-	traefikv1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/traefik/v1alpha1"
+	"github.com/traefik/hub-agent/pkg/acp"
+	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	admv1 "k8s.io/api/admission/v1"
 )
 
@@ -52,8 +52,8 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 		}
 	}
 
-	prevPolName := oldIngressRoute.Annotations[AnnotationNeoAuth]
-	polName := ingRoute.Annotations[AnnotationNeoAuth]
+	prevPolName := oldIngressRoute.Annotations[AnnotationHubAuth]
+	polName := ingRoute.Annotations[AnnotationHubAuth]
 
 	if prevPolName == "" && polName == "" {
 		logger.Debug().Msg("No ACP defined")

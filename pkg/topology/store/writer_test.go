@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/neo-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent/pkg/topology/state"
 	netv1 "k8s.io/api/networking/v1"
 )
 

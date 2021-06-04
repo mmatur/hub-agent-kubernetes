@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	neov1alpha1 "github.com/traefik/neo-agent/pkg/crd/api/neo/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )
@@ -17,11 +17,11 @@ func (f *fakeUpdater) Update(polName string) {
 	f.policies = append(f.policies, polName)
 }
 
-func createPolicy(uid, name, ns string, sah bool) *neov1alpha1.AccessControlPolicy {
-	return &neov1alpha1.AccessControlPolicy{
+func createPolicy(uid, name, ns string, sah bool) *hubv1alpha1.AccessControlPolicy {
+	return &hubv1alpha1.AccessControlPolicy{
 		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name, Namespace: ns},
-		Spec: neov1alpha1.AccessControlPolicySpec{
-			JWT: &neov1alpha1.AccessControlPolicyJWT{
+		Spec: hubv1alpha1.AccessControlPolicySpec{
+			JWT: &hubv1alpha1.AccessControlPolicyJWT{
 				SigningSecret:            "secret",
 				StripAuthorizationHeader: sah,
 			},

@@ -7,10 +7,10 @@ import (
 
 	goauth "github.com/abbot/go-http-auth"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/neo-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent/pkg/acp/basicauth"
 )
 
-const defaultRealm = "neo"
+const defaultRealm = "hub"
 
 // Config is the configuration of a digest auth ACP handler.
 type Config struct {
