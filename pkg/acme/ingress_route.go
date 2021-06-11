@@ -42,7 +42,7 @@ func (c *Controller) ingressRouteUpdated(oldObj, newObj interface{}) {
 
 	c.syncIngressRoute(newIngRoute)
 
-	if oldIngRoute.Spec.TLS != nil && oldIngRoute.Spec.TLS.SecretName != "" {
+	if oldIngRoute.Spec.TLS == nil || oldIngRoute.Spec.TLS.SecretName == "" {
 		return
 	}
 
