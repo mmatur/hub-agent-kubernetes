@@ -201,6 +201,15 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 		Points:  newPnts,
 		Logs:    logBytes,
 		State:   stateCritical,
+		Threshold: &Threshold{
+			Metric: "requestsPerSecond",
+			Condition: ThresholdCondition{
+				Above: true,
+				Value: 10,
+			},
+			Occurrence: 3,
+			TimeRange:  10 * time.Minute,
+		},
 	}
 	assert.Equal(t, want, got)
 }
@@ -279,6 +288,15 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 		Points:  newPnts,
 		Logs:    logBytes,
 		State:   stateCritical,
+		Threshold: &Threshold{
+			Metric: "requestsPerSecond",
+			Condition: ThresholdCondition{
+				Above: true,
+				Value: 10,
+			},
+			Occurrence: 3,
+			TimeRange:  40 * time.Minute,
+		},
 	}
 	assert.Equal(t, want, got)
 }

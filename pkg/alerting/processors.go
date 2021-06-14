@@ -98,12 +98,13 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule) (*Alert, e
 	}
 
 	return &Alert{
-		RuleID:  rule.ID,
-		Ingress: group.Ingress,
-		Service: group.Service,
-		Points:  newPnts,
-		Logs:    logs,
-		State:   stateCritical,
+		RuleID:    rule.ID,
+		Ingress:   group.Ingress,
+		Service:   group.Service,
+		Points:    newPnts,
+		Logs:      logs,
+		State:     stateCritical,
+		Threshold: rule.Threshold,
 	}, nil
 }
 

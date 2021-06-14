@@ -73,12 +73,13 @@ type ThresholdCondition struct {
 
 // Alert contains alert information.
 type Alert struct {
-	RuleID  string  `json:"ruleId"`
-	Ingress string  `json:"ingress"`
-	Service string  `json:"service"`
-	State   int     `json:"state"`
-	Points  []Point `json:"points"`
-	Logs    []byte  `json:"logs"`
+	RuleID    string     `json:"ruleId"`
+	Ingress   string     `json:"ingress"`
+	Service   string     `json:"service"`
+	State     int        `json:"state"`
+	Points    []Point    `json:"points"`
+	Logs      []byte     `json:"logs"`
+	Threshold *Threshold `json:"threshold"`
 }
 
 // Point contains a point and its timestamp.
