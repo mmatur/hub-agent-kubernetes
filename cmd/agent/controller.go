@@ -22,12 +22,11 @@ type controllerCmd struct {
 func newControllerCmd() controllerCmd {
 	flgs := []cli.Flag{
 		&cli.StringFlag{
-			Name:     "platform-url",
-			Usage:    "The URL at which to reach the Hub platform API",
-			Value:    "https://platform.hub.traefik.io/agent",
-			EnvVars:  []string{"PLATFORM_URL"},
-			Required: true,
-			Hidden:   true,
+			Name:    "platform-url",
+			Usage:   "The URL at which to reach the Hub platform API",
+			Value:   "https://platform.hub.traefik.io/agent",
+			EnvVars: []string{"PLATFORM_URL"},
+			Hidden:  true,
 		},
 		&cli.StringFlag{
 			Name:     "token",
