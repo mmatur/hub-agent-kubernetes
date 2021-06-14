@@ -49,7 +49,7 @@ func acpFlags() []cli.Flag {
 			Name:    "acp-server.auth-server-addr",
 			Usage:   "Address the ACP server can reach the auth server on",
 			EnvVars: []string{"ACP_SERVER_AUTH_SERVER_ADDR"},
-			Value:   "http://hub-agent.hub.svc.cluster.local",
+			Value:   "http://hub-agent-auth-server.hub.svc.cluster.local",
 		},
 	}
 }

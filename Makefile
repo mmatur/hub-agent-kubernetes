@@ -36,8 +36,10 @@ image-dev: build
 
 dev: image-dev
 	k3d image import $(BIN_NAME):dev --cluster=k3s-default-hub
-	kubectl patch deployment -n hub-agent hub-agent -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
-	kubectl rollout restart deployment -n hub-agent hub-agent
+	kubectl patch deployment -n hub-agent hub-agent-controller -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-controller","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl patch deployment -n hub-agent hub-agent-auth-server -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-auth-server","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl rollout restart deployment -n hub-agent hub-agent-controller
+	kubectl rollout restart deployment -n hub-agent hub-agent-auth-server
 
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)

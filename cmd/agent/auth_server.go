@@ -13,23 +13,43 @@ import (
 	"github.com/traefik/hub-agent/pkg/acp/auth"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/rest"
 )
 
-func authFlags() []cli.Flag {
-	return []cli.Flag{
+type authServerCmd struct {
+	flags []cli.Flag
+}
+
+func newAuthServerCmd() authServerCmd {
+	flgs := []cli.Flag{
 		&cli.StringFlag{
-			Name:    "auth-server.listen-addr",
+			Name:    "listen-addr",
 			Usage:   "Address on which the auth server listens for auth requests",
 			EnvVars: []string{"AUTH_SERVER_LISTEN_ADDR"},
 			Value:   "0.0.0.0:80",
 		},
 	}
+
+	flgs = append(flgs, globalFlags()...)
+
+	return authServerCmd{
+		flags: flgs,
+	}
 }
 
-func runAuth(ctx context.Context, cliCtx *cli.Context) error {
-	listenAddr := cliCtx.String("auth-server.listen-addr")
+func (c authServerCmd) build() *cli.Command {
+	return &cli.Command{
+		Name:   "auth-server",
+		Usage:  "Runs the Hub agent authentication server",
+		Flags:  c.flags,
+		Action: c.run,
+	}
+}
+
+func (c authServerCmd) run(cliCtx *cli.Context) error {
+	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -46,16 +66,17 @@ func runAuth(ctx context.Context, cliCtx *cli.Context) error {
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher)
-	hubInformer.Start(ctx.Done())
+	hubInformer.Start(cliCtx.Context.Done())
 
-	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
+	for t, ok := range hubInformer.WaitForCacheSync(cliCtx.Context.Done()) {
 		if !ok {
-			return fmt.Errorf("wait for cache sync: %s: %w", t, ctx.Err())
+			return fmt.Errorf("wait for cache sync: %s: %w", t, cliCtx.Context.Err())
 		}
 	}
 
-	go acpWatcher.Run(ctx)
+	go acpWatcher.Run(cliCtx.Context)
 
+	listenAddr := cliCtx.String("auth-server.listen-addr")
 	server := &http.Server{
 		Addr:     listenAddr,
 		Handler:  switcher,
@@ -73,7 +94,7 @@ func runAuth(ctx context.Context, cliCtx *cli.Context) error {
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-cliCtx.Context.Done():
 		gracefulCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
