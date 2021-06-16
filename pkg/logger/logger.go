@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"k8s.io/klog/v2"
 )
 
 // Setup is configuring the logger.
@@ -34,4 +35,6 @@ func Setup(level, format string) {
 	zerolog.SetGlobalLevel(logLevel)
 
 	log.Trace().Str("level", logLevel.String()).Msg("Log level set")
+
+	klog.SetLogger(logrWrapper{logger: log.Logger})
 }

@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/alerting"
+	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/traefik/hub-agent/pkg/metrics"
 	"github.com/traefik/hub-agent/pkg/topology/state"
 )
@@ -25,6 +27,7 @@ func runAlerting(ctx context.Context, token, platformURL string, store *metrics.
 	retryableClient.RetryWaitMin = time.Second
 	retryableClient.RetryWaitMax = 10 * time.Second
 	retryableClient.RetryMax = 4
+	retryableClient.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "alerting-service").Logger())
 
 	httpClient := retryableClient.StandardClient()
 

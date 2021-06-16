@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/abbot/go-http-auth v0.4.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gravitational/trace v1.1.14 // indirect
 	github.com/hamba/avro v1.5.4
@@ -25,7 +26,7 @@ require (
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v0.20.2
-	k8s.io/klog/v2 v2.5.0 // indirect
+	k8s.io/klog/v2 v2.5.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
 	sigs.k8s.io/external-dns v0.7.6
 )
