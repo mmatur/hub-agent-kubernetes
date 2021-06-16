@@ -3,6 +3,7 @@ package acme
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-version"
@@ -142,7 +143,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient h
 
 	hubInformers.Hub().V1alpha1().IngressClasses().Informer()
 
-	hasIngressRoute, err := hasTraefikIngressRouteCRD(kubeClient)
+	hasIngressRoute, err := hasTraefikCRDs(kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("check presence of Traefik IngressRoute CRD: %w", err)
 	}
@@ -425,9 +426,14 @@ func marshalToIngressNetworkingV1(bIng *netv1beta1.Ingress) (*netv1.Ingress, err
 	return ing, nil
 }
 
-func hasTraefikIngressRouteCRD(kubeClient clientset.Interface) (bool, error) {
+func hasTraefikCRDs(kubeClient clientset.Interface) (bool, error) {
 	resourceList, err := kubeClient.Discovery().ServerResourcesForGroupVersion(traefikv1alpha1.SchemeGroupVersion.String())
 	if err != nil {
+		if kerror.IsNotFound(err) ||
+			// because the fake client doesn't return the right error type.
+			strings.HasSuffix(err.Error(), " not found") {
+			return false, nil
+		}
 		return false, fmt.Errorf("get server groups and resources: %w", err)
 	}
 

@@ -14,6 +14,7 @@ import (
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -118,7 +119,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 
 	hasTraefikCRDs, err := hasTraefikCRDs(clientSet.Discovery())
 	if err != nil {
-		log.Error().Err(err).Msg("Unable to check if Traefik CRDs are installed")
+		return nil, fmt.Errorf("check presence of Traefik IngressRoute CRD: %w", err)
 	}
 	if hasTraefikCRDs {
 		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
@@ -250,6 +251,11 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 func hasTraefikCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
 	crdList, err := clientSet.ServerResourcesForGroupVersion(traefikv1alpha1.SchemeGroupVersion.String())
 	if err != nil {
+		if kerror.IsNotFound(err) ||
+			// because the fake client doesn't return the right error type.
+			strings.HasSuffix(err.Error(), " not found") {
+			return false, nil
+		}
 		return false, err
 	}
 
