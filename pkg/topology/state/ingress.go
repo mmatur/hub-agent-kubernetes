@@ -29,9 +29,9 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 				Namespace: ingress.Namespace,
 			},
 			IngressMeta: IngressMeta{
-				ClusterID:   clusterID,
-				Controller:  getControllerName(ingress, ingressClasses),
-				Annotations: sanitizeAnnotations(ingress.Annotations),
+				ClusterID:      clusterID,
+				ControllerType: getControllerType(ingress, ingressClasses),
+				Annotations:    sanitizeAnnotations(ingress.Annotations),
 			},
 			TLS:            ingress.Spec.TLS,
 			DefaultBackend: ingress.Spec.DefaultBackend,
@@ -104,7 +104,7 @@ func getIngressServices(ingress *netv1.Ingress) []string {
 	return result
 }
 
-func getControllerName(ingress *netv1.Ingress, ingressClasses []*netv1.IngressClass) string {
+func getControllerType(ingress *netv1.Ingress, ingressClasses []*netv1.IngressClass) string {
 	// Look for ingressClassName in Ingress spec.
 	var ingressClassName string
 	if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName != "" {

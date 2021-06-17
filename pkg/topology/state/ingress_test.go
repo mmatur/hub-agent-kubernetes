@@ -28,7 +28,7 @@ func TestFetcher_GetIngresses(t *testing.T) {
 				Annotations: map[string]string{
 					"cert-manager.io/cluster-issuer": "foo",
 				},
-				Controller: "myIngressController",
+				ControllerType: "myIngressController",
 			},
 			TLS: []netv1.IngressTLS{
 				{
@@ -159,12 +159,12 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func Test_GetControllerName(t *testing.T) {
+func Test_GetControllerType(t *testing.T) {
 	tests := []struct {
 		desc           string
 		ingress        *netv1.Ingress
 		ingressClasses []*netv1.IngressClass
-		wantName       string
+		wantType       string
 	}{
 		{
 			desc: "No IngressClassName and annotation",
@@ -191,7 +191,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: IngressControllerTypeTraefik,
+			wantType: IngressControllerTypeTraefik,
 		},
 		{
 			desc: "IngressClassName matching nginx official controller",
@@ -210,7 +210,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: IngressControllerTypeNginxOfficial,
+			wantType: IngressControllerTypeNginxOfficial,
 		},
 		{
 			desc: "IngressClassName matching nginx community controller",
@@ -229,7 +229,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: IngressControllerTypeNginxCommunity,
+			wantType: IngressControllerTypeNginxCommunity,
 		},
 		{
 			desc: "IngressClassName matching haproxy community controller",
@@ -248,7 +248,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: IngressControllerTypeHAProxyCommunity,
+			wantType: IngressControllerTypeHAProxyCommunity,
 		},
 		{
 			desc: "IngressClassName matching unknown controller",
@@ -267,7 +267,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: "my-ingress-controller",
+			wantType: "my-ingress-controller",
 		},
 		{
 			desc: "Unknown controller with annotation",
@@ -278,7 +278,7 @@ func Test_GetControllerName(t *testing.T) {
 					},
 				},
 			},
-			wantName: "my-ingress-class",
+			wantType: "my-ingress-class",
 		},
 	}
 
@@ -287,7 +287,7 @@ func Test_GetControllerName(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, test.wantName, getControllerName(test.ingress, test.ingressClasses))
+			assert.Equal(t, test.wantType, getControllerType(test.ingress, test.ingressClasses))
 		})
 	}
 }

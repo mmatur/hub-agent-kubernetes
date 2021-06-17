@@ -168,3 +168,32 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 		})
 	}
 }
+
+func Test_getOverview(t *testing.T) {
+	state := Cluster{
+		Ingresses: map[string]*Ingress{
+			"name@namespace.kind.group": {},
+		},
+		IngressRoutes: map[string]*IngressRoute{
+			"name@namespace.kind.group": {},
+		},
+		Services: map[string]*Service{
+			"name@namespace": {},
+		},
+		IngressControllers: map[string]*IngressController{
+			"name@namespace":  {Type: IngressControllerTypeTraefik},
+			"name2@namespace": {Type: IngressControllerTypeTraefik},
+			"name3@namespace": {Type: IngressControllerTypeHAProxyCommunity},
+		},
+	}
+
+	overview := getOverview(&state)
+
+	want := Overview{
+		IngressCount:           2,
+		ServiceCount:           1,
+		IngressControllerTypes: []string{IngressControllerTypeHAProxyCommunity, IngressControllerTypeTraefik},
+	}
+
+	assert.Equal(t, want, overview)
+}

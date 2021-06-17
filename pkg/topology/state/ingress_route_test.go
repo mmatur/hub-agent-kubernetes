@@ -40,8 +40,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					TLS: &IngressRouteTLS{
 						Domains: []traefikv1alpha1.Domain{
@@ -80,8 +80,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					Routes: []Route{
 						{
@@ -103,8 +103,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					TLS: &IngressRouteTLS{
 						Domains: []traefikv1alpha1.Domain{
@@ -148,8 +148,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					TLS: &IngressRouteTLS{
 						Domains: []traefikv1alpha1.Domain{
@@ -188,8 +188,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					TLS: &IngressRouteTLS{
 						Domains: []traefikv1alpha1.Domain{
@@ -238,8 +238,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 						Namespace: "ns",
 					},
 					IngressMeta: IngressMeta{
-						ClusterID:  "cluster-id",
-						Controller: IngressControllerTypeTraefik,
+						ClusterID:      "cluster-id",
+						ControllerType: IngressControllerTypeTraefik,
 					},
 					Routes: []Route{
 						{

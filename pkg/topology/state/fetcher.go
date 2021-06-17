@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -245,6 +246,8 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 		return nil, err
 	}
 
+	cluster.Overview = getOverview(cluster)
+
 	return cluster, nil
 }
 
@@ -274,6 +277,28 @@ func hasTraefikCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func getOverview(state *Cluster) Overview {
+	var ctrlTypes []string
+	existingTypes := make(map[string]struct{})
+
+	for _, ic := range state.IngressControllers {
+		if _, exists := existingTypes[ic.Type]; exists {
+			continue
+		}
+
+		ctrlTypes = append(ctrlTypes, ic.Type)
+		existingTypes[ic.Type] = struct{}{}
+	}
+
+	sort.Strings(ctrlTypes)
+
+	return Overview{
+		IngressCount:           len(state.Ingresses) + len(state.IngressRoutes),
+		ServiceCount:           len(state.Services),
+		IngressControllerTypes: ctrlTypes,
+	}
 }
 
 func objectKey(name, ns string) string {

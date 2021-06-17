@@ -23,15 +23,19 @@ const (
 func TestWrite_GitNoChanges(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	var pushCalled bool
+	var (
+		pushCallCount   int
+		commitCallCount int
+	)
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			switch args[0] {
-			case commitCommand:
-				return "nothing to commit", errors.New("fake error")
 			case pushCommand:
-				pushCalled = true
+				pushCallCount++
+			case commitCommand:
+				commitCallCount++
+				return "nothing to commit", errors.New("fake error")
 			}
 
 			return "", nil
@@ -41,18 +45,19 @@ func TestWrite_GitNoChanges(t *testing.T) {
 	err := s.Write(context.Background(), &state.Cluster{ID: "myclusterID"})
 	require.NoError(t, err)
 
-	assert.False(t, pushCalled)
+	assert.Equal(t, 1, commitCallCount)
+	assert.Equal(t, 0, pushCallCount)
 }
 
 func TestWrite_GitChanges(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
@@ -61,7 +66,7 @@ func TestWrite_GitChanges(t *testing.T) {
 	err := s.Write(context.Background(), &state.Cluster{ID: "myclusterID"})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 }
 
 func TestWrite_Apps(t *testing.T) {
@@ -69,26 +74,25 @@ func TestWrite_Apps(t *testing.T) {
 
 	app := &state.App{Name: "mysvc"}
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
 	}
 
 	err := s.Write(context.Background(), &state.Cluster{
-		ID: "myclusterID",
 		Apps: map[string]*state.App{
 			"daemonSet/mysvc@myns": app,
 		},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 
 	got := readTopology(t, tmpDir)
 
@@ -102,30 +106,28 @@ func TestWrite_Apps(t *testing.T) {
 func TestWrite_Namespaces(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
 	}
 
 	err := s.Write(context.Background(), &state.Cluster{
-		ID:         "myclusterID",
 		Namespaces: []string{"titi", "toto"},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 
 	got := readTopology(t, tmpDir)
 
 	assert.Contains(t, got, "/Namespaces/titi")
 	assert.Contains(t, got, "/Namespaces/toto")
-	assert.Len(t, got, 3)
 }
 
 func TestWrite_Ingresses(t *testing.T) {
@@ -139,8 +141,8 @@ func TestWrite_Ingresses(t *testing.T) {
 			Namespace: "namespace",
 		},
 		IngressMeta: state.IngressMeta{
-			ClusterID:  "cluster-id",
-			Controller: "controller",
+			ClusterID:      "cluster-id",
+			ControllerType: "controller",
 			Annotations: map[string]string{
 				"foo": "bar",
 			},
@@ -177,26 +179,25 @@ func TestWrite_Ingresses(t *testing.T) {
 		Services: []string{"service@namespace"},
 	}
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
 	}
 
 	err := s.Write(context.Background(), &state.Cluster{
-		ID: "cluster-id",
 		Ingresses: map[string]*state.Ingress{
 			"name@namespace.kind.group": testIngress,
 		},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 
 	got := readTopology(t, tmpDir)
 
@@ -218,8 +219,8 @@ func TestWrite_IngressRoutes(t *testing.T) {
 			Namespace: "namespace",
 		},
 		IngressMeta: state.IngressMeta{
-			ClusterID:  "cluster-id",
-			Controller: "controller",
+			ClusterID:      "cluster-id",
+			ControllerType: "controller",
 			Annotations: map[string]string{
 				"foo": "bar",
 			},
@@ -239,26 +240,25 @@ func TestWrite_IngressRoutes(t *testing.T) {
 		Services: []string{"service@namespace"},
 	}
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
 	}
 
 	err := s.Write(context.Background(), &state.Cluster{
-		ID: "cluster-id",
 		IngressRoutes: map[string]*state.IngressRoute{
 			"name@namespace.kind.group": testIngressRoute,
 		},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 
 	got := readTopology(t, tmpDir)
 
@@ -278,26 +278,25 @@ func TestWrite_IngressControllers(t *testing.T) {
 		},
 	}
 
-	var pushCalled bool
+	var pushCallCount int
 	s := &Store{
 		workingDir: tmpDir,
 		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
 			if args[0] == pushCommand {
-				pushCalled = true
+				pushCallCount++
 			}
 			return "", nil
 		},
 	}
 
 	err := s.Write(context.Background(), &state.Cluster{
-		ID: "myclusterID",
 		IngressControllers: map[string]*state.IngressController{
 			"myctrl@myns": testController,
 		},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, pushCalled)
+	assert.Equal(t, 1, pushCallCount)
 
 	got := readTopology(t, tmpDir)
 
@@ -306,6 +305,43 @@ func TestWrite_IngressControllers(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, testController, &gotCtrl)
+}
+
+func TestWrite_Overview(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testOverview := state.Overview{
+		IngressCount: 2,
+		ServiceCount: 1,
+		IngressControllerTypes: []string{
+			state.IngressControllerTypeHAProxyCommunity,
+			state.IngressControllerTypeTraefik,
+		},
+	}
+
+	var pushCallCount int
+	s := &Store{
+		workingDir: tmpDir,
+		gitExecutor: func(_ context.Context, _ string, _ bool, args ...string) (string, error) {
+			if args[0] == pushCommand {
+				pushCallCount++
+			}
+			return "", nil
+		},
+	}
+
+	err := s.Write(context.Background(), &state.Cluster{Overview: testOverview})
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, pushCallCount)
+
+	got := readTopology(t, tmpDir)
+
+	var gotOverview state.Overview
+	err = json.Unmarshal(got["/Overview.json"], &gotOverview)
+	require.NoError(t, err)
+
+	assert.Equal(t, testOverview, gotOverview)
 }
 
 func readTopology(t *testing.T, dir string) map[string][]byte {

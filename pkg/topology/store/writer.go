@@ -80,20 +80,8 @@ func (s *Store) write(st *state.Cluster) error {
 		return nil
 	}
 
-	entries, err := os.ReadDir(s.workingDir)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		if entry.Name() == ".git" || entry.Name() == "README.md" {
-			continue
-		}
-
-		err = os.RemoveAll(filepath.Join(s.workingDir, entry.Name()))
-		if err != nil {
-			return err
-		}
+	if err := cleanDir(s.workingDir); err != nil {
+		return fmt.Errorf("clean dir: %w", err)
 	}
 
 	t := reflect.TypeOf(*st)
@@ -112,6 +100,11 @@ func (s *Store) write(st *state.Cluster) error {
 			}
 		case reflect.String:
 			err := s.writeString(t.Field(i), v.Field(i))
+			if err != nil {
+				return err
+			}
+		case reflect.Struct:
+			err := s.writeStruct(t.Field(i), v.Field(i))
 			if err != nil {
 				return err
 			}
@@ -186,6 +179,22 @@ func (s *Store) writeString(field reflect.StructField, value reflect.Value) erro
 	return nil
 }
 
+// writeStruct writes a struct value to a file (field.Name).
+func (s *Store) writeStruct(field reflect.StructField, value reflect.Value) error {
+	data, err := json.MarshalIndent(value.Interface(), "", "\t")
+	if err != nil {
+		return fmt.Errorf("marshal resource: %w", err)
+	}
+
+	fileName := fmt.Sprintf("%s.json", field.Name)
+	err = writeFile(filepath.Join(s.workingDir, fileName), data)
+	if err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
+}
+
 func writeFile(filePath string, data []byte) error {
 	dir := filepath.Dir(filePath)
 	if dir != "" {
@@ -195,4 +204,23 @@ func writeFile(filePath string, data []byte) error {
 	}
 
 	return os.WriteFile(filePath, data, 0o600)
+}
+
+func cleanDir(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.Name() == ".git" || entry.Name() == "README.md" {
+			continue
+		}
+
+		if err = os.RemoveAll(filepath.Join(dir, entry.Name())); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

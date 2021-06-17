@@ -10,6 +10,7 @@ import (
 // Cluster describes a Cluster.
 type Cluster struct {
 	ID                    string
+	Overview              Overview
 	Namespaces            []string
 	Apps                  map[string]*App
 	Ingresses             map[string]*Ingress
@@ -20,6 +21,13 @@ type Cluster struct {
 	AccessControlPolicies map[string]*AccessControlPolicy
 
 	TraefikServiceNames map[string]string `dir:"-"`
+}
+
+// Overview represents an overview of the cluster resources.
+type Overview struct {
+	IngressCount           int      `json:"ingressCount"`
+	ServiceCount           int      `json:"serviceCount"`
+	IngressControllerTypes []string `json:"ingressControllerTypes"`
 }
 
 // ResourceMeta represents the metadata which identify a Kubernetes resource.
@@ -67,9 +75,9 @@ type Service struct {
 
 // IngressMeta represents the common Ingress metadata properties.
 type IngressMeta struct {
-	ClusterID   string            `json:"clusterId"`
-	Controller  string            `json:"controller,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	ClusterID      string            `json:"clusterId"`
+	ControllerType string            `json:"controllerType,omitempty"`
+	Annotations    map[string]string `json:"annotations,omitempty"`
 }
 
 // Ingress describes an Kubernetes Ingress.
