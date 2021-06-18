@@ -13,12 +13,14 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp/admission"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/kubevers"
+	"github.com/traefik/hub-agent/pkg/platform"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -54,7 +56,7 @@ func acpFlags() []cli.Flag {
 	}
 }
 
-func accessControl(ctx context.Context, cliCtx *cli.Context) error {
+func accessControl(ctx context.Context, cliCtx *cli.Context, cfg platform.AccessControlConfig) error {
 	var (
 		listenAddr     = cliCtx.String("acp-server.listen-addr")
 		certFile       = cliCtx.String("acp-server.cert")
@@ -66,7 +68,7 @@ func accessControl(ctx context.Context, cliCtx *cli.Context) error {
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	h, err := setupAdmissionHandler(ctx, authServerAddr)
+	h, err := setupAdmissionHandler(ctx, authServerAddr, cfg.MaxSecuredRoutes)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -105,7 +107,7 @@ func accessControl(ctx context.Context, cliCtx *cli.Context) error {
 	return nil
 }
 
-func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Handler, error) {
+func setupAdmissionHandler(ctx context.Context, authServerAddr string, maxSecuredRoutes int) (http.Handler, error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -156,11 +158,13 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
+	quotas := quota.New(maxSecuredRoutes)
+
 	reviewers := []admission.Reviewer{
-		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
-		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
-		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
-		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
+		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter, quotas),
+		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs, quotas),
+		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs, quotas),
+		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter, quotas),
 	}
 
 	return admission.NewHandler(reviewers), nil

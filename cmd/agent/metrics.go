@@ -5,13 +5,13 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/agent"
 	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/traefik/hub-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/platform"
 	"github.com/traefik/hub-agent/pkg/topology"
 )
 
-func newMetrics(watch *topology.Watcher, token, platformURL string, cfg agent.MetricsConfig) (*metrics.Manager, *metrics.Store, error) {
+func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform.MetricsConfig) (*metrics.Manager, *metrics.Store, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second

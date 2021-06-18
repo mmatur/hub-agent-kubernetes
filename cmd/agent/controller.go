@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/traefik/hub-agent/pkg/agent"
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/logger"
+	"github.com/traefik/hub-agent/pkg/platform"
 	"github.com/traefik/hub-agent/pkg/topology/state"
 	"github.com/traefik/hub-agent/pkg/topology/store"
 	"github.com/urfave/cli/v2"
@@ -68,9 +68,9 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
-	agentClient := agent.NewClient(platformURL, token)
+	platformClient := platform.NewClient(platformURL, token)
 
-	hubClusterID, agentCfg, err := setup(cliCtx.Context, agentClient, kubeClient)
+	hubClusterID, agentCfg, err := setup(cliCtx.Context, platformClient, kubeClient)
 	if err != nil {
 		return fmt.Errorf("setup agent: %w", err)
 	}
@@ -105,7 +105,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return nil
 	})
 
-	group.Go(func() error { return accessControl(ctx, cliCtx) })
+	group.Go(func() error { return accessControl(ctx, cliCtx, agentCfg.AccessControl) })
 
 	group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
 
@@ -114,21 +114,21 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	return group.Wait()
 }
 
-func setup(ctx context.Context, agentClient *agent.Client, kubeClient clientset.Interface) (hubClusterID string, cfg agent.Config, err error) {
+func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interface) (hubClusterID string, cfg platform.Config, err error) {
 	ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, metav1.NamespaceSystem, metav1.GetOptions{})
 	if err != nil {
-		return "", agent.Config{}, fmt.Errorf("get namespace: %w", err)
+		return "", platform.Config{}, fmt.Errorf("get namespace: %w", err)
 	}
 
-	hubClusterID, err = agentClient.Link(ctx, string(ns.UID))
+	hubClusterID, err = c.Link(ctx, string(ns.UID))
 	if err != nil {
-		return "", agent.Config{}, fmt.Errorf("link agent: %w", err)
+		return "", platform.Config{}, fmt.Errorf("link agent: %w", err)
 	}
 
-	agentCfg, err := agentClient.GetConfig(ctx)
+	cfg, err = c.GetConfig(ctx)
 	if err != nil {
-		return "", agent.Config{}, fmt.Errorf("fetch agent config: %w", err)
+		return "", platform.Config{}, fmt.Errorf("fetch agent config: %w", err)
 	}
 
-	return hubClusterID, agentCfg, nil
+	return hubClusterID, cfg, nil
 }

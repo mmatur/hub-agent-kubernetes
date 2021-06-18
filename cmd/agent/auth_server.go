@@ -76,7 +76,7 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 
 	go acpWatcher.Run(cliCtx.Context)
 
-	listenAddr := cliCtx.String("auth-server.listen-addr")
+	listenAddr := cliCtx.String("listen-addr")
 	server := &http.Server{
 		Addr:     listenAddr,
 		Handler:  switcher,

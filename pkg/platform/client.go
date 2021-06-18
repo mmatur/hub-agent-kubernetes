@@ -1,4 +1,4 @@
-package agent
+package platform
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
@@ -22,14 +23,6 @@ func (a APIError) Error() string {
 	return fmt.Sprintf("failed with code %d: %s", a.StatusCode, a.Message)
 }
 
-type linkClusterReq struct {
-	KubeID string `json:"kubeId"`
-}
-
-type linkClusterResp struct {
-	ClusterID string `json:"clusterId"`
-}
-
 // Client allows to interact with the cluster service.
 type Client struct {
 	baseURL    string
@@ -41,13 +34,21 @@ type Client struct {
 func NewClient(baseURL, token string) *Client {
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = 4
-	rc.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "agent-client").Logger())
+	rc.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "platform_client").Logger())
 
 	return &Client{
 		baseURL:    baseURL,
 		token:      token,
 		httpClient: rc.StandardClient(),
 	}
+}
+
+type linkClusterReq struct {
+	KubeID string `json:"kubeId"`
+}
+
+type linkClusterResp struct {
+	ClusterID string `json:"clusterId"`
 }
 
 // Link links the agent to the given Kubernetes ID.
@@ -80,11 +81,36 @@ func (c *Client) Link(ctx context.Context, kubeID string) (string, error) {
 	}
 
 	var linkResp linkClusterResp
-	if err := json.NewDecoder(resp.Body).Decode(&linkResp); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&linkResp); err != nil {
 		return "", fmt.Errorf("decode link agent resp: %w", err)
 	}
 
 	return linkResp.ClusterID, nil
+}
+
+// Config holds the configuration of the offer.
+type Config struct {
+	Topology      TopologyConfig      `json:"topology"`
+	Metrics       MetricsConfig       `json:"metrics"`
+	AccessControl AccessControlConfig `json:"accessControl"`
+}
+
+// TopologyConfig holds the topology part of the offer config.
+type TopologyConfig struct {
+	GitProxyHost string `json:"gitProxyHost,omitempty"`
+	GitOrgName   string `json:"gitOrgName,omitempty"`
+	GitRepoName  string `json:"gitRepoName,omitempty"`
+}
+
+// MetricsConfig holds the metrics part of the offer config.
+type MetricsConfig struct {
+	Interval time.Duration `json:"interval"`
+	Tables   []string      `json:"tables"`
+}
+
+// AccessControlConfig holds the configuration of the access control section of the offer config.
+type AccessControlConfig struct {
+	MaxSecuredRoutes int `json:"maxSecuredRoutes"`
 }
 
 // GetConfig returns the agent configuration.
@@ -112,7 +138,7 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 	}
 
 	var cfg Config
-	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 

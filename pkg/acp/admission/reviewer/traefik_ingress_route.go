@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	admv1 "k8s.io/api/admission/v1"
 )
@@ -14,12 +15,14 @@ import (
 // TraefikIngressRoute is a reviewer that can handle Traefik IngressRoute resources.
 type TraefikIngressRoute struct {
 	fwdAuthMiddlewares FwdAuthMiddlewares
+	quotas             QuotaTransaction
 }
 
 // NewTraefikIngressRoute returns a Traefik IngressRoute reviewer.
-func NewTraefikIngressRoute(fwdAuthMiddlewares FwdAuthMiddlewares) *TraefikIngressRoute {
+func NewTraefikIngressRoute(fwdAuthMiddlewares FwdAuthMiddlewares, quotas QuotaTransaction) *TraefikIngressRoute {
 	return &TraefikIngressRoute{
 		fwdAuthMiddlewares: fwdAuthMiddlewares,
+		quotas:             quotas,
 	}
 }
 
@@ -38,22 +41,26 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	logger.Info().Msg("Reviewing IngressRoute resource")
 
-	// Fetch the IngressRoute resource.
-	var ingRoute traefikv1alpha1.IngressRoute
-	if err := json.Unmarshal(ar.Request.Object.Raw, &ingRoute); err != nil {
-		return nil, fmt.Errorf("unmarshal reviewed IngressRoute: %w", err)
+	if ar.Request.Operation == admv1.Delete {
+		log.Ctx(ctx).Info().Msg("Deleting IngressRoute resource")
+		if err := releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 
-	// Fetch the last applied version of the IngressRoute resource (if it exists).
-	var oldIngressRoute traefikv1alpha1.IngressRoute
-	if ar.Request.OldObject.Raw != nil {
-		if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldIngressRoute); err != nil {
-			return nil, fmt.Errorf("unmarshal reviewed old IngressRoute: %w", err)
+	ingRoute, oldIngRoute, err := parseRawIngressRoutes(ar.Request.Object.Raw, ar.Request.OldObject.Raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse raw objects: %w", err)
+	}
+
+	prevPolName := oldIngRoute.Annotations[AnnotationHubAuth]
+	polName := ingRoute.Annotations[AnnotationHubAuth]
+	if prevPolName != "" && polName == "" {
+		if err = releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
+			return nil, err
 		}
 	}
-
-	prevPolName := oldIngressRoute.Annotations[AnnotationHubAuth]
-	polName := ingRoute.Annotations[AnnotationHubAuth]
 
 	if prevPolName == "" && polName == "" {
 		logger.Debug().Msg("No ACP defined")
@@ -62,7 +69,6 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	var updated bool
 	if prevPolName != "" {
-		var err error
 		updated, err = r.clearPreviousFwdAuthMiddleware(ctx, &ingRoute.Spec, prevPolName, ingRoute.Namespace)
 		if err != nil {
 			return nil, err
@@ -71,7 +77,19 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	var mdlwrName string
 	if polName != "" {
-		var err error
+		var tx *quota.Tx
+		tx, err = r.quotas.Tx(resourceID(ar.Request.Name, ar.Request.Namespace), len(ingRoute.Spec.Routes))
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				tx.Rollback()
+			} else {
+				tx.Commit()
+			}
+		}()
+
 		mdlwrName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ingRoute.Namespace)
 		if err != nil {
 			return nil, err
@@ -147,4 +165,19 @@ func (r TraefikIngressRoute) clearPreviousFwdAuthMiddleware(ctx context.Context,
 	}
 
 	return updated, nil
+}
+
+// parseRawIngressRoutes parses raw ingressRoutes from admission requests.
+func parseRawIngressRoutes(newRaw, oldRaw []byte) (newIng, oldIng traefikv1alpha1.IngressRoute, err error) {
+	if err = json.Unmarshal(newRaw, &newIng); err != nil {
+		return traefikv1alpha1.IngressRoute{}, traefikv1alpha1.IngressRoute{}, fmt.Errorf("unmarshal reviewed ingress: %w", err)
+	}
+
+	if oldRaw != nil {
+		if err = json.Unmarshal(oldRaw, &oldIng); err != nil {
+			return traefikv1alpha1.IngressRoute{}, traefikv1alpha1.IngressRoute{}, fmt.Errorf("unmarshal reviewed old ingress: %w", err)
+		}
+	}
+
+	return newIng, oldIng, nil
 }

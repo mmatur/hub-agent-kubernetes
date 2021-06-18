@@ -12,12 +12,12 @@ import (
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
 	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/agent"
+	"github.com/traefik/hub-agent/pkg/platform"
 )
 
 // Config represents the topology store config.
 type Config struct {
-	agent.TopologyConfig
+	platform.TopologyConfig
 
 	Token string
 }

@@ -141,6 +141,7 @@ issues:
         - funlen
         - noctx
         - gochecknoinits
+        - gochecknoglobals
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
         - gochecknoglobals
@@ -169,6 +170,19 @@ issues:
     # False positive.
     - path: pkg/metrics/store_test.go
       text: 'Multiplication of durations: `-1 \* time\.Duration\(n\) \* gran`'
-    # Keep for historical reason
+    # Keep for historical reason.
     - path: pkg/topology/state/cluster.go
       text: "json\\(camel\\): got '(metricsURLs)' want '(metricsUrLs)'"
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: pkg/acp/admission/reviewer/traefik_ingress_route.go
+      linters:
+        - gocyclo
+    - path: pkg/acp/admission/reviewer/traefik_ingress.go
+      linters:
+        - gocyclo
+    - path: pkg/acp/admission/reviewer/nginx_ingress.go
+      linters:
+        - gocyclo
+    - path: pkg/acp/admission/reviewer/nginx_ingress.go
+      linters:
+        - nestif

@@ -1,4 +1,4 @@
-package reviewer_test
+package reviewer
 
 import (
 	"context"
@@ -8,9 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent/pkg/acp"
-	"github.com/traefik/hub-agent/pkg/acp/admission"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	"github.com/traefik/hub-agent/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent/pkg/acp/jwt"
@@ -23,10 +22,10 @@ import (
 )
 
 func TestTraefikIngress_HandleACPName(t *testing.T) {
-	factory := func(policies reviewer.PolicyGetter) admission.Reviewer {
-		fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
+	factory := func(policies PolicyGetter) reviewer {
+		fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
 
-		return reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
+		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
 	}
 
 	ingressHandleACPName(t, factory)
@@ -126,8 +125,8 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := reviewer.NewTraefikIngress(i, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
+			review := NewTraefikIngress(i, fwdAuthMdlwrs, quota.New(999))
 
 			var ing netv1.Ingress
 			b, err := json.Marshal(ing)
@@ -228,8 +227,8 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := reviewer.NewTraefikIngress(i, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
+			review := NewTraefikIngress(i, fwdAuthMdlwrs, quota.New(999))
 
 			ing := netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -282,18 +281,18 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				},
 			}},
 			oldIngAnno: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-old-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-old-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "test-zz-my-old-policy-test@kubernetescrd",
 			},
 			ingAnno: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader"},
@@ -306,13 +305,13 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
@@ -325,13 +324,13 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				reviewer.AnnotationHubAuth:                         "my-policy@test",
-				"custom-annotation":                                "foobar",
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
@@ -347,8 +346,8 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return test.config
 			}
-			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
 
 			oldIng := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -465,8 +464,8 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return test.config
 			}
-			fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := reviewer.NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -474,7 +473,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				Metadata: metav1.ObjectMeta{
 					Name:        "name",
 					Namespace:   "test",
-					Annotations: map[string]string{reviewer.AnnotationHubAuth: "my-policy@test"},
+					Annotations: map[string]string{AnnotationHubAuth: "my-policy@test"},
 				},
 			}
 			b, err := json.Marshal(ing)
@@ -506,6 +505,57 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 	}
 }
 
+func TestTraefikIngress_ReviewRespectsQuotas(t *testing.T) {
+	factory := func(quotas QuotaTransaction) reviewer {
+		policies := policyGetterMock(func(string) *acp.Config {
+			return &acp.Config{JWT: &jwt.Config{}}
+		})
+		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
+			"",
+			policies,
+			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
+		)
+
+		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
+	}
+
+	reviewRespectsQuotas(t, factory)
+}
+
+func TestTraefikIngress_ReviewReleasesQuotasOnDelete(t *testing.T) {
+	factory := func(quotas QuotaTransaction) reviewer {
+		policies := policyGetterMock(func(string) *acp.Config {
+			return &acp.Config{JWT: &jwt.Config{}}
+		})
+		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
+			"",
+			policies,
+			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
+		)
+
+		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
+	}
+
+	reviewReleasesQuotasOnDelete(t, factory)
+}
+
+func TestTraefikIngress_reviewReleasesQuotasOnAnnotationRemove(t *testing.T) {
+	factory := func(quotas QuotaTransaction) reviewer {
+		policies := policyGetterMock(func(string) *acp.Config {
+			return &acp.Config{JWT: &jwt.Config{}}
+		})
+		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
+			"",
+			policies,
+			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
+		)
+
+		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
+	}
+
+	reviewReleasesQuotasOnAnnotationRemove(t, factory)
+}
+
 type policyGetterMock func(canonicalName string) *acp.Config
 
 func (m policyGetterMock) GetConfig(canonicalName string) (*acp.Config, error) {
@@ -523,4 +573,12 @@ func (m ingressClassesMock) GetController(name string) string {
 
 func (m ingressClassesMock) GetDefaultController() (string, error) {
 	return m.getDefaultControllerFunc()
+}
+
+type quotaMock struct {
+	txFunc func(resourceID string, amount int) (*quota.Tx, error)
+}
+
+func (q quotaMock) Tx(resourceID string, amount int) (*quota.Tx, error) {
+	return q.txFunc(resourceID, amount)
 }

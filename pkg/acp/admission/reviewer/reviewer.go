@@ -1,6 +1,7 @@
 package reviewer
 
 import (
+	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -9,6 +10,11 @@ import (
 type IngressClasses interface {
 	GetController(name string) string
 	GetDefaultController() (string, error)
+}
+
+// QuotaTransaction allows to reserve quotas.
+type QuotaTransaction interface {
+	Tx(resourceID string, amount int) (*quota.Tx, error)
 }
 
 func isNetV1Ingress(resource metav1.GroupVersionKind) bool {

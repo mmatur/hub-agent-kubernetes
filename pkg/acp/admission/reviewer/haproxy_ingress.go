@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	admv1 "k8s.io/api/admission/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HAProxyIngress is a reviewer that handles HAProxy Ingress resources.
@@ -18,14 +18,16 @@ type HAProxyIngress struct {
 	agentAddress   string
 	ingressClasses IngressClasses
 	policies       PolicyGetter
+	quotas         QuotaTransaction
 }
 
 // NewHAProxyIngress returns an HAProxy ingress reviewer.
-func NewHAProxyIngress(authServerAddr string, ingClasses IngressClasses, policies PolicyGetter) *HAProxyIngress {
+func NewHAProxyIngress(authServerAddr string, ingClasses IngressClasses, policies PolicyGetter, quotas QuotaTransaction) *HAProxyIngress {
 	return &HAProxyIngress{
 		agentAddress:   authServerAddr,
 		ingressClasses: ingClasses,
 		policies:       policies,
+		quotas:         quotas,
 	}
 }
 
@@ -38,9 +40,13 @@ func (r HAProxyIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 		return false, nil
 	}
 
-	ingClassName, ingClassAnno, err := parseIngressClass(ar.Request.Object.Raw)
+	obj := ar.Request.Object.Raw
+	if ar.Request.Operation == admv1.Delete {
+		obj = ar.Request.OldObject.Raw
+	}
+	ingClassName, ingClassAnno, err := parseIngressClass(obj)
 	if err != nil {
-		return false, fmt.Errorf("parse ingress class: %w", err)
+		return false, fmt.Errorf("parse raw ingress class: %w", err)
 	}
 
 	defaultCtrlr, err := r.ingressClasses.GetDefaultController()
@@ -68,30 +74,46 @@ func (r HAProxyIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([
 
 	log.Ctx(ctx).Info().Msg("Reviewing Ingress resource")
 
-	// Fetch the metadata of the Ingress resource.
-	var ing struct {
-		Metadata metav1.ObjectMeta `json:"metadata"`
-	}
-	if err := json.Unmarshal(ar.Request.Object.Raw, &ing); err != nil {
-		return nil, fmt.Errorf("unmarshal reviewed ingress metadata: %w", err)
+	if ar.Request.Operation == admv1.Delete {
+		log.Ctx(ctx).Info().Msg("Deleting Ingress resource")
+		if err := releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 
-	// Fetch the metadata of the last applied version of the Ingress resource (if it exists).
-	var oldIng struct {
-		Metadata metav1.ObjectMeta `json:"metadata"`
+	ing, oldIng, err := parseRawIngresses(ar.Request.Object.Raw, ar.Request.OldObject.Raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse raw objects: %w", err)
 	}
-	if ar.Request.OldObject.Raw != nil {
-		if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldIng); err != nil {
-			return nil, fmt.Errorf("unmarshal reviewed old ingress metadata: %w", err)
+
+	prevPolName := oldIng.Metadata.Annotations[AnnotationHubAuth]
+	polName := ing.Metadata.Annotations[AnnotationHubAuth]
+
+	if prevPolName != "" && polName == "" {
+		if err = releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
+			return nil, err
 		}
 	}
 
-	polName := ing.Metadata.Annotations[AnnotationHubAuth]
-	oldPolName := oldIng.Metadata.Annotations[AnnotationHubAuth]
-
-	if polName == "" && oldPolName == "" {
-		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("No patch required")
+	if polName == "" && prevPolName == "" {
+		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("No ACP defined")
 		return nil, nil
+	}
+
+	if polName != "" {
+		var tx *quota.Tx
+		tx, err = r.quotas.Tx(resourceID(ar.Request.Name, ar.Request.Namespace), countRoutes(ing.Spec))
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				tx.Rollback()
+			} else {
+				tx.Commit()
+			}
+		}()
 	}
 
 	authURL, authHeaders, err := r.getAuthConfig(ctx, polName, ing.Metadata.Namespace)
