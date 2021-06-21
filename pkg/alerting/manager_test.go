@@ -17,7 +17,7 @@ func TestManager_SendsAlerts(t *testing.T) {
 	sentCh := make(chan struct{})
 	srv := platformServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(sentCh)
-	}), stateOK)
+	}))
 
 	client, err := NewClient(http.DefaultClient, srv.URL, "test-token")
 	require.NoError(t, err)
@@ -74,122 +74,7 @@ func TestManager_SendsAlerts(t *testing.T) {
 	}
 }
 
-func TestManager_IgnoresStateUnchangedOK(t *testing.T) {
-	sentCh := make(chan struct{})
-	srv := platformServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(sentCh)
-	}), stateOK)
-
-	client, err := NewClient(http.DefaultClient, srv.URL, "test-token")
-	require.NoError(t, err)
-
-	now := time.Now().UTC()
-
-	store := mockThresholdStore{
-		group: metrics.DataPointGroup{
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			DataPoints: []metrics.DataPoint{
-				{
-					Timestamp: now.Add(-3 * time.Minute).Unix(),
-					ReqPerS:   9.9,
-				},
-				{
-					Timestamp: now.Add(-2 * time.Minute).Unix(),
-					ReqPerS:   12.3,
-				},
-				{
-					Timestamp: now.Add(-time.Minute).Unix(),
-					ReqPerS:   11.7,
-				},
-			},
-		},
-	}
-	logs := mockLogProvider{}
-	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store, logs),
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(func() {
-		cancel()
-	})
-
-	go func() {
-		err = mgr.Run(ctx, 10*time.Minute, time.Second)
-		assert.NoError(t, err)
-	}()
-
-	select {
-	case <-sentCh:
-		t.Errorf("alert send not expected but not received")
-	case <-time.After(5 * time.Second):
-		return
-	}
-}
-
-func TestManager_IgnoresStateUnchangedCritical(t *testing.T) {
-	sentCh := make(chan struct{})
-	srv := platformServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(sentCh)
-	}), stateCritical)
-
-	client, err := NewClient(http.DefaultClient, srv.URL, "test-token")
-	require.NoError(t, err)
-
-	now := time.Now().UTC()
-
-	store := mockThresholdStore{
-		group: metrics.DataPointGroup{
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			DataPoints: []metrics.DataPoint{
-				{
-					Timestamp: now.Add(-3 * time.Minute).Unix(),
-					ReqPerS:   11.7,
-				},
-				{
-					Timestamp: now.Add(-2 * time.Minute).Unix(),
-					ReqPerS:   12.3,
-				},
-				{
-					Timestamp: now.Add(-time.Minute).Unix(),
-					ReqPerS:   11.7,
-				},
-			},
-		},
-	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			assert.Equal(t, "svc", name)
-			assert.Equal(t, "ns", namespace)
-
-			return []byte("fake logs"), nil
-		},
-	}
-	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store, logs),
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(func() {
-		cancel()
-	})
-
-	go func() {
-		err = mgr.Run(ctx, 10*time.Minute, time.Second)
-		assert.NoError(t, err)
-	}()
-
-	select {
-	case <-sentCh:
-		t.Errorf("alert send not expected but not received")
-	case <-time.After(5 * time.Second):
-		return
-	}
-}
-
-func platformServer(t *testing.T, handler http.Handler, state int) *httptest.Server {
+func platformServer(t *testing.T, handler http.Handler) *httptest.Server {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -208,11 +93,25 @@ func platformServer(t *testing.T, handler http.Handler, state int) *httptest.Ser
 					Occurrence: 3,
 					TimeRange:  10 * time.Minute,
 				},
-				State: state,
 			},
 		}
 
 		err := json.NewEncoder(w).Encode(rules)
+		require.NoError(t, err)
+	})
+	mux.HandleFunc("/preflight", func(w http.ResponseWriter, r *http.Request) {
+		var data []struct {
+			ID int `json:"id"`
+		}
+		err := json.NewDecoder(r.Body).Decode(&data)
+		require.NoError(t, err)
+
+		var ids []int
+		for _, alert := range data {
+			ids = append(ids, alert.ID)
+		}
+
+		err = json.NewEncoder(w).Encode(ids)
 		require.NoError(t, err)
 	})
 

@@ -200,7 +200,6 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 		Service: "svc@ns",
 		Points:  newPnts,
 		Logs:    logBytes,
-		State:   stateCritical,
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -287,7 +286,6 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 		Service: "svc@ns",
 		Points:  newPnts,
 		Logs:    logBytes,
-		State:   stateCritical,
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{

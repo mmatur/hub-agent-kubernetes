@@ -8,11 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	stateOK = iota
-	stateCritical
-)
-
 // Processor represents a rule processor.
 type Processor interface {
 	Process(ctx context.Context, rule *Rule) (*Alert, error)
@@ -25,8 +20,6 @@ type Manager struct {
 	rulesMu sync.Mutex
 	rules   []Rule
 
-	states map[string]int
-
 	procs map[string]Processor
 
 	nowFunc func() time.Time
@@ -37,7 +30,6 @@ func NewManager(client *Client, procs map[string]Processor) *Manager {
 	return &Manager{
 		client:  client,
 		procs:   procs,
-		states:  map[string]int{},
 		nowFunc: time.Now,
 	}
 }
@@ -47,10 +39,6 @@ func (m *Manager) Run(ctx context.Context, refreshInterval, schedulerInterval ti
 	rules, err := m.client.GetRules(ctx)
 	if err != nil {
 		return err
-	}
-
-	for _, r := range rules {
-		m.states[r.ID] = r.State
 	}
 
 	m.rules = rules
@@ -114,44 +102,33 @@ func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
 				if err != nil {
 					log.Error().Err(err).Str("ruleID", rule.ID).Msg("Unable to process the rule")
 				}
-
-				alert, send := m.shouldSend(rule, alert)
-				if !send {
+				if alert == nil {
 					continue
 				}
 
 				alerts = append(alerts, *alert)
-				m.states[rule.ID] = alert.State
 			}
 
 			m.rulesMu.Unlock()
 
-			if len(alerts) == 0 {
+			log.Debug().Int("count", len(alerts)).Msg("Checking alerts to send")
+
+			sendAlerts, err := m.client.PreflightAlerts(ctx, alerts)
+			if err != nil {
+				log.Error().Err(err).Msg("Unable to send preflight alerts")
 				continue
 			}
 
-			log.Debug().Int("count", len(alerts)).Msg("Sending alerts")
+			log.Debug().Int("count", len(sendAlerts)).Msg("Sending alerts")
 
-			err := m.client.Send(ctx, alerts)
+			if len(sendAlerts) == 0 {
+				continue
+			}
+
+			err = m.client.SendAlerts(ctx, sendAlerts)
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to send alerts")
 			}
 		}
 	}
-}
-
-func (m *Manager) shouldSend(rule Rule, alert *Alert) (*Alert, bool) {
-	if m.states[rule.ID] == stateCritical && alert == nil {
-		alert = &Alert{
-			RuleID:  rule.ID,
-			Ingress: rule.Ingress,
-			Service: rule.Service,
-			State:   stateOK,
-		}
-	}
-
-	if alert == nil || m.states[rule.ID] == alert.State {
-		return nil, false
-	}
-	return alert, true
 }

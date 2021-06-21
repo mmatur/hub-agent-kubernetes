@@ -103,7 +103,6 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule) (*Alert, e
 		Service:   group.Service,
 		Points:    newPnts,
 		Logs:      logs,
-		State:     stateCritical,
 		Threshold: rule.Threshold,
 	}, nil
 }

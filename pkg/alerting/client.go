@@ -70,8 +70,76 @@ func (c *Client) GetRules(ctx context.Context) ([]Rule, error) {
 	return rules, nil
 }
 
-// Send sends alerts to the server.
-func (c *Client) Send(ctx context.Context, data []Alert) error {
+type descriptor struct {
+	ID      int    `json:"id"`
+	RuleID  string `json:"ruleId"`
+	Ingress string `json:"ingress"`
+	Service string `json:"service,omitempty"`
+}
+
+// PreflightAlerts sends alert descriptors to the server and returns which alerts to send.
+func (c *Client) PreflightAlerts(ctx context.Context, data []Alert) ([]Alert, error) {
+	endpoint, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "preflight"))
+	if err != nil {
+		return nil, fmt.Errorf("creating alerts url: %w", err)
+	}
+
+	descriptors := make([]descriptor, len(data))
+	for i, alert := range data {
+		descriptors[i] = descriptor{
+			ID:      i,
+			RuleID:  alert.RuleID,
+			Ingress: alert.Ingress,
+			Service: alert.Service,
+		}
+	}
+
+	body, err := json.Marshal(descriptors)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	c.setAuthHeader(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending alerts: %w", err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode/100 != 2 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("sending alerts got %d: %s", resp.StatusCode, string(body))
+	}
+
+	var pos []int
+	err = json.NewDecoder(resp.Body).Decode(&pos)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pos) == 0 {
+		return nil, nil
+	}
+
+	var allowed []Alert
+	for _, i := range pos {
+		if i < 0 || i >= len(data) {
+			return nil, fmt.Errorf("invalid alert position: %d", i)
+		}
+		allowed = append(allowed, data[i])
+	}
+
+	return allowed, nil
+}
+
+// SendAlerts sends alerts to the server.
+func (c *Client) SendAlerts(ctx context.Context, data []Alert) error {
 	endpoint, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "notify"))
 	if err != nil {
 		return fmt.Errorf("creating alerts url: %w", err)

@@ -15,8 +15,6 @@ type Rule struct {
 	Ingress string `json:"ingress"`
 	Service string `json:"service"`
 
-	State int `json:"state"`
-
 	Threshold *Threshold `json:"threshold"`
 }
 
@@ -76,7 +74,6 @@ type Alert struct {
 	RuleID    string     `json:"ruleId"`
 	Ingress   string     `json:"ingress"`
 	Service   string     `json:"service"`
-	State     int        `json:"state"`
 	Points    []Point    `json:"points"`
 	Logs      []byte     `json:"logs"`
 	Threshold *Threshold `json:"threshold"`
