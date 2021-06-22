@@ -28,8 +28,8 @@ import (
 // controllerName is the name of the controller.
 const controllerName = "hub"
 
-// annotationTLSACME is an opt-out annotation which can be added to an Ingress/IngressRoute to indicate that its TLS secrets should not be managed by the agent.
-const annotationTLSACME = "kubernetes.io/tls-acme"
+// annotationHubEnableACME is an opt-in annotation which has to be added to an Ingress/IngressRoute to indicate that its TLS secrets have to be managed by the agent.
+const annotationHubEnableACME = "hub.traefik.io/enable-acme"
 
 // annotationIngressClass is an annotation used to specify the Ingress class before Kubernetes 1.18.
 const annotationIngressClass = "kubernetes.io/ingress.class"
@@ -117,7 +117,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient h
 					log.Error().Err(asErr).Msg("Unable to convert object to Ingress")
 					return false
 				}
-				return isTLSACMEEnabled(&ing.ObjectMeta) && ctrl.isSupportedIngressController(ing)
+				return isACMEEnabled(&ing.ObjectMeta) && ctrl.isSupportedIngressController(ing)
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc:    ctrl.ingressCreated,
@@ -156,7 +156,7 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient h
 		Handler: cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				ingRoute, ok := (obj).(*traefikv1alpha1.IngressRoute)
-				return ok && isTLSACMEEnabled(&ingRoute.ObjectMeta)
+				return ok && isACMEEnabled(&ingRoute.ObjectMeta)
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc:    ctrl.ingressRouteCreated,
@@ -445,8 +445,8 @@ func hasTraefikCRDs(kubeClient clientset.Interface) (bool, error) {
 	return false, nil
 }
 
-func isTLSACMEEnabled(meta *metav1.ObjectMeta) bool {
-	return meta.Annotations[annotationTLSACME] != "false"
+func isACMEEnabled(meta *metav1.ObjectMeta) bool {
+	return meta.Annotations[annotationHubEnableACME] == "true"
 }
 
 func isSupportedController(ctrl string) bool {
