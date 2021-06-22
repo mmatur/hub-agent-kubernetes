@@ -299,12 +299,138 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+func TestThresholdProcessor_AlertMergedServices(t *testing.T) {
+	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
+	data := metrics.DataPoints{
+		{
+			Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
+			ReqPerS:   15.77,
+			Seconds:   60,
+			Requests:  947,
+		},
+		{
+			Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
+			ReqPerS:   9.77,
+			Seconds:   60,
+			Requests:  587,
+		},
+		{
+			Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
+			ReqPerS:   15.77,
+			Seconds:   60,
+			Requests:  947,
+		},
+		{
+			Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
+			ReqPerS:   15.77,
+			Seconds:   60,
+			Requests:  947,
+		},
+		{
+			Timestamp: time.Date(2021, 1, 1, 7, 30, 0, 0, time.UTC).Unix(),
+			ReqPerS:   9.78,
+			Seconds:   60,
+			Requests:  587,
+		},
+	}
+	store := mockMultiThresholdStore{
+		groups: []metrics.DataPointGroup{
+			{
+				Ingress:    "ing@ns",
+				Service:    "svc@ns",
+				DataPoints: data,
+			},
+			{
+				Ingress:    "ing@ns",
+				Service:    "svc@ns",
+				DataPoints: data,
+			},
+		},
+	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			assert.Equal(t, "svc", name)
+			assert.Equal(t, "ns", namespace)
+
+			return []byte("fake logs"), nil
+		},
+	}
+
+	threshProc := NewThresholdProcessor(store, logs)
+	threshProc.nowFunc = func() time.Time { return now }
+
+	got, err := threshProc.Process(context.Background(), &Rule{
+		ID:      "123",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
+		Threshold: &Threshold{
+			Metric: "requestsPerSecond",
+			Condition: ThresholdCondition{
+				Above: true,
+				Value: 30,
+			},
+			Occurrence: 3,
+			TimeRange:  40 * time.Minute,
+		},
+	})
+
+	require.NoError(t, err)
+
+	logBytes, err := compress([]byte("fake logs"))
+	require.NoError(t, err)
+
+	want := &Alert{
+		RuleID:  "123",
+		Ingress: "ing@ns",
+		Service: "svc@ns",
+		Points: []Point{
+			{
+				Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
+				Value:     31.566666666666666,
+			},
+			{
+				Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
+				Value:     19.566666666666666,
+			},
+			{
+				Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
+				Value:     31.566666666666666,
+			},
+			{
+				Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
+				Value:     31.566666666666666,
+			},
+		},
+		Logs: logBytes,
+		Threshold: &Threshold{
+			Metric: "requestsPerSecond",
+			Condition: ThresholdCondition{
+				Above: true,
+				Value: 30,
+			},
+			Occurrence: 3,
+			TimeRange:  40 * time.Minute,
+		},
+	}
+	assert.Equal(t, want, got)
+}
+
 type mockThresholdStore struct {
 	group metrics.DataPointGroup
 }
 
 func (t mockThresholdStore) ForEach(table string, fn metrics.ForEachFunc) {
 	fn(table, t.group.Ingress, t.group.Service, t.group.DataPoints)
+}
+
+type mockMultiThresholdStore struct {
+	groups []metrics.DataPointGroup
+}
+
+func (t mockMultiThresholdStore) ForEach(table string, fn metrics.ForEachFunc) {
+	for _, group := range t.groups {
+		fn(table, group.Ingress, group.Service, group.DataPoints)
+	}
 }
 
 type mockLogProvider struct {
