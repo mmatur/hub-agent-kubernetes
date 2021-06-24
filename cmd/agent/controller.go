@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/logger"
@@ -14,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
+
+const pidFilePath = "/var/run/hub-agent.pid"
 
 type controllerCmd struct {
 	flags []cli.Flag
@@ -56,6 +61,10 @@ func (c controllerCmd) build() *cli.Command {
 func (c controllerCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
 
+	if err := writePID(); err != nil {
+		return fmt.Errorf("write pid: %w", err)
+	}
+
 	platformURL, token := cliCtx.String("platform-url"), cliCtx.String("token")
 
 	kubeCfg, err := kube.InClusterConfigWithRetrier(2)
@@ -69,6 +78,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	}
 
 	platformClient := platform.NewClient(platformURL, token)
+	configWatcher := platform.NewConfigWatcher(15*time.Minute, platformClient)
 
 	hubClusterID, agentCfg, err := setup(cliCtx.Context, platformClient, kubeClient)
 	if err != nil {
@@ -97,6 +107,11 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 
 	group.Go(func() error {
+		configWatcher.Run(ctx)
+		return nil
+	})
+
+	group.Go(func() error {
 		return mtrcsMgr.Run(ctx)
 	})
 
@@ -105,7 +120,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return nil
 	})
 
-	group.Go(func() error { return accessControl(ctx, cliCtx, agentCfg.AccessControl) })
+	group.Go(func() error { return accessControl(ctx, cliCtx, agentCfg.AccessControl, configWatcher) })
 
 	group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
 
@@ -131,4 +146,21 @@ func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interfa
 	}
 
 	return hubClusterID, cfg, nil
+}
+
+func writePID() error {
+	f, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	pid := os.Getpid()
+	if _, err = f.WriteString(strconv.Itoa(pid)); err != nil {
+		return err
+	}
+
+	return nil
 }

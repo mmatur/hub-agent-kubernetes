@@ -10,13 +10,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func main() {
+func mainWithCode() int {
 	app := &cli.App{
 		Name:  "Hub agent CLI",
 		Usage: "Manages a Traefik Hub agent installation",
 		Commands: []*cli.Command{
 			newControllerCmd().build(),
 			newAuthServerCmd().build(),
+			newRefreshConfigCmd().build(),
 		},
 	}
 
@@ -26,8 +27,14 @@ func main() {
 	err := app.RunContext(ctx, os.Args)
 	if err != nil {
 		log.Error().Err(err).Msg("Error while executing command")
-		return
+		return 255
 	}
+
+	return 0
+}
+
+func main() {
+	os.Exit(mainWithCode())
 }
 
 func globalFlags() []cli.Flag {

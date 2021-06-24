@@ -34,6 +34,14 @@ type Tx struct {
 	done int32 // Accessed atomically.
 }
 
+// UpdateMax updates the max secured routes allowed.
+func (q *Quota) UpdateMax(newMax int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.max = newMax
+}
+
 // Tx creates a transaction for the given resource.
 // An error is returned if we're not sure it could be committed. This means that pending
 // transactions can prevent the creation of a new transaction even if they end up rolled back.

@@ -54,6 +54,20 @@ OPTIONS:
    --help, -h           show help (default: false)
 ```
 
+### Refresh Config
+
+```
+NAME:
+   hub-agent refresh-config - Refresh agent configuration
+
+USAGE:
+   hub-agent refresh-config [command options] [arguments...]
+
+OPTIONS:
+   --log-level value  Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
+   --help, -h         show help (default: false)
+```
+
 ## Debugging the Agent
 
 See [debug.md](./scripts/debug.md) for more information.
