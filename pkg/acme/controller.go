@@ -365,6 +365,10 @@ func (c *Controller) isSecretUsed(secret *corev1.Secret) (bool, error) {
 	}
 
 	for _, ing := range ings {
+		if !isACMEEnabled(&ing.ObjectMeta) {
+			continue
+		}
+
 		for _, tls := range ing.Spec.TLS {
 			if tls.SecretName == secret.Name {
 				return true, nil
@@ -378,6 +382,10 @@ func (c *Controller) isSecretUsed(secret *corev1.Secret) (bool, error) {
 	}
 
 	for _, ingRoute := range ingRoutes {
+		if !isACMEEnabled(&ingRoute.ObjectMeta) {
+			continue
+		}
+
 		if ingRoute.Spec.TLS != nil && ingRoute.Spec.TLS.SecretName == secret.Name {
 			return true, nil
 		}

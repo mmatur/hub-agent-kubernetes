@@ -65,6 +65,9 @@ func TestController_secretDeleted(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns",
 						Name:      "name",
+						Annotations: map[string]string{
+							annotationHubEnableACME: "true",
+						},
 					},
 					Spec: netv1.IngressSpec{
 						TLS: []netv1.IngressTLS{
@@ -122,6 +125,9 @@ func TestController_deleteUnusedSecret(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",
 			Name:      "name",
+			Annotations: map[string]string{
+				annotationHubEnableACME: "true",
+			},
 		},
 		Spec: traefikv1alpha1.IngressRouteSpec{
 			TLS: &traefikv1alpha1.TLS{
@@ -168,6 +174,9 @@ func TestController_deleteUnusedSecret(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "ns",
 				Name:      "name",
+				Annotations: map[string]string{
+					annotationHubEnableACME: "true",
+				},
 			},
 			Spec: netv1.IngressSpec{
 				TLS: []netv1.IngressTLS{
@@ -615,29 +624,56 @@ func TestController_isSecretUsed(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "ns",
 				Name:      "name",
+				Annotations: map[string]string{
+					annotationHubEnableACME: "true",
+				},
 			},
 			Spec: netv1.IngressSpec{
-				TLS: []netv1.IngressTLS{
-					{
-						Hosts:      []string{"test.localhost"},
-						SecretName: "ingress-secret",
-					},
-				},
+				TLS: []netv1.IngressTLS{{
+					SecretName: "ingress-secret",
+				}},
+			},
+		},
+		&netv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "name2",
+			},
+			Spec: netv1.IngressSpec{
+				TLS: []netv1.IngressTLS{{
+					SecretName: "secret",
+				}},
 			},
 		},
 	)
 
-	traefikClient := traefikkubemock.NewSimpleClientset(&traefikv1alpha1.IngressRoute{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns",
-			Name:      "name",
-		},
-		Spec: traefikv1alpha1.IngressRouteSpec{
-			TLS: &traefikv1alpha1.TLS{
-				SecretName: "ingressroute-secret",
+	traefikClient := traefikkubemock.NewSimpleClientset(
+		&traefikv1alpha1.IngressRoute{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "name",
+				Annotations: map[string]string{
+					annotationHubEnableACME: "true",
+				},
+			},
+			Spec: traefikv1alpha1.IngressRouteSpec{
+				TLS: &traefikv1alpha1.TLS{
+					SecretName: "ingressroute-secret",
+				},
 			},
 		},
-	})
+		&traefikv1alpha1.IngressRoute{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "name2",
+			},
+			Spec: traefikv1alpha1.IngressRouteSpec{
+				TLS: &traefikv1alpha1.TLS{
+					SecretName: "secret",
+				},
+			},
+		},
+	)
 
 	hubClient := hubkubemock.NewSimpleClientset()
 
