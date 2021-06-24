@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/traefik/hub-agent/pkg/heartbeat"
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/traefik/hub-agent/pkg/platform"
@@ -78,7 +79,10 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	}
 
 	platformClient := platform.NewClient(platformURL, token)
+
 	configWatcher := platform.NewConfigWatcher(15*time.Minute, platformClient)
+
+	heartbeater := heartbeat.NewHeartbeater(platformClient)
 
 	hubClusterID, agentCfg, err := setup(cliCtx.Context, platformClient, kubeClient)
 	if err != nil {
@@ -108,6 +112,11 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	group.Go(func() error {
 		configWatcher.Run(ctx)
+		return nil
+	})
+
+	group.Go(func() error {
+		heartbeater.Run(ctx)
 		return nil
 	})
 

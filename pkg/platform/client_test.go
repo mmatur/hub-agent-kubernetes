@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testToken = "123"
+
 func TestClient_Link(t *testing.T) {
 	tests := []struct {
 		desc             string
@@ -52,7 +54,7 @@ func TestClient_Link(t *testing.T) {
 					return
 				}
 
-				if req.Header.Get("Authorization") != "Bearer 123" {
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
 					http.Error(rw, "Invalid token", http.StatusUnauthorized)
 					return
 				}
@@ -76,7 +78,7 @@ func TestClient_Link(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, "123")
+			c := NewClient(srv.URL, testToken)
 			c.httpClient = srv.Client()
 
 			hubClusterID, err := c.Link(context.Background(), "1")
@@ -136,7 +138,7 @@ func TestClient_GetConfig(t *testing.T) {
 					return
 				}
 
-				if req.Header.Get("Authorization") != "Bearer 123" {
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
 					http.Error(rw, "Invalid token", http.StatusUnauthorized)
 					return
 				}
@@ -149,7 +151,7 @@ func TestClient_GetConfig(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, "123")
+			c := NewClient(srv.URL, testToken)
 			c.httpClient = srv.Client()
 
 			agentCfg, err := c.GetConfig(context.Background())
@@ -158,6 +160,68 @@ func TestClient_GetConfig(t *testing.T) {
 			require.Equal(t, 1, callCount)
 
 			assert.Equal(t, test.wantConfig, agentCfg)
+		})
+	}
+}
+
+func TestClient_Ping(t *testing.T) {
+	tests := []struct {
+		desc             string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "ping successfully sent",
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "ping sent for an unknown cluster",
+			returnStatusCode: http.StatusNotFound,
+			wantErr:          assert.Error,
+		},
+		{
+			desc:             "error on ping",
+			returnStatusCode: http.StatusInternalServerError,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/ping", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			err := c.Ping(context.Background())
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
 		})
 	}
 }

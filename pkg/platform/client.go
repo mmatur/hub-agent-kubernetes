@@ -144,3 +144,24 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 
 	return cfg, nil
 }
+
+// Ping sends a ping to the platform to inform that the agent is alive.
+func (c *Client) Ping(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/ping", nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed with code %d", resp.StatusCode)
+	}
+	return nil
+}
