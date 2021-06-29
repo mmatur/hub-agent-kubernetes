@@ -14,7 +14,7 @@ import (
 func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
 	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
 	store := mockThresholdStore{
-		group: generateData(t, now, 3, 10, 3),
+		group: generateData(t, "ing@ns", "svc@ns", now, 3, 10, 3),
 	}
 	logs := mockLogProvider{}
 
@@ -34,6 +34,8 @@ func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  10 * time.Minute,
 		},
+	}, map[string][]string{
+		"test:foo": {"svc3@ns"},
 	})
 	require.NoError(t, err)
 
@@ -43,7 +45,7 @@ func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
 func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
 	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
 	store := mockThresholdStore{
-		group: generateData(t, now, 2, 10, 2),
+		group: generateData(t, "ing@ns", "svc@ns", now, 2, 10, 2),
 	}
 	logs := mockLogProvider{}
 
@@ -63,7 +65,7 @@ func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  10 * time.Minute,
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	assert.Nil(t, got)
@@ -72,7 +74,7 @@ func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
 func TestThresholdProcessor_NoAlert(t *testing.T) {
 	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
 	store := mockThresholdStore{
-		group: generateData(t, now, 3, 10, 2),
+		group: generateData(t, "ing@ns", "svc@ns", now, 3, 10, 2),
 	}
 	logs := mockLogProvider{}
 
@@ -92,7 +94,7 @@ func TestThresholdProcessor_NoAlert(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  10 * time.Minute,
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	assert.Nil(t, got)
@@ -147,7 +149,7 @@ func TestThresholdProcessor_NoAlert10Minute(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  40 * time.Minute,
 		},
-	})
+	}, nil)
 
 	require.NoError(t, err)
 	assert.Nil(t, got)
@@ -155,7 +157,7 @@ func TestThresholdProcessor_NoAlert10Minute(t *testing.T) {
 
 func TestThresholdProcessor_Alert(t *testing.T) {
 	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	metricsData := generateData(t, now, 3, 15, 3)
+	metricsData := generateData(t, "ing@ns", "svc@ns", now, 3, 15, 3)
 	store := mockThresholdStore{
 		group: metricsData,
 	}
@@ -184,7 +186,7 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  10 * time.Minute,
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	newPnts := make([]Point, len(metricsData.DataPoints))
@@ -194,12 +196,51 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 	logBytes, err := compress([]byte("fake logs"))
 	require.NoError(t, err)
 
-	want := &Alert{
-		RuleID:  "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Points:  newPnts,
-		Logs:    logBytes,
+	want := []Alert{
+		{
+			RuleID:  "123",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
+			Points:  newPnts,
+			Logs:    logBytes,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 10,
+				},
+				Occurrence: 3,
+				TimeRange:  10 * time.Minute,
+			},
+		},
+	}
+	assert.Equal(t, want, got)
+}
+
+func TestThresholdProcessor_AlertWithAnnotation(t *testing.T) {
+	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
+	metricsData := generateData(t, "ing@ns", "svc@ns", now, 3, 15, 3)
+	metricsData2 := generateData(t, "ing2@ns", "svc2@ns", now, 3, 15, 3)
+	store := mockMultiThresholdStore{
+		groups: []metrics.DataPointGroup{
+			metricsData,
+			metricsData2,
+		},
+	}
+	logs := mockLogProvider{
+		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
+			return []byte("fake logs"), nil
+		},
+	}
+
+	threshProc := NewThresholdProcessor(store, logs)
+	threshProc.nowFunc = func() time.Time { return now }
+
+	got, err := threshProc.Process(context.Background(), &Rule{
+		ID:         "123",
+		Ingress:    "",
+		Service:    "",
+		Annotation: "test:foo",
 		Threshold: &Threshold{
 			Metric: "requestsPerSecond",
 			Condition: ThresholdCondition{
@@ -208,6 +249,55 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 			},
 			Occurrence: 3,
 			TimeRange:  10 * time.Minute,
+		},
+	}, map[string][]string{
+		"test:foo": {"svc@ns", "svc2@ns"},
+	})
+	require.NoError(t, err)
+
+	newPnts := make([]Point, len(metricsData.DataPoints))
+	for i, pnt := range metricsData.DataPoints {
+		newPnts[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
+	}
+	newPnts2 := make([]Point, len(metricsData2.DataPoints))
+	for i, pnt := range metricsData2.DataPoints {
+		newPnts2[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
+	}
+	logBytes, err := compress([]byte("fake logs"))
+	require.NoError(t, err)
+
+	want := []Alert{
+		{
+			RuleID:  "123",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
+			Points:  newPnts,
+			Logs:    logBytes,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 10,
+				},
+				Occurrence: 3,
+				TimeRange:  10 * time.Minute,
+			},
+		},
+		{
+			RuleID:  "123",
+			Ingress: "ing2@ns",
+			Service: "svc2@ns",
+			Points:  newPnts2,
+			Logs:    logBytes,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 10,
+				},
+				Occurrence: 3,
+				TimeRange:  10 * time.Minute,
+			},
 		},
 	}
 	assert.Equal(t, want, got)
@@ -269,7 +359,7 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  40 * time.Minute,
 		},
-	})
+	}, nil)
 
 	require.NoError(t, err)
 
@@ -280,20 +370,22 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 	logBytes, err := compress([]byte("fake logs"))
 	require.NoError(t, err)
 
-	want := &Alert{
-		RuleID:  "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Points:  newPnts,
-		Logs:    logBytes,
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
+	want := []Alert{
+		{
+			RuleID:  "123",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
+			Points:  newPnts,
+			Logs:    logBytes,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 10,
+				},
+				Occurrence: 3,
+				TimeRange:  40 * time.Minute,
 			},
-			Occurrence: 3,
-			TimeRange:  40 * time.Minute,
 		},
 	}
 	assert.Equal(t, want, got)
@@ -372,44 +464,46 @@ func TestThresholdProcessor_AlertMergedServices(t *testing.T) {
 			Occurrence: 3,
 			TimeRange:  40 * time.Minute,
 		},
-	})
+	}, nil)
 
 	require.NoError(t, err)
 
 	logBytes, err := compress([]byte("fake logs"))
 	require.NoError(t, err)
 
-	want := &Alert{
-		RuleID:  "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Points: []Point{
-			{
-				Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
-				Value:     31.566666666666666,
+	want := []Alert{
+		{
+			RuleID:  "123",
+			Ingress: "ing@ns",
+			Service: "svc@ns",
+			Points: []Point{
+				{
+					Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
+					Value:     31.566666666666666,
+				},
+				{
+					Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
+					Value:     19.566666666666666,
+				},
+				{
+					Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
+					Value:     31.566666666666666,
+				},
+				{
+					Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
+					Value:     31.566666666666666,
+				},
 			},
-			{
-				Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
-				Value:     19.566666666666666,
+			Logs: logBytes,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 30,
+				},
+				Occurrence: 3,
+				TimeRange:  40 * time.Minute,
 			},
-			{
-				Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
-				Value:     31.566666666666666,
-			},
-			{
-				Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
-				Value:     31.566666666666666,
-			},
-		},
-		Logs: logBytes,
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 30,
-			},
-			Occurrence: 3,
-			TimeRange:  40 * time.Minute,
 		},
 	}
 	assert.Equal(t, want, got)
@@ -441,12 +535,12 @@ func (m mockLogProvider) GetServiceLogs(_ context.Context, namespace, name strin
 	return m.getServiceLogsFn(namespace, name, lines, maxLen)
 }
 
-func generateData(t *testing.T, now time.Time, points, threshold, occurrences int) metrics.DataPointGroup {
+func generateData(t *testing.T, ingress, service string, now time.Time, points, threshold, occurrences int) metrics.DataPointGroup {
 	t.Helper()
 
 	group := metrics.DataPointGroup{
-		Ingress:    "ing@ns",
-		Service:    "svc@ns",
+		Ingress:    ingress,
+		Service:    service,
 		DataPoints: metrics.DataPoints{},
 	}
 

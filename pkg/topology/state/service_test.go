@@ -20,6 +20,9 @@ func TestFetcher_GetServices(t *testing.T) {
 		"myService@myns": {
 			Name:      "myService",
 			Namespace: "myns",
+			Annotations: map[string]string{
+				"my.annotation": "foo",
+			},
 			Selector: map[string]string{
 				"my.label": "foo",
 			},
@@ -72,6 +75,9 @@ func TestFetcher_GetServices(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myService",
 				Namespace: "myns",
+				Annotations: map[string]string{
+					"my.annotation": "foo",
+				},
 			},
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeClusterIP,

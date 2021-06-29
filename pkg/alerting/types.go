@@ -11,9 +11,10 @@ const (
 // Rule defines evaluation configuration for alerting
 // on metrics.
 type Rule struct {
-	ID      string `json:"id"`
-	Ingress string `json:"ingress"`
-	Service string `json:"service"`
+	ID         string `json:"id"`
+	Ingress    string `json:"ingress"`
+	Service    string `json:"service"`
+	Annotation string `json:"annotation"`
 
 	Threshold *Threshold `json:"threshold"`
 }

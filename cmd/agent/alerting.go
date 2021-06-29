@@ -9,6 +9,7 @@ import (
 	"github.com/traefik/hub-agent/pkg/alerting"
 	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/traefik/hub-agent/pkg/metrics"
+	"github.com/traefik/hub-agent/pkg/topology"
 	"github.com/traefik/hub-agent/pkg/topology/state"
 )
 
@@ -22,7 +23,7 @@ const (
 	alertSchedulerInterval = time.Minute
 )
 
-func runAlerting(ctx context.Context, token, platformURL string, store *metrics.Store, fetcher *state.Fetcher) error {
+func runAlerting(ctx context.Context, watch *topology.Watcher, token, platformURL string, store *metrics.Store, fetcher *state.Fetcher) error {
 	retryableClient := retryablehttp.NewClient()
 	retryableClient.RetryWaitMin = time.Second
 	retryableClient.RetryWaitMax = 10 * time.Second
@@ -41,6 +42,8 @@ func runAlerting(ctx context.Context, token, platformURL string, store *metrics.
 	mgr := alerting.NewManager(client, map[string]alerting.Processor{
 		alerting.ThresholdType: threshProc,
 	})
+
+	watch.AddListener(mgr.TopologyStateChanged)
 
 	return mgr.Run(ctx, alertRefreshInterval, alertSchedulerInterval)
 }

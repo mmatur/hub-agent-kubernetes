@@ -131,7 +131,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	group.Go(func() error { return accessControl(ctx, cliCtx, agentCfg.AccessControl, configWatcher) })
 
-	group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
+	group.Go(func() error { return runAlerting(ctx, topoWatch, token, platformURL, mtrcsStore, topoFetcher) })
 
 	group.Go(func() error { return runACME(ctx, platformURL, token) })
 

@@ -24,12 +24,13 @@ func (f *Fetcher) getServices(apps map[string]*App) (map[string]*Service, map[st
 	for _, service := range services {
 		svcName := objectKey(service.Name, service.Namespace)
 		svcs[svcName] = &Service{
-			Name:      service.Name,
-			Namespace: service.Namespace,
-			Selector:  service.Spec.Selector,
-			Apps:      selectApps(apps, service),
-			Type:      service.Spec.Type,
-			status:    service.Status,
+			Name:        service.Name,
+			Namespace:   service.Namespace,
+			Annotations: sanitizeAnnotations(service.Annotations),
+			Selector:    service.Spec.Selector,
+			Apps:        selectApps(apps, service),
+			Type:        service.Spec.Type,
+			status:      service.Status,
 		}
 
 		for _, key := range traefikServiceNames(service) {

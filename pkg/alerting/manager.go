@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent/pkg/topology/state"
 )
 
 // Processor represents a rule processor.
 type Processor interface {
-	Process(ctx context.Context, rule *Rule) (*Alert, error)
+	Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, error)
 }
 
 // Manager manages rule synchronization and scheduling.
@@ -21,6 +22,9 @@ type Manager struct {
 	rules   []Rule
 
 	procs map[string]Processor
+
+	svcAnnotationsMu sync.Mutex
+	svcAnnotations   map[string][]string
 
 	nowFunc func() time.Time
 }
@@ -48,6 +52,20 @@ func (m *Manager) Run(ctx context.Context, refreshInterval, schedulerInterval ti
 	m.runRefresh(ctx, refreshInterval)
 
 	return nil
+}
+
+// TopologyStateChanged is called every time the topology state changes.
+func (m *Manager) TopologyStateChanged(ctx context.Context, cluster *state.Cluster) {
+	m.svcAnnotationsMu.Lock()
+	defer m.svcAnnotationsMu.Unlock()
+
+	m.svcAnnotations = make(map[string][]string)
+	for _, svc := range cluster.Services {
+		for k, v := range svc.Annotations {
+			key := k + ":" + v
+			m.svcAnnotations[key] = append(m.svcAnnotations[key], svc.Name+"@"+svc.Namespace)
+		}
+	}
 }
 
 func (m *Manager) runRefresh(ctx context.Context, refreshInterval time.Duration) {
@@ -86,8 +104,10 @@ func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
 			return
 		case <-schedulerTicker.C:
 			m.rulesMu.Lock()
+			m.svcAnnotationsMu.Lock()
 
 			var alerts []Alert
+
 			for _, rule := range m.rules {
 				rule := rule
 				log.Debug().Str("ruleId", rule.ID).Msg("Processing rule")
@@ -98,18 +118,19 @@ func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
 					continue
 				}
 
-				alert, err := proc.Process(ctx, &rule)
+				newAlerts, err := proc.Process(ctx, &rule, m.svcAnnotations)
 				if err != nil {
 					log.Error().Err(err).Str("ruleID", rule.ID).Msg("Unable to process the rule")
 				}
-				if alert == nil {
+				if newAlerts == nil {
 					continue
 				}
 
-				alerts = append(alerts, *alert)
+				alerts = append(alerts, newAlerts...)
 			}
 
 			m.rulesMu.Unlock()
+			m.svcAnnotationsMu.Unlock()
 
 			log.Debug().Int("count", len(alerts)).Msg("Checking alerts to send")
 
