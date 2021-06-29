@@ -87,6 +87,29 @@ func TestController_syncIngress(t *testing.T) {
 			},
 		},
 		{
+			desc: "Missing secret ignoring casing, ordering and duplicates",
+			ing: &netv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: netv1.IngressSpec{
+					TLS: []netv1.IngressTLS{
+						{
+							Hosts:      []string{"test2.localhost", "test.localhost", "TEST2.localhost"},
+							SecretName: "missing-secret",
+						},
+					},
+				},
+			},
+			wantIssuerCallCount: 1,
+			wantIssuerCallReq: CertificateRequest{
+				Domains:    []string{"test.localhost", "test2.localhost"},
+				Namespace:  "ns",
+				SecretName: "missing-secret",
+			},
+		},
+		{
 			desc: "Existing secret with matching domains",
 			ing: &netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -98,6 +121,24 @@ func TestController_syncIngress(t *testing.T) {
 						{
 							Hosts:      []string{"test.localhost"},
 							SecretName: "secret",
+						},
+					},
+				},
+			},
+			wantIssuerCallCount: 0,
+		},
+		{
+			desc: "Existing secret with matching domains ignoring casing, ordering and duplicates",
+			ing: &netv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: netv1.IngressSpec{
+					TLS: []netv1.IngressTLS{
+						{
+							Hosts:      []string{"test2.localhost", "test.localhost", "TEST2.localhost"},
+							SecretName: "secret2",
 						},
 					},
 				},
@@ -147,18 +188,32 @@ func TestController_syncIngress(t *testing.T) {
 			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			kubeClient := newFakeKubeClient(t, &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns",
-					Name:      "secret",
-					Labels: map[string]string{
-						labelManagedBy: controllerName,
-					},
-					Annotations: map[string]string{
-						annotationCertificateDomains: "test.localhost",
+			kubeClient := newFakeKubeClient(t,
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "secret",
+						Labels: map[string]string{
+							labelManagedBy: controllerName,
+						},
+						Annotations: map[string]string{
+							annotationCertificateDomains: "test.localhost",
+						},
 					},
 				},
-			})
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "secret2",
+						Labels: map[string]string{
+							labelManagedBy: controllerName,
+						},
+						Annotations: map[string]string{
+							annotationCertificateDomains: "test.localhost,test2.localhost",
+						},
+					},
+				},
+			)
 
 			ctrl := newController(t, issuer, kubeClient, hubClient, traefikClient)
 

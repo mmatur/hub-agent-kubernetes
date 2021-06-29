@@ -89,6 +89,8 @@ func (c *Controller) syncIngressRoute(ingRoute *traefikv1alpha1.IngressRoute) {
 		return
 	}
 
+	domains = sanitizeDomains(domains)
+
 	// Here we check that the existing secret has the needed domains, if not it needs to be updated.
 	if secret != nil && isManagedSecret(secret) && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
 		return

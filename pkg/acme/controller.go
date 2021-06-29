@@ -3,6 +3,7 @@ package acme
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -479,4 +480,23 @@ func hasDefaultIngressClassAnnotation(ing *netv1.Ingress) bool {
 		return false
 	}
 	return true
+}
+
+// sanitizeDomains returns a sorted, lower cased and deduplicated domain list.
+func sanitizeDomains(domains []string) []string {
+	var result []string
+	existingDomains := map[string]struct{}{}
+
+	for _, domain := range domains {
+		domain = strings.ToLower(domain)
+		if _, exists := existingDomains[domain]; exists {
+			continue
+		}
+
+		result = append(result, domain)
+		existingDomains[domain] = struct{}{}
+	}
+
+	sort.Strings(result)
+	return result
 }

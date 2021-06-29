@@ -785,6 +785,46 @@ func Test_hasDefaultIngressClassAnnotation(t *testing.T) {
 	}
 }
 
+func Test_sanitizeDomains(t *testing.T) {
+	tests := []struct {
+		desc    string
+		domains []string
+		want    []string
+	}{
+		{
+			desc: "empty list",
+		},
+		{
+			desc:    "unordered list",
+			domains: []string{"foo.com", "bar.com"},
+			want:    []string{"bar.com", "foo.com"},
+		},
+		{
+			desc:    "upper cased domain",
+			domains: []string{"DOMAIN.COM"},
+			want:    []string{"domain.com"},
+		},
+		{
+			desc:    "duplicated domains",
+			domains: []string{"bar.com", "bar.com"},
+			want:    []string{"bar.com"},
+		},
+		{
+			desc:    "unordered, upper cased and duplicated domains",
+			domains: []string{"foo.com", "bar.com", "BAR.com"},
+			want:    []string{"bar.com", "foo.com"},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			got := sanitizeDomains(test.domains)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
 func newController(t *testing.T, issuer issuerMock, kubeClient clientset.Interface, hubClient hubclientset.Interface, traefikClient traefikclientset.Interface) *Controller {
 	t.Helper()
 

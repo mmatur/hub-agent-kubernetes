@@ -71,13 +71,15 @@ func (c *Controller) syncIngress(ing *netv1.Ingress) {
 			continue
 		}
 
+		domains := sanitizeDomains(tls.Hosts)
+
 		// Here we check that the existing secret has the needed domains, if not it needs to be updated.
-		if secret != nil && isManagedSecret(secret) && reflect.DeepEqual(tls.Hosts, getCertificateDomains(secret)) {
+		if secret != nil && isManagedSecret(secret) && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
 			continue
 		}
 
 		c.certs.ObtainCertificate(CertificateRequest{
-			Domains:    tls.Hosts,
+			Domains:    domains,
 			Namespace:  ing.Namespace,
 			SecretName: tls.SecretName,
 		})
