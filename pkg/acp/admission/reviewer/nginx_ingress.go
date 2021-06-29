@@ -50,17 +50,25 @@ func (r NginxIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 
 	defaultCtrlr, err := r.ingressClasses.GetDefaultController()
 	if err != nil {
-		return false, fmt.Errorf("get default controller: %w", err)
+		return false, fmt.Errorf("get default ingress class controller: %w", err)
 	}
 
 	switch {
 	case ingClassName != "":
-		return isNginx(r.ingressClasses.GetController(ingClassName)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassName)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isNginx(ctrlr), nil
 	case ingClassAnno != "":
 		if ingClassAnno == defaultAnnotationNginx {
 			return true, nil
 		}
-		return isNginx(r.ingressClasses.GetController(ingClassAnno)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassAnno)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isNginx(ctrlr), nil
 	default:
 		return isNginx(defaultCtrlr), nil
 	}

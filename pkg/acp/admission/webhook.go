@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -16,6 +17,18 @@ import (
 type Reviewer interface {
 	CanReview(ar admv1.AdmissionReview) (bool, error)
 	Review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error)
+}
+
+type reviewerWarning struct {
+	err error
+}
+
+func (e reviewerWarning) Error() string {
+	if e.err == nil {
+		return "reviewer warning"
+	}
+
+	return e.err.Error()
 }
 
 // Handler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
@@ -53,8 +66,14 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	patch, err := h.review(ctx, ar)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
-		setReviewErrorResponse(&ar, err)
+		var warn *reviewerWarning
+		if errors.As(err, &warn) {
+			log.Ctx(ctx).Debug().Err(warn).Msg("Reviewer warning")
+			setReviewWarningResponse(&ar, warn.err)
+		} else {
+			log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
+			setReviewErrorResponse(&ar, err)
+		}
 	} else {
 		setReviewResponse(&ar, patch)
 	}
@@ -67,19 +86,30 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error) {
-	if ar.Request == nil {
-		return nil, errors.New("nothing to review")
-	}
-
-	reviewer, err := findReviewer(h.reviewers, ar)
+	usesACP, err := isUsingACP(ar)
 	if err != nil {
-		return nil, fmt.Errorf("find reviewer: %w", err)
-	}
-	if reviewer == nil {
-		return nil, fmt.Errorf("unable to determine IngressClass for resource %q of kind %q", ar.Request.Name, ar.Request.Kind)
+		return nil, fmt.Errorf("unable to determine if resource uses ACP: %w", err)
 	}
 
-	patch, err := reviewer.Review(ctx, ar)
+	rev, revErr := findReviewer(h.reviewers, ar)
+	if revErr != nil {
+		// We had an error looking for a reviewer for this resource but it's not using ACPs,
+		// so just warn the user.
+		if !usesACP {
+			return nil, &reviewerWarning{err: revErr}
+		}
+		return nil, fmt.Errorf("find reviewer: %w", revErr)
+	}
+
+	if rev == nil {
+		// We could not find a reviewer for this resource but it's not using ACPs, don't do anything.
+		if !usesACP {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("no reviewer found for resource %q of kind %q", ar.Request.Name, ar.Request.Kind)
+	}
+
+	patch, err := rev.Review(ctx, ar)
 	if err != nil {
 		return nil, fmt.Errorf("reviewing resource %q of kind %q: %w", ar.Request.Name, ar.Request.Kind, err)
 	}
@@ -96,6 +126,8 @@ func findReviewer(reviewers []Reviewer, ar admv1.AdmissionReview) (Reviewer, err
 		}
 		if ok {
 			if rev != nil {
+				// This can only happen if reviewers' CanReview method overlap.
+				// It does not depend on user input.
 				return nil, fmt.Errorf("more than one reviewer found (at least %T and %T)", rev, r)
 			}
 
@@ -116,6 +148,16 @@ func setReviewErrorResponse(ar *admv1.AdmissionReview, err error) {
 	}
 }
 
+func setReviewWarningResponse(ar *admv1.AdmissionReview, err error) {
+	ar.Response = &admv1.AdmissionResponse{
+		Allowed: true,
+		UID:     ar.Request.UID,
+		Warnings: []string{
+			err.Error(),
+		},
+	}
+}
+
 func setReviewResponse(ar *admv1.AdmissionReview, patch []byte) {
 	ar.Response = &admv1.AdmissionResponse{
 		Allowed: true,
@@ -128,4 +170,33 @@ func setReviewResponse(ar *admv1.AdmissionReview, patch []byte) {
 		}()
 		ar.Response.Patch = patch
 	}
+}
+
+func isUsingACP(ar admv1.AdmissionReview) (bool, error) {
+	var obj struct {
+		Metadata metav1.ObjectMeta `json:"metadata"`
+	}
+	var polName string
+	if ar.Request.Object.Raw != nil {
+		if err := json.Unmarshal(ar.Request.Object.Raw, &obj); err != nil {
+			return false, err
+		}
+		polName = obj.Metadata.Annotations[reviewer.AnnotationHubAuth]
+	}
+
+	var oldObj struct {
+		Metadata metav1.ObjectMeta `json:"metadata"`
+	}
+	var prevPolName string
+	if ar.Request.OldObject.Raw != nil {
+		if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldObj); err != nil {
+			return false, err
+		}
+		prevPolName = oldObj.Metadata.Annotations[reviewer.AnnotationHubAuth]
+	}
+
+	if polName == "" && prevPolName == "" {
+		return false, nil
+	}
+	return true, nil
 }

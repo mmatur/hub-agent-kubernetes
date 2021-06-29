@@ -108,17 +108,17 @@ func (w *Watcher) upsert(obj interface{}) {
 
 // GetController returns the controller of the IngressClass matching the given name. If no IngressClass
 // is found, an empty string is returned.
-func (w *Watcher) GetController(name string) string {
+func (w *Watcher) GetController(name string) (string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	for _, class := range w.ingressClasses {
 		if class.Name == name {
-			return class.Controller
+			return class.Controller, nil
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("IngressClass %q not found", name)
 }
 
 // GetDefaultController returns the controller of the IngressClass that is noted as default.

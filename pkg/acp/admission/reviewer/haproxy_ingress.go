@@ -51,17 +51,25 @@ func (r HAProxyIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 
 	defaultCtrlr, err := r.ingressClasses.GetDefaultController()
 	if err != nil {
-		return false, fmt.Errorf("get default controller: %w", err)
+		return false, fmt.Errorf("get default ingress class controller: %w", err)
 	}
 
 	switch {
 	case ingClassName != "":
-		return isHAProxy(r.ingressClasses.GetController(ingClassName)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassName)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isHAProxy(ctrlr), nil
 	case ingClassAnno != "":
 		if ingClassAnno == defaultAnnotationHAProxy {
 			return true, nil
 		}
-		return isHAProxy(r.ingressClasses.GetController(ingClassAnno)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassAnno)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isHAProxy(ctrlr), nil
 	default:
 		return isHAProxy(defaultCtrlr), nil
 	}

@@ -80,9 +80,15 @@ func TestWatcher_GetController(t *testing.T) {
 	err = waitForIngressClasses(watcher, 3)
 	require.NoError(t, err)
 
-	assert.Equal(t, ControllerTypeTraefik, watcher.GetController("ing-class-1"))
-	assert.Equal(t, ControllerTypeNginxOfficial, watcher.GetController("ing-class-2"))
-	assert.Equal(t, ControllerTypeTraefik, watcher.GetController("ing-class-3"))
+	ctrlr, err := watcher.GetController("ing-class-1")
+	assert.NoError(t, err)
+	assert.Equal(t, ControllerTypeTraefik, ctrlr)
+	ctrlr, err = watcher.GetController("ing-class-2")
+	assert.NoError(t, err)
+	assert.Equal(t, ControllerTypeNginxOfficial, ctrlr)
+	ctrlr, err = watcher.GetController("ing-class-3")
+	assert.NoError(t, err)
+	assert.Equal(t, ControllerTypeTraefik, ctrlr)
 
 	err = clientSet.NetworkingV1().IngressClasses().Delete(context.Background(), "ing-class-1", metav1.DeleteOptions{})
 	require.NoError(t, err)
@@ -94,9 +100,15 @@ func TestWatcher_GetController(t *testing.T) {
 	err = waitForIngressClasses(watcher, 0)
 	require.NoError(t, err)
 
-	assert.Equal(t, "", watcher.GetController("ing-class-1"))
-	assert.Equal(t, "", watcher.GetController("ing-class-2"))
-	assert.Equal(t, "", watcher.GetController("ing-class-3"))
+	ctrlr, err = watcher.GetController("ing-class-1")
+	assert.Error(t, err)
+	assert.Equal(t, "", ctrlr)
+	ctrlr, err = watcher.GetController("ing-class-2")
+	assert.Error(t, err)
+	assert.Equal(t, "", ctrlr)
+	ctrlr, err = watcher.GetController("ing-class-3")
+	assert.Error(t, err)
+	assert.Equal(t, "", ctrlr)
 }
 
 func TestWatcher_GetDefaultController(t *testing.T) {

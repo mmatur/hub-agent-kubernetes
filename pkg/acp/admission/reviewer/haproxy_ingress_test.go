@@ -3,6 +3,7 @@ package reviewer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -142,52 +143,62 @@ func TestHAProxyIngress_CanReviewChecksIngressClass(t *testing.T) {
 		spec                   string
 		wrongDefaultController bool
 		canReview              bool
+		canReviewErr           assert.ErrorAssertionFunc
 	}{
 		{
-			desc:      "can review a valid resource",
-			canReview: true,
+			desc:         "can review a valid resource",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
 			desc:                   "can't review if the default controller is not of the correct type",
 			wrongDefaultController: true,
 			canReview:              false,
+			canReviewErr:           assert.NoError,
 		},
 		{
-			desc:       "can review if annotation is correct",
-			annotation: "haproxy",
-			canReview:  true,
+			desc:         "can review if annotation is correct",
+			annotation:   "haproxy",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can review if using a custom ingress class (annotation)",
-			annotation: "custom-haproxy-community-ingress-class",
-			canReview:  true,
+			desc:         "can review if using a custom ingress class (annotation)",
+			annotation:   "custom-haproxy-community-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can't review if using another annotation",
-			annotation: "traefik",
-			canReview:  false,
+			desc:         "can't review if using another annotation",
+			annotation:   "traefik",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:      "can review if using a custom ingress class (spec)",
-			spec:      "custom-haproxy-community-ingress-class",
-			canReview: true,
+			desc:         "can review if using a custom ingress class (spec)",
+			spec:         "custom-haproxy-community-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:      "can't review if using another controller",
-			spec:      "haproxy",
-			canReview: false,
+			desc:         "can't review if using another controller",
+			spec:         "haproxy",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:       "spec takes priority over ingAnnotation#1",
-			annotation: "haproxy",
-			spec:       "custom-haproxy-community-ingress-class",
-			canReview:  true,
+			desc:         "spec takes priority over ingAnnotation#1",
+			annotation:   "haproxy",
+			spec:         "custom-haproxy-community-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "spec takes priority over ingAnnotation#2",
-			annotation: "haproxy",
-			spec:       "haproxy",
-			canReview:  false,
+			desc:         "spec takes priority over ingAnnotation#2",
+			annotation:   "haproxy",
+			spec:         "haproxy",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 	}
 
@@ -197,11 +208,11 @@ func TestHAProxyIngress_CanReviewChecksIngressClass(t *testing.T) {
 			t.Parallel()
 
 			i := ingressClassesMock{
-				getControllerFunc: func(name string) string {
+				getControllerFunc: func(name string) (string, error) {
 					if name == "custom-haproxy-community-ingress-class" {
-						return ingclass.ControllerTypeHAProxyCommunity
+						return ingclass.ControllerTypeHAProxyCommunity, nil
 					}
-					return "nope"
+					return "", errors.New("nope")
 				},
 				getDefaultControllerFunc: func() (string, error) {
 					if test.wrongDefaultController {
@@ -244,7 +255,7 @@ func TestHAProxyIngress_CanReviewChecksIngressClass(t *testing.T) {
 			}
 
 			ok, err := review.CanReview(ar)
-			require.NoError(t, err)
+			test.canReviewErr(t, err)
 			assert.Equal(t, test.canReview, ok)
 		})
 	}

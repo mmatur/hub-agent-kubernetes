@@ -8,7 +8,7 @@ import (
 // IngressClasses allows to get the ingress controller type given an ingress class desc
 // or the default ingress controller type.
 type IngressClasses interface {
-	GetController(name string) string
+	GetController(name string) (string, error)
 	GetDefaultController() (string, error)
 }
 

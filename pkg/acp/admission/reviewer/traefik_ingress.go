@@ -53,17 +53,25 @@ func (r TraefikIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 
 	defaultCtrlr, err := r.ingressClasses.GetDefaultController()
 	if err != nil {
-		return false, fmt.Errorf("get default controller: %w", err)
+		return false, fmt.Errorf("get default ingress class controller: %w", err)
 	}
 
 	switch {
 	case ingClassName != "":
-		return isTraefik(r.ingressClasses.GetController(ingClassName)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassName)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isTraefik(ctrlr), nil
 	case ingClassAnno != "":
 		if ingClassAnno == defaultAnnotationTraefik {
 			return true, nil
 		}
-		return isTraefik(r.ingressClasses.GetController(ingClassAnno)), nil
+		ctrlr, err := r.ingressClasses.GetController(ingClassAnno)
+		if err != nil {
+			return false, fmt.Errorf("get ingress class controller: %w", err)
+		}
+		return isTraefik(ctrlr), nil
 	default:
 		return isTraefik(defaultCtrlr), nil
 	}

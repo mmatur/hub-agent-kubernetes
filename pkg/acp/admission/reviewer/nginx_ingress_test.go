@@ -3,6 +3,7 @@ package reviewer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -142,57 +143,68 @@ func TestNginxIngress_CanReviewChecksIngressClass(t *testing.T) {
 		spec                   string
 		wrongDefaultController bool
 		canReview              bool
+		canReviewErr           assert.ErrorAssertionFunc
 	}{
 		{
-			desc:      "can review a valid resource",
-			canReview: true,
+			desc:         "can review a valid resource",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
 			desc:                   "can't review if the default controller is not of the correct type",
 			wrongDefaultController: true,
 			canReview:              false,
+			canReviewErr:           assert.NoError,
 		},
 		{
-			desc:       "can review if annotation is correct",
-			annotation: "nginx",
-			canReview:  true,
+			desc:         "can review if annotation is correct",
+			annotation:   "nginx",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can review if using a custom ingress class (annotation)",
-			annotation: "custom-nginx-ingress-class",
-			canReview:  true,
+			desc:         "can review if using a custom ingress class (annotation)",
+			annotation:   "custom-nginx-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can't review if using another annotation",
-			annotation: "traefik",
-			canReview:  false,
+			desc:         "can't review if using another annotation",
+			annotation:   "traefik",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:      "can review if using a custom ingress class (spec)",
-			spec:      "custom-nginx-ingress-class",
-			canReview: true,
+			desc:         "can review if using a custom ingress class (spec)",
+			spec:         "custom-nginx-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:      "can review if using a custom ingress class with nginx community value (spec)",
-			spec:      "custom-nginx-community-ingress-class",
-			canReview: true,
+			desc:         "can review if using a custom ingress class with nginx community value (spec)",
+			spec:         "custom-nginx-community-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:      "can't review if using another controller",
-			spec:      "nginx",
-			canReview: false,
+			desc:         "can't review if using another controller",
+			spec:         "nginx",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:       "spec takes priority over ingAnnotation#1",
-			annotation: "nginx",
-			spec:       "custom-nginx-ingress-class",
-			canReview:  true,
+			desc:         "spec takes priority over ingAnnotation#1",
+			annotation:   "nginx",
+			spec:         "custom-nginx-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "spec takes priority over ingAnnotation#2",
-			annotation: "nginx",
-			spec:       "nginx",
-			canReview:  false,
+			desc:         "spec takes priority over ingAnnotation#2",
+			annotation:   "nginx",
+			spec:         "nginx",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 	}
 
@@ -202,14 +214,14 @@ func TestNginxIngress_CanReviewChecksIngressClass(t *testing.T) {
 			t.Parallel()
 
 			i := ingressClassesMock{
-				getControllerFunc: func(name string) string {
+				getControllerFunc: func(name string) (string, error) {
 					if name == "custom-nginx-ingress-class" {
-						return ingclass.ControllerTypeNginxOfficial
+						return ingclass.ControllerTypeNginxOfficial, nil
 					}
 					if name == "custom-nginx-community-ingress-class" {
-						return ingclass.ControllerTypeNginxCommunity
+						return ingclass.ControllerTypeNginxCommunity, nil
 					}
-					return "nope"
+					return "", errors.New("nope")
 				},
 				getDefaultControllerFunc: func() (string, error) {
 					if test.wrongDefaultController {
@@ -252,7 +264,7 @@ func TestNginxIngress_CanReviewChecksIngressClass(t *testing.T) {
 			}
 
 			ok, err := review.CanReview(ar)
-			require.NoError(t, err)
+			test.canReviewErr(t, err)
 			assert.Equal(t, test.canReview, ok)
 		})
 	}

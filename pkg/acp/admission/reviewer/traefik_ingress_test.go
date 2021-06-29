@@ -3,6 +3,7 @@ package reviewer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,52 +156,62 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 		spec                   string
 		wrongDefaultController bool
 		canReview              bool
+		canReviewErr           assert.ErrorAssertionFunc
 	}{
 		{
-			desc:      "can review a valid resource",
-			canReview: true,
+			desc:         "can review a valid resource",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
 			desc:                   "can't review if the default controller is not of the correct type",
 			wrongDefaultController: true,
 			canReview:              false,
+			canReviewErr:           assert.NoError,
 		},
 		{
-			desc:       "can review if annotation is correct",
-			annotation: "traefik",
-			canReview:  true,
+			desc:         "can review if annotation is correct",
+			annotation:   "traefik",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can review if using a custom ingress class (annotation)",
-			annotation: "custom-traefik-ingress-class",
-			canReview:  true,
+			desc:         "can review if using a custom ingress class (annotation)",
+			annotation:   "custom-traefik-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "can't review if using another annotation",
-			annotation: "nginx",
-			canReview:  false,
+			desc:         "can't review if using another annotation",
+			annotation:   "nginx",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:      "can review if using a custom ingress class (spec)",
-			spec:      "custom-traefik-ingress-class",
-			canReview: true,
+			desc:         "can review if using a custom ingress class (spec)",
+			spec:         "custom-traefik-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:      "can't review if using another controller",
-			spec:      "nginx",
-			canReview: false,
+			desc:         "can't review if using another controller",
+			spec:         "nginx",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 		{
-			desc:       "spec takes priority over annotation#1",
-			annotation: "nginx",
-			spec:       "custom-traefik-ingress-class",
-			canReview:  true,
+			desc:         "spec takes priority over annotation#1",
+			annotation:   "nginx",
+			spec:         "custom-traefik-ingress-class",
+			canReview:    true,
+			canReviewErr: assert.NoError,
 		},
 		{
-			desc:       "spec takes priority over annotation#2",
-			annotation: "traefik",
-			spec:       "nginx",
-			canReview:  false,
+			desc:         "spec takes priority over annotation#2",
+			annotation:   "traefik",
+			spec:         "nginx",
+			canReview:    false,
+			canReviewErr: assert.Error,
 		},
 	}
 
@@ -210,11 +221,11 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 			t.Parallel()
 
 			i := ingressClassesMock{
-				getControllerFunc: func(name string) string {
+				getControllerFunc: func(name string) (string, error) {
 					if name == "custom-traefik-ingress-class" {
-						return ingclass.ControllerTypeTraefik
+						return ingclass.ControllerTypeTraefik, nil
 					}
-					return "nope"
+					return "", errors.New("nope")
 				},
 				getDefaultControllerFunc: func() (string, error) {
 					if test.wrongDefaultController {
@@ -258,7 +269,7 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 			}
 
 			ok, err := review.CanReview(ar)
-			require.NoError(t, err)
+			test.canReviewErr(t, err)
 			assert.Equal(t, test.canReview, ok)
 		})
 	}
@@ -563,11 +574,11 @@ func (m policyGetterMock) GetConfig(canonicalName string) (*acp.Config, error) {
 }
 
 type ingressClassesMock struct {
-	getControllerFunc        func(name string) string
+	getControllerFunc        func(name string) (string, error)
 	getDefaultControllerFunc func() (string, error)
 }
 
-func (m ingressClassesMock) GetController(name string) string {
+func (m ingressClassesMock) GetController(name string) (string, error) {
 	return m.getControllerFunc(name)
 }
 
