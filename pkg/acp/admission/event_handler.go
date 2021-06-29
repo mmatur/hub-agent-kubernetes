@@ -31,7 +31,7 @@ func (w *EventHandler) OnAdd(obj interface{}) {
 	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
-			Str("component", "acpWatcher").
+			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received add event of unknown type")
 		return
@@ -46,18 +46,18 @@ func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newACP, ok := newObj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
-			Str("component", "acpWatcher").
+			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", newObj)).
-			Msg("Received update event of unknown type")
+			Msg("Received update event of unknown type (old)")
 		return
 	}
 
 	oldACP, ok := oldObj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
-			Str("component", "acpWatcher").
+			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", oldObj)).
-			Msg("Received update event of unknown type")
+			Msg("Received update event of unknown type (new)")
 		return
 	}
 
@@ -74,7 +74,7 @@ func (w *EventHandler) OnDelete(obj interface{}) {
 	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
 	if !ok {
 		log.Error().
-			Str("component", "acpWatcher").
+			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received delete event of unknown type")
 		return

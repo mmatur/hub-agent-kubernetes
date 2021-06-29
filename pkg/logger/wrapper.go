@@ -70,7 +70,7 @@ func logWithLevel(ev *zerolog.Event, msg string, kvs ...interface{}) {
 		return r
 	}, msg)
 
-	ev.Msg(msg)
+	ev.Msg(strings.TrimSpace(msg))
 }
 
 type logrWrapper struct {
@@ -87,6 +87,10 @@ func (l logrWrapper) Info(msg string, keysAndValues ...interface{}) {
 }
 
 func (l logrWrapper) Error(err error, msg string, keysAndValues ...interface{}) {
+	if err != nil {
+		keysAndValues = append(keysAndValues, "error", err.Error())
+	}
+
 	logWithLevel(l.logger.Error(), msg, keysAndValues...)
 }
 

@@ -13,9 +13,9 @@ import (
 	"github.com/traefik/hub-agent/pkg/acp/auth"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/logger"
 	"github.com/urfave/cli/v2"
-	"k8s.io/client-go/rest"
 )
 
 type authServerCmd struct {
@@ -51,7 +51,7 @@ func (c authServerCmd) build() *cli.Command {
 func (c authServerCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
 
-	config, err := rest.InClusterConfig()
+	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}

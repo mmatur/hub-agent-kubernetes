@@ -3,23 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acme"
 	"github.com/traefik/hub-agent/pkg/acme/client"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent/pkg/kube"
 	"golang.org/x/sync/errgroup"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func runACME(ctx context.Context, platformURL, token string) error {
-	config, err := setupKubeConfig()
+	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
-		return fmt.Errorf("create Kubernetes configuration: %w", err)
+		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
 	kubeClient, err := clientset.NewForConfig(config)
@@ -56,14 +53,4 @@ func runACME(ctx context.Context, platformURL, token string) error {
 	})
 
 	return group.Wait()
-}
-
-func setupKubeConfig() (*rest.Config, error) {
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
-		log.Debug().Msg("Creating in-cluster k8s certificates")
-		return rest.InClusterConfig()
-	}
-
-	log.Debug().Str("kubeconfig", os.Getenv("KUBECONFIG")).Msg("Creating external k8s certificates")
-	return clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
 }

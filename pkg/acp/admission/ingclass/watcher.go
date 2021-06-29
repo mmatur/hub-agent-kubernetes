@@ -69,7 +69,7 @@ func (w *Watcher) OnDelete(obj interface{}) {
 		delete(w.ingressClasses, v.ObjectMeta.UID)
 	default:
 		log.Error().
-			Str("component", "ingressClassWatcher").
+			Str("component", "ingress_class_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received delete event of unknown type")
 	}
@@ -100,7 +100,7 @@ func (w *Watcher) upsert(obj interface{}) {
 		}
 	default:
 		log.Error().
-			Str("component", "ingressClassWatcher").
+			Str("component", "ingress_class_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received upsert event of unknown type")
 	}

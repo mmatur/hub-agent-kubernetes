@@ -3,7 +3,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -15,12 +14,11 @@ import (
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/kube"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/external-dns/source"
 )
 
@@ -39,22 +37,9 @@ type Fetcher struct {
 
 // NewFetcher creates a new Fetcher.
 func NewFetcher(ctx context.Context, clusterID string) (*Fetcher, error) {
-	var (
-		config *rest.Config
-		err    error
-	)
-
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
-		log.Debug().Msg("Creating in-cluster k8s client")
-
-		config, err = rest.InClusterConfig()
-	} else {
-		log.Debug().Str("kubeconfig", os.Getenv("KUBECONFIG")).Msg("Creating external k8s client")
-
-		config, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	}
+	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
-		return nil, fmt.Errorf("create k8s configuration: %w", err)
+		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
 	clientSet, err := clientset.NewForConfig(config)

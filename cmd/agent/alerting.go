@@ -28,7 +28,7 @@ func runAlerting(ctx context.Context, watch *topology.Watcher, token, platformUR
 	retryableClient.RetryWaitMin = time.Second
 	retryableClient.RetryWaitMax = 10 * time.Second
 	retryableClient.RetryMax = 4
-	retryableClient.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "alerting-service").Logger())
+	retryableClient.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "alerting_client").Logger())
 
 	httpClient := retryableClient.StandardClient()
 

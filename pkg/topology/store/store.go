@@ -43,7 +43,7 @@ func New(ctx context.Context, cfg Config) (*Store, error) {
 			out, err := cmd.CombinedOutput()
 			output := string(out)
 
-			log.Debug().Str("cmd", name).Strs("args", args).Str("output", output).Send()
+			log.Trace().Str("cmd", name).Strs("args", args).Str("output", output).Send()
 
 			return output, err
 		},

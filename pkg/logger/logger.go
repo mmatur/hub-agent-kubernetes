@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -19,11 +20,14 @@ func Setup(level, format string) {
 	case "json":
 		w = os.Stderr
 	case "console":
-		w = zerolog.ConsoleWriter{Out: os.Stderr}
+		w = zerolog.ConsoleWriter{
+			Out:        os.Stderr,
+			TimeFormat: time.RFC3339,
+		}
 	default:
 		w = os.Stderr
 	}
-	log.Logger = zerolog.New(w).With().Timestamp().Caller().Logger()
+	log.Logger = zerolog.New(w).With().Timestamp().Logger()
 
 	logLevel, err := zerolog.ParseLevel(strings.ToLower(level))
 	if err != nil {
@@ -36,5 +40,5 @@ func Setup(level, format string) {
 
 	log.Trace().Str("level", logLevel.String()).Msg("Log level set")
 
-	klog.SetLogger(logrWrapper{logger: log.Logger})
+	klog.SetLogger(logrWrapper{logger: log.Logger.With().Str("component", "kubernetes").Logger()})
 }

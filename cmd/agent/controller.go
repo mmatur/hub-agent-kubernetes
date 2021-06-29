@@ -70,7 +70,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	kubeCfg, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
-		return fmt.Errorf("create Kubernetes in-agent configuration: %w", err)
+		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
 	kubeClient, err := clientset.NewForConfig(kubeCfg)
