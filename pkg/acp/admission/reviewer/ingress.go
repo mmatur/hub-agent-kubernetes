@@ -134,3 +134,12 @@ func releaseQuotas(q QuotaTransaction, name, ns string) error {
 
 	return nil
 }
+
+func isDefaultIngressClassValue(value string) bool {
+	switch value {
+	case defaultAnnotationHAProxy, defaultAnnotationTraefik, defaultAnnotationNginx:
+		return true
+	default:
+		return false
+	}
+}

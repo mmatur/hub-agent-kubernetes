@@ -35,7 +35,7 @@ func (r TraefikIngressRoute) CanReview(ar admv1.AdmissionReview) (bool, error) {
 }
 
 // Review reviews the given admission review request and optionally returns the required patch.
-func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error) {
+func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error) {
 	logger := log.Ctx(ctx).With().Str("reviewer", "TraefikIngressRoute").Logger()
 	ctx = logger.WithContext(ctx)
 
@@ -103,20 +103,11 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	logger.Info().Str("acp_name", polName).Msg("Patching resource")
 
-	patch := []map[string]interface{}{
-		{
-			"op":    "replace",
-			"path":  "/spec/routes",
-			"value": ingRoute.Spec.Routes,
-		},
-	}
-
-	b, err := json.Marshal(patch)
-	if err != nil {
-		return nil, fmt.Errorf("marshal IngressRoute patch: %w", err)
-	}
-
-	return b, nil
+	return map[string]interface{}{
+		"op":    "replace",
+		"path":  "/spec/routes",
+		"value": ingRoute.Spec.Routes,
+	}, nil
 }
 
 func updateIngressRoute(spec *traefikv1alpha1.IngressRouteSpec, name, namespace string) (updated bool) {

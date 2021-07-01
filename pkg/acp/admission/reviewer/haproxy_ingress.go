@@ -2,7 +2,6 @@ package reviewer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -54,20 +53,28 @@ func (r HAProxyIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 		return false, fmt.Errorf("get default ingress class controller: %w", err)
 	}
 
+	var ctrlr string
 	switch {
 	case ingClassName != "":
-		ctrlr, err := r.ingressClasses.GetController(ingClassName)
+		ctrlr, err = r.ingressClasses.GetController(ingClassName)
 		if err != nil {
-			return false, fmt.Errorf("get ingress class controller: %w", err)
+			return false, fmt.Errorf("get ingress class controller from ingress class name: %w", err)
 		}
 		return isHAProxy(ctrlr), nil
 	case ingClassAnno != "":
 		if ingClassAnno == defaultAnnotationHAProxy {
 			return true, nil
 		}
-		ctrlr, err := r.ingressClasses.GetController(ingClassAnno)
+
+		// Don't return an error if it's the default value of another reviewer,
+		// just say we can't review it.
+		if isDefaultIngressClassValue(ingClassAnno) {
+			return false, nil
+		}
+
+		ctrlr, err = r.ingressClasses.GetController(ingClassAnno)
 		if err != nil {
-			return false, fmt.Errorf("get ingress class controller: %w", err)
+			return false, fmt.Errorf("get ingress class controller from annotation: %w", err)
 		}
 		return isHAProxy(ctrlr), nil
 	default:
@@ -76,7 +83,7 @@ func (r HAProxyIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 }
 
 // Review reviews the given admission review request and optionally returns the required patch.
-func (r HAProxyIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error) {
+func (r HAProxyIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error) {
 	l := log.Ctx(ctx).With().Str("reviewer", "HAProxyIngress").Logger()
 	ctx = l.WithContext(ctx)
 
@@ -138,18 +145,11 @@ func (r HAProxyIngress) Review(ctx context.Context, ar admv1.AdmissionReview) ([
 
 	log.Ctx(ctx).Info().Str("acp_name", polName).Msg("Patching resource")
 
-	b, err := json.Marshal([]map[string]interface{}{
-		{
-			"op":    "replace",
-			"path":  "/metadata/annotations",
-			"value": ing.Metadata.Annotations,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal ingress patch: %w", err)
-	}
-
-	return b, nil
+	return map[string]interface{}{
+		"op":    "replace",
+		"path":  "/metadata/annotations",
+		"value": ing.Metadata.Annotations,
+	}, nil
 }
 
 func (r HAProxyIngress) getAuthConfig(ctx context.Context, polName, namespace string) (authURL, authHeaders string, err error) {

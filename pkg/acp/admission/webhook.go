@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent/pkg/acp"
 	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +17,7 @@ import (
 // Reviewer allows to review an admission review request.
 type Reviewer interface {
 	CanReview(ar admv1.AdmissionReview) (bool, error)
-	Review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error)
+	Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error)
 }
 
 type reviewerWarning struct {
@@ -109,12 +110,68 @@ func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, 
 		return nil, fmt.Errorf("no reviewer found for resource %q of kind %q", ar.Request.Name, ar.Request.Kind)
 	}
 
-	patch, err := rev.Review(ctx, ar)
+	resourcePatch, err := rev.Review(ctx, ar)
 	if err != nil {
 		return nil, fmt.Errorf("reviewing resource %q of kind %q: %w", ar.Request.Name, ar.Request.Kind, err)
 	}
 
-	return patch, nil
+	policyPatch, err := canonicalizePolicyName(ar.Request)
+	if err != nil {
+		return nil, fmt.Errorf("canonicalizing access control policy name: %w", err)
+	}
+
+	if resourcePatch == nil && policyPatch == nil {
+		return nil, nil
+	}
+
+	var patches []map[string]interface{}
+	if resourcePatch != nil {
+		patches = append(patches, resourcePatch)
+	}
+	if policyPatch != nil {
+		patches = append(patches, policyPatch)
+	}
+
+	b, err := json.Marshal(patches)
+	if err != nil {
+		return nil, fmt.Errorf("serialize patches: %w", err)
+	}
+
+	return b, nil
+}
+
+// canonicalizePolicyName returns a patch to canonicalize the policy name if needed.
+func canonicalizePolicyName(ar *admv1.AdmissionRequest) (map[string]interface{}, error) {
+	if ar.Operation == admv1.Delete {
+		return nil, nil
+	}
+
+	var ing struct {
+		Metadata metav1.ObjectMeta `json:"metadata"`
+	}
+	if err := json.Unmarshal(ar.Object.Raw, &ing); err != nil {
+		return nil, fmt.Errorf("unmarshal reviewed ingress: %w", err)
+	}
+
+	rawName := ing.Metadata.Annotations[reviewer.AnnotationHubAuth]
+	if rawName == "" {
+		return nil, nil
+	}
+
+	name, err := acp.CanonicalName(rawName, ing.Metadata.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == rawName {
+		return nil, nil
+	}
+
+	return map[string]interface{}{
+		"op":    "replace",
+		"path":  "/metadata/annotations/hub.traefik.io~1access-control-policy",
+		"value": name,
+	}, nil
 }
 
 func findReviewer(reviewers []Reviewer, ar admv1.AdmissionReview) (Reviewer, error) {

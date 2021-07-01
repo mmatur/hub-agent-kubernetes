@@ -172,7 +172,7 @@ func TestNginxIngress_CanReviewChecksIngressClass(t *testing.T) {
 			desc:         "can't review if using another annotation",
 			annotation:   "traefik",
 			canReview:    false,
-			canReviewErr: assert.Error,
+			canReviewErr: assert.NoError,
 		},
 		{
 			desc:         "can review if using a custom ingress class (spec)",
@@ -588,25 +588,21 @@ func TestNginxIngress_Review(t *testing.T) {
 				},
 			}
 
-			p, err := rev.Review(context.Background(), ar)
+			patch, err := rev.Review(context.Background(), ar)
 			require.NoError(t, err)
 
 			if test.noPatch {
-				assert.Nil(t, p)
+				assert.Nil(t, patch)
 				return
 			}
-			assert.NotNil(t, p)
+			assert.NotNil(t, patch)
 
-			var patches []map[string]interface{}
-			err = json.Unmarshal(p, &patches)
-			require.NoError(t, err)
-
-			assert.Equal(t, 1, len(patches))
-			assert.Equal(t, "replace", patches[0]["op"])
-			assert.Equal(t, "/metadata/annotations", patches[0]["path"])
-			assert.Equal(t, len(test.wantPatch), len(patches[0]["value"].(map[string]interface{})))
+			assert.Equal(t, 3, len(patch))
+			assert.Equal(t, "replace", patch["op"])
+			assert.Equal(t, "/metadata/annotations", patch["path"])
+			assert.Equal(t, len(test.wantPatch), len(patch["value"].(map[string]string)))
 			for k := range test.wantPatch {
-				assert.Equal(t, test.wantPatch[k], patches[0]["value"].(map[string]interface{})[k])
+				assert.Equal(t, test.wantPatch[k], patch["value"].(map[string]string)[k])
 			}
 		})
 	}

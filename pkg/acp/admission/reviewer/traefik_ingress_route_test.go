@@ -360,19 +360,15 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 				},
 			}
 
-			p, err := rev.Review(context.Background(), ar)
+			patch, err := rev.Review(context.Background(), ar)
 			assert.NoError(t, err)
-			assert.NotNil(t, p)
+			assert.NotNil(t, patch)
 
-			var patches []map[string]interface{}
-			err = json.Unmarshal(p, &patches)
-			require.NoError(t, err)
+			assert.Equal(t, 3, len(patch))
+			assert.Equal(t, "replace", patch["op"])
+			assert.Equal(t, "/spec/routes", patch["path"])
 
-			assert.Equal(t, 1, len(patches))
-			assert.Equal(t, "replace", patches[0]["op"])
-			assert.Equal(t, "/spec/routes", patches[0]["path"])
-
-			b, err = json.Marshal(patches[0]["value"])
+			b, err = json.Marshal(patch["value"])
 			require.NoError(t, err)
 
 			var middlewares []traefikv1alpha1.Route

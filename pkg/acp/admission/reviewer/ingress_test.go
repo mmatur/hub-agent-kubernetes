@@ -17,7 +17,7 @@ import (
 
 type reviewer interface {
 	CanReview(ar admv1.AdmissionReview) (bool, error)
-	Review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error)
+	Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error)
 }
 
 func ingressHandleACPName(t *testing.T, factory func(policies PolicyGetter) reviewer) {
