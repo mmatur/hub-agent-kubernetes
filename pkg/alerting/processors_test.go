@@ -300,7 +300,7 @@ func TestThresholdProcessor_AlertWithAnnotation(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, want, got)
+	assert.ElementsMatch(t, want, got)
 }
 
 func TestThresholdProcessor_Alert10Minute(t *testing.T) {
