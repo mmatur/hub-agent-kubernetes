@@ -635,81 +635,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 	}
 }
 
-func TestGuessMetricsURL(t *testing.T) {
-	tests := []struct {
-		desc    string
-		ctrl    string
-		pod     *corev1.Pod
-		wantURL string
-	}{
-		{
-			desc: "Pod with traefik controller defaults",
-			ctrl: IngressControllerTypeTraefik,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:8080/metrics",
-		},
-		{
-			desc: "Pod with nginx community controller defaults",
-			ctrl: IngressControllerTypeNginxCommunity,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:10254/metrics",
-		},
-		{
-			desc: "Pod with haproxy community controller defaults",
-			ctrl: IngressControllerTypeHAProxyCommunity,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:9101/metrics",
-		},
-		{
-			desc: "Pod with nginx official controller",
-			ctrl: IngressControllerTypeNginxOfficial,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-		},
-		{
-			desc: "Pod with annotations",
-			ctrl: "unknown_controller",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"prometheus.io/port": "8443",
-					},
-				},
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:8443/metrics",
-		},
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
-
-			got := guessMetricsURL(test.ctrl, test.pod)
-			assert.Equal(t, test.wantURL, got)
-		})
-	}
-}
-
-func TestGetIngressControllerType(t *testing.T) {
+func TestFetcher_GetIngressControllerType(t *testing.T) {
 	tests := []struct {
 		desc     string
 		pod      *corev1.Pod
@@ -778,6 +704,42 @@ func TestGetIngressControllerType(t *testing.T) {
 				},
 			},
 			wantType: IngressControllerTypeTraefik,
+		},
+		{
+			desc: "Valid TraefikEE controller image",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image:   "traefik/traefikee:latest",
+							Command: []string{"/traefikee", "proxy"},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeTraefik,
+		},
+		{
+			desc: "Valid TraefikEE controller image without proxy command arg",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image:   "traefik/traefikee:latest",
+							Command: []string{"/traefikee", "controller"},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			wantType: IngressControllerTypeNone,
 		},
 		{
 			desc: "Valid nginx official controller image",
@@ -928,7 +890,7 @@ func TestGetIngressControllerType(t *testing.T) {
 	}
 }
 
-func TestGetAnnotation(t *testing.T) {
+func TestFetcher_GetAnnotation(t *testing.T) {
 	tests := []struct {
 		desc      string
 		fixture   string
@@ -1018,6 +980,80 @@ func TestGetAnnotation(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.wantValue, gotValue)
+		})
+	}
+}
+
+func TestGuessMetricsURL(t *testing.T) {
+	tests := []struct {
+		desc    string
+		ctrl    string
+		pod     *corev1.Pod
+		wantURL string
+	}{
+		{
+			desc: "Pod with traefik controller defaults",
+			ctrl: IngressControllerTypeTraefik,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:8080/metrics",
+		},
+		{
+			desc: "Pod with nginx community controller defaults",
+			ctrl: IngressControllerTypeNginxCommunity,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:10254/metrics",
+		},
+		{
+			desc: "Pod with haproxy community controller defaults",
+			ctrl: IngressControllerTypeHAProxyCommunity,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:9101/metrics",
+		},
+		{
+			desc: "Pod with nginx official controller",
+			ctrl: IngressControllerTypeNginxOfficial,
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+		},
+		{
+			desc: "Pod with annotations",
+			ctrl: "unknown_controller",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"prometheus.io/port": "8443",
+					},
+				},
+				Status: corev1.PodStatus{
+					PodIP: "1.2.3.4",
+				},
+			},
+			wantURL: "http://1.2.3.4:8443/metrics",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			got := guessMetricsURL(test.ctrl, test.pod)
+			assert.Equal(t, test.wantURL, got)
 		})
 	}
 }

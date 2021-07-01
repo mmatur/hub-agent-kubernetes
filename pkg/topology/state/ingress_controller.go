@@ -134,74 +134,6 @@ func (f *Fetcher) fetchIngressClasses() ([]*netv1.IngressClass, error) {
 	return ingressClasses, nil
 }
 
-func setIngressClasses(controllers map[string]*IngressController, ingressClasses []*netv1.IngressClass) {
-	// Ensure the order of IngressClasses always remains the same.
-	sort.Slice(ingressClasses, func(i, j int) bool {
-		return ingressClasses[i].Name < ingressClasses[j].Name
-	})
-
-	// TODO: Support custom controller values.
-	// TODO: Detect which ingress class is selected by which controller.
-	for _, ingressClass := range ingressClasses {
-		var ctrlType string
-
-		switch ingressClass.Spec.Controller {
-		case ControllerTypeNginxCommunity:
-			ctrlType = IngressControllerTypeNginxCommunity
-
-		case ControllerTypeNginxOfficial:
-			ctrlType = IngressControllerTypeNginxOfficial
-
-		case ControllerTypeTraefik:
-			ctrlType = IngressControllerTypeTraefik
-
-		case ControllerTypeHAProxyCommunity:
-			ctrlType = IngressControllerTypeHAProxyCommunity
-
-		default:
-			continue
-		}
-
-		for _, controller := range controllers {
-			if controller.Type == ctrlType {
-				controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
-			}
-		}
-	}
-}
-
-// guessMetricsURL builds the metrics endpoint URL based on simple assumptions for a given pod.
-// For instance, this will not work if someone use a specific configuration to expose the prometheus metrics endpoint.
-// TODO we can try to use the IngressController configuration to be more accurate.
-func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
-	// Metrics are not supported for Nginx official.
-	if ctrl == IngressControllerTypeNginxOfficial {
-		return ""
-	}
-
-	var port string
-	switch ctrl {
-	case IngressControllerTypeTraefik:
-		port = "8080"
-	case IngressControllerTypeNginxCommunity:
-		port = "10254"
-	case IngressControllerTypeHAProxyCommunity:
-		port = "9101"
-	}
-
-	if pod.Annotations["prometheus.io/port"] != "" {
-		port = pod.Annotations["prometheus.io/port"]
-	}
-
-	path := "metrics"
-	if pod.Annotations["prometheus.io/path"] != "" {
-		path = pod.Annotations["prometheus.io/path"]
-	}
-	path = strings.TrimPrefix(path, "/")
-
-	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(pod.Status.PodIP, port), path)
-}
-
 func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
 	value, err := f.getAnnotation(pod, AnnotationHubIngressController)
 	if err != nil {
@@ -216,6 +148,11 @@ func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
 		parts := strings.Split(container.Image, ":")
 
 		if strings.HasSuffix(parts[0], "traefik") {
+			return IngressControllerTypeTraefik, nil
+		}
+
+		// For now we are only detecting TraefikEE proxies to be able to fetch metrics.
+		if strings.HasSuffix(parts[0], "traefikee") && contains(container.Command, "proxy") {
 			return IngressControllerTypeTraefik, nil
 		}
 
@@ -283,6 +220,74 @@ func (f *Fetcher) getAnnotation(pod *corev1.Pod, key string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func setIngressClasses(controllers map[string]*IngressController, ingressClasses []*netv1.IngressClass) {
+	// Ensure the order of IngressClasses always remains the same.
+	sort.Slice(ingressClasses, func(i, j int) bool {
+		return ingressClasses[i].Name < ingressClasses[j].Name
+	})
+
+	// TODO: Support custom controller values.
+	// TODO: Detect which ingress class is selected by which controller.
+	for _, ingressClass := range ingressClasses {
+		var ctrlType string
+
+		switch ingressClass.Spec.Controller {
+		case ControllerTypeNginxCommunity:
+			ctrlType = IngressControllerTypeNginxCommunity
+
+		case ControllerTypeNginxOfficial:
+			ctrlType = IngressControllerTypeNginxOfficial
+
+		case ControllerTypeTraefik:
+			ctrlType = IngressControllerTypeTraefik
+
+		case ControllerTypeHAProxyCommunity:
+			ctrlType = IngressControllerTypeHAProxyCommunity
+
+		default:
+			continue
+		}
+
+		for _, controller := range controllers {
+			if controller.Type == ctrlType {
+				controller.IngressClasses = append(controller.IngressClasses, ingressClass.Name)
+			}
+		}
+	}
+}
+
+// guessMetricsURL builds the metrics endpoint URL based on simple assumptions for a given pod.
+// For instance, this will not work if someone use a specific configuration to expose the prometheus metrics endpoint.
+// TODO we can try to use the IngressController configuration to be more accurate.
+func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
+	// Metrics are not supported for Nginx official.
+	if ctrl == IngressControllerTypeNginxOfficial {
+		return ""
+	}
+
+	var port string
+	switch ctrl {
+	case IngressControllerTypeTraefik:
+		port = "8080"
+	case IngressControllerTypeNginxCommunity:
+		port = "10254"
+	case IngressControllerTypeHAProxyCommunity:
+		port = "9101"
+	}
+
+	if pod.Annotations["prometheus.io/port"] != "" {
+		port = pod.Annotations["prometheus.io/port"]
+	}
+
+	path := "metrics"
+	if pod.Annotations["prometheus.io/path"] != "" {
+		path = pod.Annotations["prometheus.io/path"]
+	}
+	path = strings.TrimPrefix(path, "/")
+
+	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(pod.Status.PodIP, port), path)
 }
 
 func isSupportedIngressControllerType(value string) bool {
@@ -383,4 +388,13 @@ func marshalToIngressClassNetworkingV1(ing *netv1beta1.IngressClass) (*netv1.Ing
 	}
 
 	return ni, nil
+}
+
+func contains(slice []string, value string) bool {
+	for _, v := range slice {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
