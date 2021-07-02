@@ -160,6 +160,24 @@ func TestController_syncIngressRoute(t *testing.T) {
 				SecretName: "secret",
 			},
 		},
+		{
+			desc: "Existing user secret",
+			ingRoute: &traefikv1alpha1.IngressRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: traefikv1alpha1.IngressRouteSpec{
+					Routes: []traefikv1alpha1.Route{
+						{Match: "Host(`test.localhost`, `test2.localhost`)"},
+					},
+					TLS: &traefikv1alpha1.TLS{
+						SecretName: "user-secret",
+					},
+				},
+			},
+			wantIssuerCallCount: 0,
+		},
 	}
 
 	for _, test := range tests {
@@ -181,6 +199,12 @@ func TestController_syncIngressRoute(t *testing.T) {
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
 			kubeClient := newFakeKubeClient(t,
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "user-secret",
+					},
+				},
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns",

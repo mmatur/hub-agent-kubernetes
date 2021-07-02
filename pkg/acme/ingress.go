@@ -59,22 +59,27 @@ func (c *Controller) syncIngress(ing *netv1.Ingress) {
 			continue
 		}
 
+		logger := log.With().
+			Str("namespace", ing.Namespace).
+			Str("ingress", ing.Name).
+			Str("secret", tls.SecretName).
+			Logger()
+
 		secret, err := c.kubeInformers.Core().V1().Secrets().Lister().Secrets(ing.Namespace).Get(tls.SecretName)
 		if err != nil && !kerror.IsNotFound(err) {
-			log.Error().
-				Err(err).
-				Str("namespace", ing.Namespace).
-				Str("ingress", ing.Name).
-				Str("secret", tls.SecretName).
-				Msg("Unable to get secret")
+			logger.Error().Err(err).Msg("Unable to get secret")
+			continue
+		}
 
+		if secret != nil && !isManagedSecret(secret) {
+			logger.Error().Err(err).Msg("Secret already exists")
 			continue
 		}
 
 		domains := sanitizeDomains(tls.Hosts)
 
 		// Here we check that the existing secret has the needed domains, if not it needs to be updated.
-		if secret != nil && isManagedSecret(secret) && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
+		if secret != nil && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
 			continue
 		}
 

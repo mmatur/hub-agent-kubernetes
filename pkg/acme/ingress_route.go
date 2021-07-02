@@ -77,22 +77,27 @@ func (c *Controller) syncIngressRoute(ingRoute *traefikv1alpha1.IngressRoute) {
 		return
 	}
 
+	logger := log.With().
+		Str("namespace", ingRoute.Namespace).
+		Str("ingressroute", ingRoute.Name).
+		Str("secret", ingRoute.Spec.TLS.SecretName).
+		Logger()
+
 	secret, err := c.kubeInformers.Core().V1().Secrets().Lister().Secrets(ingRoute.Namespace).Get(ingRoute.Spec.TLS.SecretName)
 	if err != nil && !kerror.IsNotFound(err) {
-		log.Error().
-			Err(err).
-			Str("namespace", ingRoute.Namespace).
-			Str("ingressroute", ingRoute.Name).
-			Str("secret", ingRoute.Spec.TLS.SecretName).
-			Msg("Unable to get secret")
+		logger.Error().Err(err).Msg("Unable to get secret")
+		return
+	}
 
+	if secret != nil && !isManagedSecret(secret) {
+		logger.Error().Err(err).Msg("Secret already exists")
 		return
 	}
 
 	domains = sanitizeDomains(domains)
 
 	// Here we check that the existing secret has the needed domains, if not it needs to be updated.
-	if secret != nil && isManagedSecret(secret) && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
+	if secret != nil && reflect.DeepEqual(domains, getCertificateDomains(secret)) {
 		return
 	}
 

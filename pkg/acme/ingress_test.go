@@ -168,6 +168,22 @@ func TestController_syncIngress(t *testing.T) {
 				SecretName: "secret",
 			},
 		},
+		{
+			desc: "Existing user secret",
+			ing: &netv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: netv1.IngressSpec{
+					TLS: []netv1.IngressTLS{{
+						Hosts:      []string{"test.localhost"},
+						SecretName: "user-secret",
+					}},
+				},
+			},
+			wantIssuerCallCount: 0,
+		},
 	}
 
 	for _, test := range tests {
@@ -189,6 +205,12 @@ func TestController_syncIngress(t *testing.T) {
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
 			kubeClient := newFakeKubeClient(t,
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "user-secret",
+					},
+				},
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns",
