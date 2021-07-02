@@ -27,7 +27,7 @@ build: clean
 image: export GOOS := linux
 image: export GOARCH := amd64
 image: build
-	docker build -t gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) .
 
 image-dev: export GOOS := linux
 image-dev: export GOARCH := amd64
@@ -43,10 +43,16 @@ dev: image-dev
 
 publish:
 	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)
+	# Github container registry
+	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) ghcr.io/traefik/$(BIN_NAME):$(VERSION)
+	docker push ghcr.io/traefik/$(BIN_NAME):$(VERSION)
 
 publish-latest:
 	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) gcr.io/traefiklabs/$(BIN_NAME):latest
 	docker push gcr.io/traefiklabs/$(BIN_NAME):latest
+	# Github container registry
+	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) ghcr.io/traefik/$(BIN_NAME):latest
+	docker push ghcr.io/traefik/$(BIN_NAME):latest
 
 generate-crd:
 	@$(CURDIR)/scripts/code-gen.sh
