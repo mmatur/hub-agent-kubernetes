@@ -165,3 +165,37 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 	return nil
 }
+
+// ReportSecuredRoutesInUse reports the number of secured routes in use to the platform.
+func (c *Client) ReportSecuredRoutesInUse(ctx context.Context, n int) error {
+	payload := struct {
+		Name    string `json:"name"`
+		Current int    `json:"current"`
+	}{
+		Name:    "maxSecuredRoutes",
+		Current: n,
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal quota usage request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+"/quotas", bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed with code %d", resp.StatusCode)
+	}
+	return nil
+}

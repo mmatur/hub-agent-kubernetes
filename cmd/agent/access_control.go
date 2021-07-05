@@ -56,7 +56,7 @@ func acpFlags() []cli.Flag {
 	}
 }
 
-func accessControl(ctx context.Context, cliCtx *cli.Context, cfg platform.AccessControlConfig, configWatcher *platform.ConfigWatcher) error {
+func accessControl(ctx context.Context, cliCtx *cli.Context, cfg platform.AccessControlConfig, configWatcher *platform.ConfigWatcher, platformClient *platform.Client) error {
 	var (
 		listenAddr     = cliCtx.String("acp-server.listen-addr")
 		certFile       = cliCtx.String("acp-server.cert")
@@ -68,7 +68,14 @@ func accessControl(ctx context.Context, cliCtx *cli.Context, cfg platform.Access
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	h, err := setupAdmissionHandler(ctx, authServerAddr, cfg.MaxSecuredRoutes, configWatcher)
+	quotas := quota.New(cfg.MaxSecuredRoutes)
+	configWatcher.AddListener(func(cfg platform.Config) {
+		quotas.UpdateMax(cfg.AccessControl.MaxSecuredRoutes)
+	})
+
+	go quota.NewReporter(platformClient, quotas, time.Minute).Run(ctx)
+
+	h, err := setupAdmissionHandler(ctx, authServerAddr, quotas)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -107,7 +114,7 @@ func accessControl(ctx context.Context, cliCtx *cli.Context, cfg platform.Access
 	return nil
 }
 
-func setupAdmissionHandler(ctx context.Context, authServerAddr string, maxSecuredRoutes int, configWatcher *platform.ConfigWatcher) (http.Handler, error) {
+func setupAdmissionHandler(ctx context.Context, authServerAddr string, quotas *quota.Quota) (http.Handler, error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -157,11 +164,6 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string, maxSecure
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
-
-	quotas := quota.New(maxSecuredRoutes)
-	configWatcher.AddListener(func(cfg platform.Config) {
-		quotas.UpdateMax(cfg.AccessControl.MaxSecuredRoutes)
-	})
 
 	reviewers := []admission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter, quotas),

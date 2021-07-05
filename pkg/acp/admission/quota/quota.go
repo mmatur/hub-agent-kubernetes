@@ -7,6 +7,40 @@ import (
 	"sync/atomic"
 )
 
+// Tx represents a quota transaction.
+// Transactions must always be either committed or rolled back.
+// Note that neither of these actions can fail, only the creation of a transaction can.
+type Tx struct {
+	q    *Quota
+	id   string
+	done int32 // Accessed atomically.
+}
+
+// Commit commits the transaction, applying its changes.
+func (t *Tx) Commit() {
+	if !atomic.CompareAndSwapInt32(&t.done, 0, 1) {
+		return
+	}
+
+	t.q.mu.Lock()
+	defer t.q.mu.Unlock()
+
+	t.q.acquired[t.id] = t.q.pending[t.id]
+	delete(t.q.pending, t.id)
+}
+
+// Rollback rollbacks the transaction, discarding its changes.
+func (t *Tx) Rollback() {
+	if !atomic.CompareAndSwapInt32(&t.done, 0, 1) {
+		return
+	}
+
+	t.q.mu.Lock()
+	defer t.q.mu.Unlock()
+
+	delete(t.q.pending, t.id)
+}
+
 // Quota allows to enforce quotas.
 type Quota struct {
 	mu sync.RWMutex
@@ -23,23 +57,6 @@ func New(max int) *Quota {
 		acquired: make(map[string]int),
 		pending:  make(map[string]int),
 	}
-}
-
-// Tx represents a quota transaction.
-// Transactions must always be either committed or rolled back.
-// Note that neither of these actions can fail, only the creation of a transaction can.
-type Tx struct {
-	q    *Quota
-	id   string
-	done int32 // Accessed atomically.
-}
-
-// UpdateMax updates the max secured routes allowed.
-func (q *Quota) UpdateMax(newMax int) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.max = newMax
 }
 
 // Tx creates a transaction for the given resource.
@@ -90,6 +107,19 @@ func (q *Quota) Tx(resourceID string, amount int) (*Tx, error) {
 	return &Tx{q: q, id: resourceID}, nil
 }
 
+// Used returns the number of used quota.
+func (q *Quota) Used() int {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	var used int
+	for _, n := range q.acquired {
+		used += n
+	}
+
+	return used
+}
+
 func (q *Quota) taken() int {
 	var taken int
 	for _, n := range q.acquired {
@@ -110,29 +140,10 @@ func (q *Quota) allowed(diff int) error {
 	return nil
 }
 
-// Commit commits the transaction, applying its changes.
-func (t *Tx) Commit() {
-	if atomic.LoadInt32(&t.done) == 1 {
-		return
-	}
-	atomic.StoreInt32(&t.done, 1)
+// UpdateMax updates the max secured routes allowed.
+func (q *Quota) UpdateMax(newMax int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	t.q.mu.Lock()
-	defer t.q.mu.Unlock()
-
-	t.q.acquired[t.id] = t.q.pending[t.id]
-	delete(t.q.pending, t.id)
-}
-
-// Rollback rollbacks the transaction, discarding its changes.
-func (t *Tx) Rollback() {
-	if atomic.LoadInt32(&t.done) == 1 {
-		return
-	}
-	atomic.StoreInt32(&t.done, 1)
-
-	t.q.mu.Lock()
-	defer t.q.mu.Unlock()
-
-	delete(t.q.pending, t.id)
+	q.max = newMax
 }

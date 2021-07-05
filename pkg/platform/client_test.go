@@ -225,3 +225,80 @@ func TestClient_Ping(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_ReportSecuredRoutesInUse(t *testing.T) {
+	tests := []struct {
+		desc string
+
+		securedRoute     int
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "reports secured routes in use",
+			securedRoute:     3,
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "returns error when status code is not 200",
+			returnStatusCode: http.StatusBadRequest,
+			wantErr:          assert.Error,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+			var gotCurrent int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/quotas", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if test.returnStatusCode != http.StatusOK {
+					rw.WriteHeader(test.returnStatusCode)
+					return
+				}
+
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				payload := struct {
+					Name    string `json:"name"`
+					Current int    `json:"current"`
+				}{}
+
+				err := json.NewDecoder(req.Body).Decode(&payload)
+				require.NoError(t, err)
+				gotCurrent = payload.Current
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			err := c.ReportSecuredRoutesInUse(context.Background(), 3)
+			test.wantErr(t, err)
+
+			assert.Equal(t, 1, callCount)
+			if test.returnStatusCode == http.StatusOK {
+				assert.Equal(t, test.securedRoute, gotCurrent)
+			}
+		})
+	}
+}
