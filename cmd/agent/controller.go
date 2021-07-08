@@ -102,7 +102,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return err
 	}
 
-	mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, agentCfg.Metrics)
+	mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, agentCfg.Metrics, configWatcher)
 	if err != nil {
 		return err
 	}

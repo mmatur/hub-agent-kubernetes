@@ -11,7 +11,7 @@ import (
 	"github.com/traefik/hub-agent/pkg/topology"
 )
 
-func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform.MetricsConfig) (*metrics.Manager, *metrics.Store, error) {
+func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform.MetricsConfig, cfgWatcher *platform.ConfigWatcher) (*metrics.Manager, *metrics.Store, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second
@@ -34,6 +34,10 @@ func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform
 	mgr.SetConfig(cfg.Interval, cfg.Tables)
 
 	watch.AddListener(mgr.TopologyStateChanged)
+
+	cfgWatcher.AddListener(func(cfg platform.Config) {
+		mgr.SetConfig(cfg.Metrics.Interval, cfg.Metrics.Tables)
+	})
 
 	return mgr, store, nil
 }
