@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -72,6 +73,10 @@ func (c *Client) Link(ctx context.Context, kubeID string) (string, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusConflict {
+			return "", errors.New("this token is already used by an agent in another Kubernetes cluster")
+		}
+
 		apiErr := APIError{StatusCode: resp.StatusCode}
 		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
 			return "", fmt.Errorf("failed with code %d: decode response: %w", resp.StatusCode, err)
