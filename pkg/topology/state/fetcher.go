@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
-	"github.com/rs/zerolog/log"
 	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/external-dns/source"
 )
 
 // Fetcher fetches Kubernetes resources and converts them into a filtered and simplified state.
@@ -27,12 +25,10 @@ type Fetcher struct {
 	clusterID     string
 	serverVersion *version.Version
 
-	k8s           informers.SharedInformerFactory
-	hub           hubinformer.SharedInformerFactory
-	traefik       traefikinformer.SharedInformerFactory
-	ingressSource source.Source
-	crdSource     source.Source
-	clientSet     clientset.Interface
+	k8s       informers.SharedInformerFactory
+	hub       hubinformer.SharedInformerFactory
+	traefik   traefikinformer.SharedInformerFactory
+	clientSet clientset.Interface
 }
 
 // NewFetcher creates a new Fetcher.
@@ -112,25 +108,6 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
 	}
 
-	ingressSource, err := source.NewIngressSource(clientSet, "", "", "", false, false, false)
-	if err != nil {
-		log.Error().Err(err).Msg("Unable to create external DNS IngressSource")
-	}
-
-	restClient, scheme, err := source.NewCRDClientForAPIVersionKind(clientSet, "", "", "externaldns.k8s.io/v1alpha1", "DNSEndpoint")
-	if err != nil && !strings.Contains(err.Error(), "the server could not find the requested resource") {
-		// The second condition above is due to the extensions package not wrapping the error correctly.
-		log.Error().Err(err).Msg("Unable to fetch DNS endpoints from Kubernetes REST API")
-	}
-
-	crdSource := source.NewEmptySource()
-	if restClient != nil {
-		crdSource, err = source.NewCRDSource(restClient, "", "DNSEndpoint", "", "", scheme)
-		if err != nil {
-			log.Error().Err(err).Msg("Unable to create external DNS CRDSource")
-		}
-	}
-
 	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
 	hubFactory.Hub().V1alpha1().AccessControlPolicies().Informer()
 
@@ -162,17 +139,14 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 		k8s:           kubernetesFactory,
 		hub:           hubFactory,
 		traefik:       traefikFactory,
-		ingressSource: ingressSource,
-		crdSource:     crdSource,
 		clientSet:     clientSet,
 	}, nil
 }
 
 // FetchState assembles a cluster state from Kubernetes resources.
-func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
+func (f *Fetcher) FetchState() (*Cluster, error) {
 	cluster := &Cluster{
-		ID:            f.clusterID,
-		ExternalDNSes: make(map[string]*ExternalDNS),
+		ID: f.clusterID,
 	}
 
 	var err error
@@ -206,24 +180,6 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 	cluster.IngressRoutes, err = f.getIngressRoutes(cluster.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	ingressExternalDNSes, err := getExternalDNS(ctx, f.ingressSource)
-	if err != nil {
-		return nil, err
-	}
-
-	for dnsName, externalDNS := range ingressExternalDNSes {
-		cluster.ExternalDNSes[objectKey(dnsName, "ingress")] = externalDNS
-	}
-
-	crdExternalDNSes, err := getExternalDNS(ctx, f.crdSource)
-	if err != nil {
-		return nil, err
-	}
-
-	for dnsName, externalDNS := range crdExternalDNSes {
-		cluster.ExternalDNSes[objectKey(dnsName, "crd")] = externalDNS
 	}
 
 	cluster.AccessControlPolicies, err = f.getAccessControlPolicies(cluster.ID)

@@ -28,7 +28,6 @@ require (
 	k8s.io/client-go v0.20.2
 	k8s.io/klog/v2 v2.5.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
-	sigs.k8s.io/external-dns v0.7.6
 )
 
 replace github.com/abbot/go-http-auth => github.com/containous/go-http-auth v0.4.1-0.20210329152427-e70ce7ef1ade

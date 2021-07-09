@@ -4,7 +4,6 @@ import (
 	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
-	"sigs.k8s.io/external-dns/endpoint"
 )
 
 // Cluster describes a Cluster.
@@ -17,7 +16,6 @@ type Cluster struct {
 	IngressRoutes         map[string]*IngressRoute `dir:"Ingresses"`
 	Services              map[string]*Service
 	IngressControllers    map[string]*IngressController
-	ExternalDNSes         map[string]*ExternalDNS
 	AccessControlPolicies map[string]*AccessControlPolicy
 
 	TraefikServiceNames map[string]string `dir:"-"`
@@ -120,13 +118,6 @@ type RouteService struct {
 	Name       string `json:"name"`
 	PortName   string `json:"portName,omitempty"`
 	PortNumber int32  `json:"portNumber,omitempty"`
-}
-
-// ExternalDNS describes an External DNS configured within a cluster.
-type ExternalDNS struct {
-	DNSName string           `json:"dnsName"`
-	Targets endpoint.Targets `json:"targets"`
-	TTL     endpoint.TTL     `json:"ttl"`
 }
 
 // AccessControlPolicy describes an Access Control Policy configured within a cluster.
