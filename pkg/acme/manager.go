@@ -2,7 +2,6 @@ package acme
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,10 +30,8 @@ const (
 )
 
 // maxRetries is the number of times a certificate request will be retried before it is dropped out of the queue.
-const maxRetries = 10
-
-// defaultRetryAfter is the duration to wait before queueing again the certificate request when the certificate issuance is pending in the platform.
-const defaultRetryAfter = 10 * time.Second
+// With the current rate-limiter the first 24 attempts will be done every 10s and the next two calls will done after 1min.
+const maxRetries = 26
 
 // CertResolver is responsible of resolving certificates.
 type CertResolver interface {
@@ -65,7 +62,7 @@ func NewManager(certs CertResolver, kubeClient clientset.Interface) *Manager {
 
 	return &Manager{
 		certs:         certs,
-		workqueue:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		workqueue:     workqueue.NewRateLimitingQueue(workqueue.NewItemFastSlowRateLimiter(10*time.Second, time.Minute, 24)),
 		reqs:          make(map[string]CertificateRequest),
 		kubeClient:    kubeClient,
 		kubeInformers: kubeInformers,
@@ -132,31 +129,37 @@ func (m *Manager) processNextWorkItem() bool {
 	}
 
 	err := m.resolveAndStoreCertificate(req)
-
-	var pendingErr client.PendingError
-	if errors.As(err, &pendingErr) {
-		m.workqueue.AddAfter(key, defaultRetryAfter)
+	if err == nil || kerror.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+		m.forget(key)
 		return true
 	}
 
-	if err != nil && !kerror.HasStatusCause(err, corev1.NamespaceTerminatingCause) && m.workqueue.NumRequeues(key) < maxRetries {
-		log.Error().
-			Err(err).
-			Str("namespace", req.Namespace).
-			Str("secret", req.SecretName).
-			Strs("domains", req.Domains).
-			Msg("Unable to obtain certificate")
+	numRetry := m.workqueue.NumRequeues(key)
+	logger := log.With().
+		Err(err).
+		Str("namespace", req.Namespace).
+		Str("secret", req.SecretName).
+		Strs("domains", req.Domains).
+		Int("retry", numRetry).
+		Logger()
 
-		m.workqueue.AddRateLimited(key)
+	if numRetry >= maxRetries {
+		logger.Error().Msg("Max number of retry exceeded")
+		m.forget(key)
 		return true
 	}
 
+	logger.Error().Msg("Unable to obtain certificate")
+	m.workqueue.AddRateLimited(key)
+	return true
+}
+
+func (m *Manager) forget(key string) {
 	m.reqsMu.Lock()
 	delete(m.reqs, key)
 	m.reqsMu.Unlock()
 
 	m.workqueue.Forget(key)
-	return true
 }
 
 // TODO Check that the created secret is still used, because the Ingress/IngressRoute could have been deleted/updated before the completion of the task.
