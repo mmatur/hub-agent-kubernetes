@@ -18,7 +18,7 @@ import (
 )
 
 func TestManager_ObtainCertificate(t *testing.T) {
-	kubeClient := newFakeKubeClient(t)
+	kubeClient := newFakeKubeClient(t, "1.20")
 	mgr := newManager(t, nil, kubeClient)
 
 	want := CertificateRequest{
@@ -112,19 +112,21 @@ func TestManager_resolveAndStoreCertificate(t *testing.T) {
 				return cert, test.resolverErr
 			})
 
-			kubeClient := newFakeKubeClient(t, &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns",
-					Name:      "existing-secret",
-					Labels: map[string]string{
-						labelManagedBy: controllerName,
+			kubeClient := newFakeKubeClient(t, "1.20",
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "existing-secret",
+						Labels: map[string]string{
+							labelManagedBy: controllerName,
+						},
+					},
+					Data: map[string][]byte{
+						"tls.crt": []byte("cert2"),
+						"tls.key": []byte("key2"),
 					},
 				},
-				Data: map[string][]byte{
-					"tls.crt": []byte("cert2"),
-					"tls.key": []byte("key2"),
-				},
-			})
+			)
 
 			mgr := newManager(t, resolver, kubeClient)
 
@@ -206,7 +208,7 @@ func TestManager_renewExpiringCertificates(t *testing.T) {
 		},
 	}
 
-	kubeClient := newFakeKubeClient(t, secrets...)
+	kubeClient := newFakeKubeClient(t, "1.20", secrets...)
 	mgr := newManager(t, nil, kubeClient)
 
 	err := mgr.renewExpiringCertificates()

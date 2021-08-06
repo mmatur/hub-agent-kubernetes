@@ -15,7 +15,7 @@ import (
 	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func Test_WatchAllHandlesUnsupportedVersions(t *testing.T) {
+func Test_watchAll_handlesUnsupportedVersions(t *testing.T) {
 	tests := []struct {
 		desc          string
 		serverVersion string
@@ -58,7 +58,7 @@ func Test_WatchAllHandlesUnsupportedVersions(t *testing.T) {
 	}
 }
 
-func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
+func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 	tests := []struct {
 		desc          string
 		serverVersion string
@@ -84,6 +84,23 @@ func Test_WatchAllHandlesAllIngressAPIVersions(t *testing.T) {
 		{
 			desc:          "v1.18",
 			serverVersion: "v1.18",
+			want: map[string]*Ingress{
+				"myIngress_netv1beta1@myns.ingress.networking.k8s.io": {
+					ResourceMeta: ResourceMeta{
+						Kind:      "Ingress",
+						Group:     "networking.k8s.io",
+						Name:      "myIngress_netv1beta1",
+						Namespace: "myns",
+					},
+					IngressMeta: IngressMeta{
+						ClusterID: "cluster-id",
+					},
+				},
+			},
+		},
+		{
+			desc:          "v1.18.10",
+			serverVersion: "v1.18.10",
 			want: map[string]*Ingress{
 				"myIngress_netv1beta1@myns.ingress.networking.k8s.io": {
 					ResourceMeta: ResourceMeta{

@@ -87,14 +87,13 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 		// Clusters supporting networking.k8s.io/v1.
 		kubernetesFactory.Networking().V1().IngressClasses().Informer()
 		kubernetesFactory.Networking().V1().Ingresses().Informer()
+	} else {
+		// Since we only support Kubernetes v1.14 and up, we always have at least net v1beta1 Ingresses.
+		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
 	}
 
 	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.18"))) {
 		kubernetesFactory.Networking().V1beta1().IngressClasses().Informer()
-	}
-
-	if serverSemVer.LessThanOrEqual(version.Must(version.NewVersion("1.18"))) {
-		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
 	}
 
 	traefikFactory := traefikinformer.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)

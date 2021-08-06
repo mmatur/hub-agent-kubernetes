@@ -103,7 +103,7 @@ func TestController_secretDeleted(t *testing.T) {
 				issuerCallReq = req
 			}
 
-			kubeClient := newFakeKubeClient(t, test.objects...)
+			kubeClient := newFakeKubeClient(t, "1.20", test.objects...)
 			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
@@ -136,7 +136,7 @@ func TestController_deleteUnusedSecret(t *testing.T) {
 		},
 	})
 
-	kubeClient := newFakeKubeClient(t,
+	kubeClient := newFakeKubeClient(t, "1.20",
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "ns",
@@ -424,7 +424,7 @@ func TestController_isSupportedIngressClassController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := newFakeKubeClient(t, test.objects...)
+			kubeClient := newFakeKubeClient(t, "1.20", test.objects...)
 			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
@@ -529,7 +529,7 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := newFakeKubeClient(t, test.kubeObjects...)
+			kubeClient := newFakeKubeClient(t, "1.20", test.kubeObjects...)
 			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
@@ -604,7 +604,7 @@ func TestController_getIngressClassController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := newFakeKubeClient(t, test.k8sObjects...)
+			kubeClient := newFakeKubeClient(t, "1.20", test.k8sObjects...)
 			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
@@ -619,7 +619,7 @@ func TestController_getIngressClassController(t *testing.T) {
 }
 
 func TestController_isSecretUsed(t *testing.T) {
-	kubeClient := newFakeKubeClient(t,
+	kubeClient := newFakeKubeClient(t, "1.20",
 		&netv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "ns",
@@ -711,6 +711,89 @@ func TestController_isSecretUsed(t *testing.T) {
 	got, err = ctrl.isSecretUsed(&secret)
 	require.NoError(t, err)
 	assert.False(t, got)
+}
+
+func TestController_listIngresses_handlesAllIngressAPIVersions(t *testing.T) {
+	tests := []struct {
+		desc          string
+		serverVersion string
+		want          metav1.ObjectMeta
+	}{
+		{
+			desc:          "v1.16",
+			serverVersion: "v1.16",
+			want: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "v1beta1",
+			},
+		},
+		{
+			desc:          "v1.18",
+			serverVersion: "v1.18",
+			want: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "v1beta1",
+			},
+		},
+		{
+			desc:          "v1.18.10",
+			serverVersion: "v1.18.10",
+			want: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "v1beta1",
+			},
+		},
+		{
+			desc:          "v1.19",
+			serverVersion: "v1.19",
+			want: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "v1",
+			},
+		},
+		{
+			desc:          "v1.22",
+			serverVersion: "v1.22",
+			want: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "v1",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			k8sObjects := []runtime.Object{
+				&netv1beta1.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "v1beta1",
+					},
+				},
+				&netv1.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns",
+						Name:      "v1",
+					},
+				},
+			}
+
+			kubeClient := newFakeKubeClient(t, test.serverVersion, k8sObjects...)
+			hubClient := hubkubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
+
+			ctrl := newController(t, nil, kubeClient, hubClient, traefikClient)
+
+			ings, err := ctrl.listIngresses("ns")
+			require.NoError(t, err)
+
+			assert.Len(t, ings, 1)
+			assert.Equal(t, test.want, ings[0].ObjectMeta)
+		})
+	}
 }
 
 func Test_hasDefaultIngressClassAnnotation(t *testing.T) {
@@ -843,7 +926,7 @@ func newController(t *testing.T, issuer issuerMock, kubeClient clientset.Interfa
 	return ctrl
 }
 
-func newFakeKubeClient(t *testing.T, objects ...runtime.Object) clientset.Interface {
+func newFakeKubeClient(t *testing.T, serverVersion string, objects ...runtime.Object) clientset.Interface {
 	t.Helper()
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
@@ -857,7 +940,7 @@ func newFakeKubeClient(t *testing.T, objects ...runtime.Object) clientset.Interf
 	fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
 	require.True(t, ok)
 
-	fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: "1.20"}
+	fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: serverVersion}
 	return kubeClient
 }
 

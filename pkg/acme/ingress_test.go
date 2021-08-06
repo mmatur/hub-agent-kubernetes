@@ -204,7 +204,7 @@ func TestController_syncIngress(t *testing.T) {
 			hubClient := hubkubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			kubeClient := newFakeKubeClient(t,
+			kubeClient := newFakeKubeClient(t, "1.20",
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns",

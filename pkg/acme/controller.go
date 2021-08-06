@@ -132,14 +132,13 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient h
 	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.19"))) {
 		kubeInformers.Networking().V1().IngressClasses().Informer()
 		kubeInformers.Networking().V1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
+	} else {
+		// Since we only support Kubernetes v1.14 and up, we always have at least net v1beta1 Ingresses.
+		kubeInformers.Networking().V1beta1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
 	}
 
 	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.18"))) {
 		kubeInformers.Networking().V1beta1().IngressClasses().Informer()
-	}
-
-	if serverSemVer.LessThanOrEqual(version.Must(version.NewVersion("1.18"))) {
-		kubeInformers.Networking().V1beta1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
 	}
 
 	hubInformers.Hub().V1alpha1().IngressClasses().Informer()
