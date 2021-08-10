@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
 	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
+	"github.com/traefik/hub-agent/pkg/kubevers"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -73,16 +73,12 @@ type Controller struct {
 
 // NewController returns a new Controller instance.
 func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient hubclientset.Interface, traefikClient traefikclientset.Interface) (*Controller, error) {
-	serverVersion, err := kubeClient.Discovery().ServerVersion()
+	serverVersionInfo, err := kubeClient.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	serverSemVer, err := version.NewVersion(serverVersion.GitVersion)
-	if err != nil {
-		return nil, fmt.Errorf("parse server version: %w", err)
-	}
-
+	serverVersion := serverVersionInfo.GitVersion
 	kubeInformers := informers.NewSharedInformerFactory(kubeClient, defaultResync)
 	hubInformers := hubinformer.NewSharedInformerFactory(hubClient, defaultResync)
 	traefikInformers := traefikinformer.NewSharedInformerFactory(traefikClient, defaultResync)
@@ -128,17 +124,17 @@ func NewController(certs CertIssuer, kubeClient clientset.Interface, hubClient h
 		},
 	}
 
-	// Clusters supporting networking.k8s.io/v1.
-	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.19"))) {
+	if kubevers.SupportsNetV1IngressClasses(serverVersion) {
 		kubeInformers.Networking().V1().IngressClasses().Informer()
+	} else if kubevers.SupportsNetV1Beta1IngressClasses(serverVersion) {
+		kubeInformers.Networking().V1beta1().IngressClasses().Informer()
+	}
+
+	if kubevers.SupportsNetV1Ingresses(serverVersion) {
 		kubeInformers.Networking().V1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
 	} else {
 		// Since we only support Kubernetes v1.14 and up, we always have at least net v1beta1 Ingresses.
 		kubeInformers.Networking().V1beta1().Ingresses().Informer().AddEventHandler(ingressEventHandler)
-	}
-
-	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.18"))) {
-		kubeInformers.Networking().V1beta1().IngressClasses().Informer()
 	}
 
 	hubInformers.Hub().V1alpha1().IngressClasses().Informer()

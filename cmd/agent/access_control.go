@@ -176,18 +176,17 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string, quotas *q
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
-	if kubevers.SupportsIngressClasses(kubeVers) {
+	if kubevers.SupportsNetV1IngressClasses(kubeVers) {
 		kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
-	}
-	if kubevers.SupportsNetV1Beta1IngressClasses(kubeVers) {
+	} else if kubevers.SupportsNetV1Beta1IngressClasses(kubeVers) {
 		kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
 	}
 
-	// Since we only support Kubernetes v1.14 and up,
-	// we should always at least have net v1beta1 Ingresses.
-	kubeInformer.Networking().V1beta1().Ingresses().Informer()
 	if kubevers.SupportsNetV1Ingresses(kubeVers) {
 		kubeInformer.Networking().V1().Ingresses().Informer()
+	} else {
+		// Since we only support Kubernetes v1.14 and up, we should always at least have net v1beta1 Ingresses.
+		kubeInformer.Networking().V1beta1().Ingresses().Informer()
 	}
 
 	kubeInformer.Start(ctx.Done())

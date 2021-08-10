@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent/pkg/kubevers"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -93,7 +93,7 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 	}
 
 	// Stop early if server does not support IngressClasses.
-	if f.serverVersion.LessThan(version.Must(version.NewVersion("1.18"))) {
+	if !kubevers.SupportsIngressClasses(f.serverVersion) {
 		return result, nil
 	}
 
@@ -111,10 +111,6 @@ func (f *Fetcher) fetchIngressClasses() ([]*netv1.IngressClass, error) {
 	ingressClasses, err := f.k8s.Networking().V1().IngressClasses().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
-	}
-
-	if f.serverVersion.GreaterThanOrEqual(version.Must(version.NewVersion("1.19"))) {
-		return ingressClasses, nil
 	}
 
 	v1beta1IngressClasses, err := f.k8s.Networking().V1beta1().IngressClasses().Lister().List(labels.Everything())

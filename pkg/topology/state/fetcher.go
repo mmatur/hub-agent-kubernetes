@@ -14,6 +14,7 @@ import (
 	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions"
 	"github.com/traefik/hub-agent/pkg/kube"
+	"github.com/traefik/hub-agent/pkg/kubevers"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
@@ -23,7 +24,7 @@ import (
 // Fetcher fetches Kubernetes resources and converts them into a filtered and simplified state.
 type Fetcher struct {
 	clusterID     string
-	serverVersion *version.Version
+	serverVersion string
 
 	k8s       informers.SharedInformerFactory
 	hub       hubinformer.SharedInformerFactory
@@ -83,17 +84,17 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 	kubernetesFactory.Core().V1().Pods().Informer()
 	kubernetesFactory.Core().V1().Services().Informer()
 
-	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.19"))) {
-		// Clusters supporting networking.k8s.io/v1.
+	if kubevers.SupportsNetV1IngressClasses(serverVersion) {
 		kubernetesFactory.Networking().V1().IngressClasses().Informer()
+	} else if kubevers.SupportsNetV1Beta1IngressClasses(serverVersion) {
+		kubernetesFactory.Networking().V1beta1().IngressClasses().Informer()
+	}
+
+	if kubevers.SupportsNetV1Ingresses(serverVersion) {
 		kubernetesFactory.Networking().V1().Ingresses().Informer()
 	} else {
 		// Since we only support Kubernetes v1.14 and up, we always have at least net v1beta1 Ingresses.
 		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
-	}
-
-	if serverSemVer.GreaterThanOrEqual(version.Must(version.NewVersion("1.18"))) {
-		kubernetesFactory.Networking().V1beta1().IngressClasses().Informer()
 	}
 
 	traefikFactory := traefikinformer.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)
@@ -134,7 +135,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 
 	return &Fetcher{
 		clusterID:     clusterID,
-		serverVersion: serverSemVer,
+		serverVersion: serverVersion,
 		k8s:           kubernetesFactory,
 		hub:           hubFactory,
 		traefik:       traefikFactory,

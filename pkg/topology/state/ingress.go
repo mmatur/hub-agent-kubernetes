@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/hashicorp/go-version"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,16 +45,9 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 }
 
 func (f *Fetcher) fetchIngresses() ([]*netv1.Ingress, error) {
-	var result []*netv1.Ingress
-
-	if f.serverVersion.GreaterThanOrEqual(version.Must(version.NewVersion("1.19"))) {
-		var err error
-		result, err = f.k8s.Networking().V1().Ingresses().Lister().List(labels.Everything())
-		if err != nil {
-			return nil, err
-		}
-
-		return result, nil
+	ingresses, err := f.k8s.Networking().V1().Ingresses().Lister().List(labels.Everything())
+	if err != nil {
+		return nil, err
 	}
 
 	v1beta1Ingresses, err := f.k8s.Networking().V1beta1().Ingresses().Lister().List(labels.Everything())
@@ -64,14 +56,14 @@ func (f *Fetcher) fetchIngresses() ([]*netv1.Ingress, error) {
 	}
 
 	for _, ingress := range v1beta1Ingresses {
-		networking, err := toNetworkingV1(ingress)
+		ing, err := toNetworkingV1(ingress)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, networking)
+		ingresses = append(ingresses, ing)
 	}
 
-	return result, nil
+	return ingresses, nil
 }
 
 func getIngressServices(ingress *netv1.Ingress) []string {

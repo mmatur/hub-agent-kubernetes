@@ -441,14 +441,16 @@ func TestController_isSupportedIngressClassController(t *testing.T) {
 
 func TestController_getDefaultIngressClassController(t *testing.T) {
 	tests := []struct {
-		desc        string
-		want        string
-		kubeObjects []runtime.Object
-		hubObjects  []runtime.Object
+		desc          string
+		want          string
+		serverVersion string
+		kubeObjects   []runtime.Object
+		hubObjects    []runtime.Object
 	}{
 		{
-			desc: "Default v1beta1 IngressClass",
-			want: "default",
+			desc:          "Default v1beta1 IngressClass",
+			want:          "default",
+			serverVersion: "v1.18",
 			kubeObjects: []runtime.Object{
 				&netv1beta1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
@@ -472,8 +474,9 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "Default v1 IngressClass",
-			want: "default",
+			desc:          "Default v1 IngressClass",
+			want:          "default",
+			serverVersion: "v1.20",
 			kubeObjects: []runtime.Object{
 				&netv1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
@@ -497,8 +500,9 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "Default hub IngressClass",
-			want: "default",
+			desc:          "Default hub IngressClass",
+			want:          "default",
+			serverVersion: "v1.20",
 			hubObjects: []runtime.Object{
 				&hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
@@ -529,7 +533,7 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := newFakeKubeClient(t, "1.20", test.kubeObjects...)
+			kubeClient := newFakeKubeClient(t, test.serverVersion, test.kubeObjects...)
 			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
@@ -545,19 +549,22 @@ func TestController_getDefaultIngressClassController(t *testing.T) {
 
 func TestController_getIngressClassController(t *testing.T) {
 	tests := []struct {
-		desc       string
-		want       string
-		k8sObjects []runtime.Object
-		hubObjects []runtime.Object
+		desc          string
+		want          string
+		serverVersion string
+		kubeObjects   []runtime.Object
+		hubObjects    []runtime.Object
 	}{
 		{
-			desc: "IngressClass not found",
-			want: "",
+			desc:          "IngressClass not found",
+			serverVersion: "v1.20",
+			want:          "",
 		},
 		{
-			desc: "IngressClass v1beta1",
-			want: "v1beta1",
-			k8sObjects: []runtime.Object{
+			desc:          "IngressClass v1beta1",
+			want:          "v1beta1",
+			serverVersion: "v1.18",
+			kubeObjects: []runtime.Object{
 				&netv1beta1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name",
@@ -569,9 +576,10 @@ func TestController_getIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "IngressClass v1",
-			want: "v1",
-			k8sObjects: []runtime.Object{
+			desc:          "IngressClass v1",
+			want:          "v1",
+			serverVersion: "v1.20",
+			kubeObjects: []runtime.Object{
 				&netv1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name",
@@ -583,8 +591,9 @@ func TestController_getIngressClassController(t *testing.T) {
 			},
 		},
 		{
-			desc: "IngressClass hub",
-			want: "hub",
+			desc:          "IngressClass hub",
+			want:          "hub",
+			serverVersion: "v1.16",
 			hubObjects: []runtime.Object{
 				&hubv1alpha1.IngressClass{
 					ObjectMeta: metav1.ObjectMeta{
@@ -604,7 +613,7 @@ func TestController_getIngressClassController(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := newFakeKubeClient(t, "1.20", test.k8sObjects...)
+			kubeClient := newFakeKubeClient(t, test.serverVersion, test.kubeObjects...)
 			hubClient := hubkubemock.NewSimpleClientset(test.hubObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 

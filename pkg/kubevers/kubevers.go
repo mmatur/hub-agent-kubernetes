@@ -14,14 +14,19 @@ func SupportsNetV1Beta1IngressClasses(ver string) bool {
 	return atLeast(ver, "1.18")
 }
 
-// SupportsIngressClasses reports whether the Kubernetes cluster supports net v1 IngressClasses.
-func SupportsIngressClasses(ver string) bool {
+// SupportsNetV1IngressClasses reports whether the Kubernetes cluster supports net v1 IngressClasses.
+func SupportsNetV1IngressClasses(ver string) bool {
 	return atLeast(ver, "1.19")
+}
+
+// SupportsIngressClasses reports whether the Kubernetes cluster supports IngressClasses.
+func SupportsIngressClasses(ver string) bool {
+	return atLeast(ver, "1.18")
 }
 
 func atLeast(ver, minVer string) bool {
 	kubeVersion := version.Must(version.NewSemver(ver))
-	ingClassMinVers := version.Must(version.NewSemver(minVer))
+	minVersion := version.Must(version.NewSemver(minVer))
 
-	return kubeVersion.GreaterThanOrEqual(ingClassMinVers)
+	return kubeVersion.GreaterThanOrEqual(minVersion)
 }
