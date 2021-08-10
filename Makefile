@@ -1,5 +1,5 @@
 .PHONY: clean lint test build \
-		publish publish-latest image image-dev
+		publish publish-latest image image-dev multi-arch-image
 
 BIN_NAME := hub-agent
 MAIN_DIRECTORY := ./cmd/agent
@@ -8,6 +8,10 @@ TAG_NAME := $(shell git tag -l --contains HEAD)
 SHA := $(shell git rev-parse --short HEAD)
 VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
+
+DOCKER_BUILD_PLATFORMS ?= "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+DOCKER_IMAGE_TAG := $(if $(TAG_NAME),$(TAG_NAME),latest)
+OUTPUT := $(if $(OUTPUT),$(OUTPUT),$(BIN_NAME))
 
 default: clean lint test build
 
@@ -22,12 +26,12 @@ test: clean
 
 build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
-	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${BIN_NAME} ${MAIN_DIRECTORY}
+	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
 
 image: export GOOS := linux
 image: export GOARCH := amd64
 image: build
-	docker build --build-arg VERSION=$(VERSION) -t gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/traefik/$(BIN_NAME):$(VERSION) .
 
 image-dev: export GOOS := linux
 image-dev: export GOARCH := amd64
@@ -41,18 +45,12 @@ dev: image-dev
 	kubectl rollout restart deployment -n hub-agent hub-agent-controller
 	kubectl rollout restart deployment -n hub-agent hub-agent-auth-server
 
-publish:
-	docker push gcr.io/traefiklabs/$(BIN_NAME):$(VERSION)
-	# Github container registry
-	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) ghcr.io/traefik/$(BIN_NAME):$(VERSION)
-	docker push ghcr.io/traefik/$(BIN_NAME):$(VERSION)
+## Build Multi archs Docker image
+multi-arch-image:
+	docker buildx build $(DOCKER_BUILDX_ARGS) --build-arg VERSION=$(VERSION) -t ghcr.io/traefik/$(BIN_NAME):$(DOCKER_IMAGE_TAG) --platform=$(DOCKER_BUILD_PLATFORMS) -f buildx.Dockerfile .
 
-publish-latest:
-	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) gcr.io/traefiklabs/$(BIN_NAME):latest
-	docker push gcr.io/traefiklabs/$(BIN_NAME):latest
-	# Github container registry
-	docker tag gcr.io/traefiklabs/$(BIN_NAME):$(VERSION) ghcr.io/traefik/$(BIN_NAME):latest
-	docker push ghcr.io/traefik/$(BIN_NAME):latest
+publish:
+	docker push ghcr.io/traefik/$(BIN_NAME):$(VERSION)
 
 generate-crd:
 	@$(CURDIR)/scripts/code-gen.sh
