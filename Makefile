@@ -9,7 +9,7 @@ SHA := $(shell git rev-parse --short HEAD)
 VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
 
-DOCKER_BUILD_PLATFORMS ?= "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+DOCKER_BUILD_PLATFORMS ?= linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
 DOCKER_IMAGE_TAG := $(if $(TAG_NAME),$(TAG_NAME),latest)
 OUTPUT := $(if $(OUTPUT),$(OUTPUT),$(BIN_NAME))
 
