@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog/log"
 	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
@@ -106,6 +107,12 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 	if hasTraefikCRDs {
 		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
 		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
+	} else {
+		msg := "The agent has been installed in a cluster where the Traefik Proxy CustomResourceDefinitions are not installed. " +
+			"If you want to install these CustomResourceDefinitions and take advantage of them in Traefik Hub, " +
+			"the agent needs to be restarted in order to load them. " +
+			"Run 'kubectl -n hub-agent delete pod -l app=hub-agent,component=controller'"
+		log.Info().Msg(msg)
 	}
 
 	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
