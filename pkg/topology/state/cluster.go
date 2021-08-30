@@ -62,12 +62,14 @@ type IngressController struct {
 
 // Service describes a Service.
 type Service struct {
-	Name        string             `json:"name"`
-	Namespace   string             `json:"namespace"`
-	Type        corev1.ServiceType `json:"type"`
-	Selector    map[string]string  `json:"selector"`
-	Apps        []string           `json:"apps,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty"`
+	Name          string             `json:"name"`
+	Namespace     string             `json:"namespace"`
+	Type          corev1.ServiceType `json:"type"`
+	Selector      map[string]string  `json:"selector"`
+	Apps          []string           `json:"apps,omitempty"`
+	Annotations   map[string]string  `json:"annotations,omitempty"`
+	ExternalIPs   []string           `json:"externalIPs,omitempty"`
+	ExternalPorts []int              `json:"externalPorts,omitempty"`
 
 	status corev1.ServiceStatus
 }

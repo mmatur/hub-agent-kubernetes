@@ -22,15 +22,34 @@ func (f *Fetcher) getServices(apps map[string]*App) (map[string]*Service, map[st
 	svcs := make(map[string]*Service)
 	traefikNames := make(map[string]string)
 	for _, service := range services {
+		var (
+			externalIPs   []string
+			externalPorts []int
+		)
+		if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			for _, ingress := range service.Status.LoadBalancer.Ingress {
+				hostname := ingress.Hostname
+				if hostname == "" {
+					hostname = ingress.IP
+				}
+				externalIPs = append(externalIPs, hostname)
+			}
+			for _, port := range service.Spec.Ports {
+				externalPorts = append(externalPorts, int(port.Port))
+			}
+		}
+
 		svcName := objectKey(service.Name, service.Namespace)
 		svcs[svcName] = &Service{
-			Name:        service.Name,
-			Namespace:   service.Namespace,
-			Annotations: sanitizeAnnotations(service.Annotations),
-			Selector:    service.Spec.Selector,
-			Apps:        selectApps(apps, service),
-			Type:        service.Spec.Type,
-			status:      service.Status,
+			Name:          service.Name,
+			Namespace:     service.Namespace,
+			Annotations:   sanitizeAnnotations(service.Annotations),
+			Selector:      service.Spec.Selector,
+			Apps:          selectApps(apps, service),
+			Type:          service.Spec.Type,
+			ExternalIPs:   externalIPs,
+			ExternalPorts: externalPorts,
+			status:        service.Status,
 		}
 
 		for _, key := range traefikServiceNames(service) {

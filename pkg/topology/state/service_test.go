@@ -124,6 +124,120 @@ func TestFetcher_GetServices(t *testing.T) {
 	assert.Equal(t, wantNames, gotNames)
 }
 
+func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
+	wantSvcs := map[string]*Service{
+		"myService@myns": {
+			Name:      "myService",
+			Namespace: "myns",
+			Annotations: map[string]string{
+				"my.annotation": "foo",
+			},
+			Selector: map[string]string{
+				"my.label": "foo",
+			},
+			Apps: []string{"jeanmich@myns"},
+			Type: corev1.ServiceTypeLoadBalancer,
+			ExternalIPs: []string{
+				"foo.bar",
+			},
+			ExternalPorts: []int{443},
+			status: corev1.ServiceStatus{
+				LoadBalancer: corev1.LoadBalancerStatus{
+					Ingress: []corev1.LoadBalancerIngress{
+						{
+							IP:       "1.2.3.4",
+							Hostname: "foo.bar",
+							Ports: []corev1.PortStatus{
+								{
+									Port:     443,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	wantNames := map[string]string{
+		"myns-myService-443":   "myService@myns",
+		"myns-myService-https": "myService@myns",
+	}
+
+	apps := map[string]*App{
+		"jeanmich@myns": {
+			Name:      "jeanmich",
+			Kind:      "Deployment",
+			Namespace: "myns",
+			podLabels: map[string]string{
+				"my.label": "foo",
+			},
+		},
+		"mouette@myotherns": {
+			Name:      "mouette",
+			Kind:      "Deployment",
+			Namespace: "myotherns",
+			podLabels: map[string]string{
+				"my.label": "foo",
+			},
+		},
+	}
+
+	objects := []runtime.Object{
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myService",
+				Namespace: "myns",
+				Annotations: map[string]string{
+					"my.annotation": "foo",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+				Selector: map[string]string{
+					"my.label": "foo",
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Port:     443,
+						NodePort: 32085,
+						Name:     "https",
+					},
+				},
+			},
+			Status: corev1.ServiceStatus{
+				LoadBalancer: corev1.LoadBalancerStatus{
+					Ingress: []corev1.LoadBalancerIngress{
+						{
+							IP:       "1.2.3.4",
+							Hostname: "foo.bar",
+							Ports: []corev1.PortStatus{
+								{
+									Port:     443,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	kubeClient := kubemock.NewSimpleClientset(objects...)
+	hubClient := hubkubemock.NewSimpleClientset()
+	traefikClient := traefikkubemock.NewSimpleClientset()
+
+	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
+	require.NoError(t, err)
+
+	gotSvcs, gotNames, err := f.getServices(apps)
+	require.NoError(t, err)
+
+	assert.Equal(t, wantSvcs, gotSvcs)
+	assert.Equal(t, wantNames, gotNames)
+}
+
 func TestFetcher_SelectApps(t *testing.T) {
 	tests := []struct {
 		desc    string
