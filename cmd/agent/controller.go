@@ -129,7 +129,9 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return nil
 	})
 
-	group.Go(func() error { return accessControl(ctx, cliCtx, agentCfg.AccessControl, configWatcher, platformClient) })
+	group.Go(func() error {
+		return webhookAdmission(ctx, cliCtx, agentCfg.AccessControl, configWatcher, platformClient)
+	})
 
 	group.Go(func() error { return runAlerting(ctx, topoWatch, token, platformURL, mtrcsStore, topoFetcher) })
 

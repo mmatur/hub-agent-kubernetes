@@ -204,3 +204,35 @@ func (c *Client) ReportSecuredRoutesInUse(ctx context.Context, n int) error {
 	}
 	return nil
 }
+
+// ListVerifiedDomains list verified domains.
+func (c *Client) ListVerifiedDomains(ctx context.Context) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/verified-domains", http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", c.baseURL+"/verified-domains", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", c.baseURL+"/verified-domains", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("%q failed with code %d: decode response: %w", c.baseURL+"/verified-domains", resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("%q failed with code %d: %s", c.baseURL+"/verified-domains", resp.StatusCode, apiErr.Message)
+	}
+
+	var domains []string
+	if err = json.NewDecoder(resp.Body).Decode(&domains); err != nil {
+		return nil, fmt.Errorf("failed to decode verified domains: %w", err)
+	}
+
+	return domains, nil
+}

@@ -302,3 +302,67 @@ func TestClient_ReportSecuredRoutesInUse(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_ListVerifiedDomains(t *testing.T) {
+	tests := []struct {
+		desc             string
+		returnStatusCode int
+		domains          []string
+		wantErr          assert.ErrorAssertionFunc
+		wantDomains      []string
+	}{
+		{
+			desc:             "get domains",
+			returnStatusCode: http.StatusOK,
+			domains:          []string{"domain.com"},
+			wantErr:          assert.NoError,
+			wantDomains:      []string{"domain.com"},
+		},
+		{
+			desc:             "unable to get domains",
+			returnStatusCode: http.StatusInternalServerError,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/verified-domains", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodGet {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+				err := json.NewEncoder(rw).Encode(test.domains)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			domains, err := c.ListVerifiedDomains(context.Background())
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.wantDomains, domains)
+		})
+	}
+}
