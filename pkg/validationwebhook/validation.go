@@ -165,6 +165,12 @@ func listDomainsFromIngressRoute(ar *admv1.AdmissionRequest) ([]string, error) {
 			Routes []struct {
 				Match string `json:"match"`
 			} `json:"routes"`
+			TLS struct {
+				Domains []struct {
+					Main string   `json:"main"`
+					SANs []string `json:"sans"`
+				} `json:"domains"`
+			} `json:"tls"`
 		} `json:"spec"`
 	}
 
@@ -178,6 +184,26 @@ func listDomainsFromIngressRoute(ar *admv1.AdmissionRequest) ([]string, error) {
 
 	var domains []string
 	unique := map[string]struct{}{}
+
+	for _, dom := range ing.Spec.TLS.Domains {
+		domain := dom.Main
+		if _, found := unique[domain]; !found {
+			domains = append(domains, domain)
+			unique[domain] = struct{}{}
+		}
+
+		for _, domain := range dom.SANs {
+			if _, found := unique[domain]; !found {
+				domains = append(domains, domain)
+				unique[domain] = struct{}{}
+			}
+		}
+	}
+
+	if len(unique) != 0 {
+		return domains, nil
+	}
+
 	for _, route := range ing.Spec.Routes {
 		domainParsed := parseDomains(route.Match)
 

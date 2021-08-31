@@ -70,9 +70,17 @@ func (c *Controller) syncIngressRoute(ingRoute *traefikv1alpha1.IngressRoute) {
 	}
 
 	var domains []string
-	for _, route := range ingRoute.Spec.Routes {
-		domains = append(domains, parseDomains(route.Match)...)
+	for _, domain := range ingRoute.Spec.TLS.Domains {
+		domains = append(domains, domain.Main)
+		domains = append(domains, domain.SANs...)
 	}
+
+	if len(domains) == 0 {
+		for _, route := range ingRoute.Spec.Routes {
+			domains = append(domains, parseDomains(route.Match)...)
+		}
+	}
+
 	if len(domains) == 0 {
 		return
 	}

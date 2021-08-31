@@ -34,6 +34,82 @@ func TestController_syncIngressRoute(t *testing.T) {
 			wantIssuerCallCount: 0,
 		},
 		{
+			desc: "TLS config with no domain",
+			ingRoute: &traefikv1alpha1.IngressRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: traefikv1alpha1.IngressRouteSpec{
+					Routes: []traefikv1alpha1.Route{
+						{Match: "Path(`/`)"},
+					},
+					TLS: &traefikv1alpha1.TLS{
+						SecretName: "secret",
+						Domains:    []traefikv1alpha1.Domain{},
+					},
+				},
+			},
+			wantIssuerCallCount: 0,
+		},
+		{
+			desc: "TLS config with no domain fallbacks to routes",
+			ingRoute: &traefikv1alpha1.IngressRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: traefikv1alpha1.IngressRouteSpec{
+					Routes: []traefikv1alpha1.Route{
+						{Match: "Host(`test.localhost`)"},
+					},
+					TLS: &traefikv1alpha1.TLS{
+						SecretName: "missing-secret",
+						Domains:    []traefikv1alpha1.Domain{},
+					},
+				},
+			},
+			wantIssuerCallCount: 1,
+			wantIssuerCallReq: CertificateRequest{
+				Domains:    []string{"test.localhost"},
+				Namespace:  "ns",
+				SecretName: "missing-secret",
+			},
+		},
+		{
+			desc: "TLS config with domains",
+			ingRoute: &traefikv1alpha1.IngressRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "name",
+				},
+				Spec: traefikv1alpha1.IngressRouteSpec{
+					Routes: []traefikv1alpha1.Route{
+						{Match: "Host(`test.localhost`)"},
+					},
+					TLS: &traefikv1alpha1.TLS{
+						SecretName: "missing-secret",
+						Domains: []traefikv1alpha1.Domain{
+							{
+								Main: "test.localhost2",
+								SANs: []string{"toto.test.localhost2", "titi.test.localhost2"},
+							},
+							{
+								Main: "test.localhost3",
+								SANs: []string{"*.test.localhost3"},
+							},
+						},
+					},
+				},
+			},
+			wantIssuerCallCount: 1,
+			wantIssuerCallReq: CertificateRequest{
+				Domains:    []string{"test.localhost2", "toto.test.localhost2", "titi.test.localhost2", "test.localhost3", "*.test.localhost3"},
+				Namespace:  "ns",
+				SecretName: "missing-secret",
+			},
+		},
+		{
 			desc: "No domains parsed from routes",
 			ingRoute: &traefikv1alpha1.IngressRoute{
 				ObjectMeta: metav1.ObjectMeta{
@@ -236,7 +312,9 @@ func TestController_syncIngressRoute(t *testing.T) {
 			ctrl.syncIngressRoute(test.ingRoute)
 
 			assert.Equal(t, test.wantIssuerCallCount, issuerCallCount)
-			assert.Equal(t, test.wantIssuerCallReq, issuerCallReq)
+			assert.Equal(t, test.wantIssuerCallReq.Namespace, issuerCallReq.Namespace)
+			assert.Equal(t, test.wantIssuerCallReq.SecretName, issuerCallReq.SecretName)
+			assert.ElementsMatch(t, test.wantIssuerCallReq.Domains, issuerCallReq.Domains)
 		})
 	}
 }

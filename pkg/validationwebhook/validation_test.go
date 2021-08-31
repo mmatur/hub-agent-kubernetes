@@ -62,6 +62,20 @@ func TestValidationWebhook_ServeHTTP(t *testing.T) {
 			wantAllow:       true,
 		},
 		{
+			desc:            "returns true when asking for a verified domain (TLS config) - ingressRoute",
+			rawResource:     `{"metadata":{"annotations":{"hub.traefik.io/enable-acme":"true"}}, "spec":{"tls": { "domains": [ {"main": "domain.com"}]}}}`,
+			verifiedDomains: []string{"domain.com"},
+			ingressRoute:    true,
+			wantAllow:       true,
+		},
+		{
+			desc:            "returns true when asking for a verified domain (TLS config) - ingressRoute",
+			rawResource:     `{"metadata":{"annotations":{"hub.traefik.io/enable-acme":"true"}}, "spec":{"tls": { "domains": [ {"main": "domain.com", "sans": ["test.domain.com"]}]}}}`,
+			verifiedDomains: []string{"domain.com", "test.domain.com"},
+			ingressRoute:    true,
+			wantAllow:       true,
+		},
+		{
 			desc:         "returns true when ACME is disabled - ingressRoute",
 			rawResource:  `{"metadata":{"annotations":{"hub.traefik.io/enable-acme":"false"}}, "spec":{"routes":[{"match":"Host(unverifiedDomain.com)"}]}}`,
 			ingressRoute: true,
@@ -90,6 +104,13 @@ func TestValidationWebhook_ServeHTTP(t *testing.T) {
 			rawResource:  `{"metadata":{"annotations":{"hub.traefik.io/enable-acme":"true"}}, "spec":{"routes":[{"match":"Path(/no-host)"}]}}`,
 			ingressRoute: true,
 			wantAllow:    false,
+		},
+		{
+			desc:            "returns false when asking for at least one unverified domain (TLS config) - ingressRoute",
+			rawResource:     `{"metadata":{"annotations":{"hub.traefik.io/enable-acme":"true"}}, "spec":{"tls": { "domains": [ {"main": "domain.com", "sans": ["test.domain.com"]}]}}}`,
+			verifiedDomains: []string{"domain.com"},
+			ingressRoute:    true,
+			wantAllow:       false,
 		},
 	}
 
