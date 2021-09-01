@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp/admission"
@@ -22,7 +21,6 @@ import (
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/kubevers"
 	"github.com/traefik/hub-agent/pkg/platform"
-	"github.com/traefik/hub-agent/pkg/validationwebhook"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -82,22 +80,9 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, cfg platform.Acc
 		return fmt.Errorf("create admission handler: %w", err)
 	}
 
-	domainCache := platform.NewDomainCache(platformClient, 30*time.Second)
-	if err = domainCache.WarmUp(ctx); err != nil {
-		return fmt.Errorf("warming up domain cache: %w", err)
-	}
-
-	go domainCache.Run(ctx)
-
-	validationHandler := validationwebhook.NewHandler(domainCache)
-
-	router := chi.NewRouter()
-	router.Handle("/", h)
-	router.Handle("/validation", validationHandler)
-
 	server := &http.Server{
 		Addr:     listenAddr,
-		Handler:  router,
+		Handler:  h,
 		ErrorLog: stdlog.New(log.Logger.Level(zerolog.DebugLevel), "", 0),
 	}
 	srvDone := make(chan struct{})
