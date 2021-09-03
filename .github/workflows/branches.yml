@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - master
-    tags:
-      - v*
+      - deploy
 jobs:
 
   branches:
@@ -68,9 +67,16 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build multi arch image
-        if: github.repository == 'traefik/hub-agent'
+        if: github.repository == 'traefik/hub-agent' && github.ref == 'refs/heads/deploy'
         env:
           DOCKER_BUILDX_ARGS: --push
         run: |
           make multi-arch-image
 
+      - name: Build multi arch experimental image
+        if: github.repository == 'traefik/hub-agent' && github.ref == 'refs/heads/master'
+        env:
+          DOCKER_BUILDX_ARGS: --push
+          DOCKER_IMAGE_TAG: experimental
+        run: |
+          make multi-arch-image
