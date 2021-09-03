@@ -6,6 +6,7 @@ require (
 	github.com/abbot/go-http-auth v0.4.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ettle/strcase v0.1.1
+	github.com/go-chi/chi/v5 v5.0.3
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gravitational/trace v1.1.14 // indirect
