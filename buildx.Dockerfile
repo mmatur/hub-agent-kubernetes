@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.2
 # Go mod
 FROM --platform=$BUILDPLATFORM golang:1.16-alpine as gomod
 
