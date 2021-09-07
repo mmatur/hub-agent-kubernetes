@@ -40,15 +40,11 @@ func (d *DomainCache) Run(ctx context.Context) {
 		select {
 		case <-t.C:
 			timeoutCtx, cancelFunc := context.WithTimeout(ctx, d.ttl)
-
 			if err := d.updateVerifiedDomains(timeoutCtx); err != nil {
 				log.Error().Err(err).Msg("unable to list verified domains")
-				cancelFunc()
-				return
 			}
 
 			cancelFunc()
-
 		case <-ctx.Done():
 			log.Error().Err(ctx.Err()).Msg("stop listing verified domains")
 			return
