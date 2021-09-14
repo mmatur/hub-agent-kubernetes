@@ -165,6 +165,8 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 
 func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-chan struct{}) {
 	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+		Ingresses:            m.getIngresses(),
+		IngressRoutes:        m.getIngressRoutes(),
 		ServiceIngresses:     m.getSvcIngresses(),
 		ServiceIngressRoutes: m.getSvcIngressRoutes(),
 		TraefikServiceNames:  m.getTraefikServiceNames(),
@@ -187,6 +189,8 @@ func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-
 
 		case <-tick.C:
 			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+				Ingresses:            m.getIngresses(),
+				IngressRoutes:        m.getIngressRoutes(),
 				ServiceIngresses:     m.getSvcIngresses(),
 				ServiceIngressRoutes: m.getSvcIngressRoutes(),
 				TraefikServiceNames:  m.getTraefikServiceNames(),
@@ -252,6 +256,28 @@ func (m *Manager) getTraefikServiceNames() map[string]string {
 	cluster := m.state.Load().(*state.Cluster)
 
 	return cluster.TraefikServiceNames
+}
+
+func (m *Manager) getIngresses() map[string]struct{} {
+	cluster := m.state.Load().(*state.Cluster)
+
+	ingresses := make(map[string]struct{}, len(cluster.Ingresses))
+	for name := range cluster.Ingresses {
+		ingresses[name] = struct{}{}
+	}
+
+	return ingresses
+}
+
+func (m *Manager) getIngressRoutes() map[string]struct{} {
+	cluster := m.state.Load().(*state.Cluster)
+
+	ingRoutes := make(map[string]struct{}, len(cluster.IngressRoutes))
+	for name := range cluster.IngressRoutes {
+		ingRoutes[name] = struct{}{}
+	}
+
+	return ingRoutes
 }
 
 func (m *Manager) getIngressURLs(name string) []string {

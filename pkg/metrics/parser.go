@@ -110,34 +110,102 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 
 	switch *m.Name {
 	case "traefik_service_request_duration_seconds":
-		for _, mtrc := range m.Metric {
-			hist := HistogramFromMetric(mtrc)
-			if hist == nil {
-				continue
-			}
-
-			svc, ingresses := p.guessService(mtrc.Label, state)
-			if svc == "" || len(ingresses) == 0 {
-				continue
-			}
-
-			metrics = append(metrics, getRequestDurationMetrics(hist, svc, ingresses)...)
-		}
+		metrics = append(metrics, p.parseServiceRequestDuration(m.Metric, state)...)
 
 	case "traefik_service_requests_total":
-		for _, mtrc := range m.Metric {
-			reqs := CounterFromMetric(mtrc)
-			if reqs == nil {
-				continue
-			}
+		metrics = append(metrics, p.parseServiceRequestTotal(m.Metric, state)...)
 
-			svc, ingresses := p.guessService(mtrc.Label, state)
-			if svc == "" || len(ingresses) == 0 {
-				continue
-			}
+	case "traefik_router_request_duration_seconds":
+		metrics = append(metrics, p.parseRouterRequestDuration(m.Metric, state)...)
 
-			metrics = append(metrics, getRequestMetrics(reqs, svc, ingresses, mtrc.Label)...)
+	case "traefik_router_requests_total":
+		metrics = append(metrics, p.parseRouterRequestTotal(m.Metric, state)...)
+	}
+
+	return metrics
+}
+
+func (p TraefikParser) parseServiceRequestDuration(metric []*dto.Metric, state ScrapeState) []Metric {
+	var metrics []Metric
+
+	for _, mtrc := range metric {
+		hist := HistogramFromMetric(mtrc)
+		if hist == nil {
+			continue
 		}
+
+		svc, ingresses := p.guessService(mtrc.Label, state)
+		if svc == "" || len(ingresses) == 0 {
+			continue
+		}
+
+		metrics = append(metrics, getRequestDurationMetrics(hist, svc, ingresses)...)
+	}
+
+	return metrics
+}
+
+func (p TraefikParser) parseServiceRequestTotal(metric []*dto.Metric, state ScrapeState) []Metric {
+	var metrics []Metric
+
+	for _, mtrc := range metric {
+		reqs := CounterFromMetric(mtrc)
+		if reqs == nil {
+			continue
+		}
+
+		svc, ingresses := p.guessService(mtrc.Label, state)
+		if svc == "" || len(ingresses) == 0 {
+			continue
+		}
+
+		metrics = append(metrics, getRequestMetrics(reqs, svc, ingresses, mtrc.Label)...)
+	}
+
+	return metrics
+}
+
+func (p TraefikParser) parseRouterRequestDuration(metric []*dto.Metric, state ScrapeState) []Metric {
+	var metrics []Metric
+
+	for _, mtrc := range metric {
+		hist := HistogramFromMetric(mtrc)
+		if hist == nil {
+			continue
+		}
+
+		ingress := p.guessIngress(mtrc.Label, state)
+		if ingress == "" {
+			continue
+		}
+
+		hist.Name = MetricRequestDuration
+		hist.Ingress = ingress
+
+		metrics = append(metrics, hist)
+	}
+
+	return metrics
+}
+
+func (p TraefikParser) parseRouterRequestTotal(metric []*dto.Metric, state ScrapeState) []Metric {
+	var metrics []Metric
+
+	for _, mtrc := range metric {
+		reqs := CounterFromMetric(mtrc)
+		if reqs == nil {
+			continue
+		}
+
+		ingress := p.guessIngress(mtrc.Label, state)
+		if ingress == "" {
+			continue
+		}
+
+		reqs.Name = MetricRequests
+		reqs.Ingress = ingress
+
+		metrics = append(metrics, reqs)
 	}
 
 	return metrics
@@ -202,6 +270,43 @@ func (p TraefikParser) guessIngressRoute(name string, svcs map[string][]string) 
 		}
 	}
 	return "", nil
+}
+
+func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (ingress string) {
+	name := getLabel(lbls, "router")
+
+	parts := strings.SplitN(name, "@", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	name, typ := parts[0], parts[1]
+
+	if typ == "kubernetes" {
+		for ingressName := range state.Ingresses {
+			guess := strings.ReplaceAll(ingressName, "@", "-")
+			// Remove the `.kind.group` from the namespace.
+			guess = strings.SplitN(guess, ".", 2)[0]
+			if strings.HasPrefix(name, guess) {
+				return ingressName
+			}
+		}
+		return ""
+	}
+
+	for irName := range state.IngressRoutes {
+		// for ingress routes resource names are prefixed with their namespace so we need to
+		// flip those around
+		parts := strings.SplitN(irName, "@", 2)
+
+		// Remove the `.kind.group` from the namespace.
+		parts[1] = strings.SplitN(parts[1], ".", 2)[0]
+		guess := parts[1] + "-" + parts[0]
+
+		if strings.HasPrefix(name, guess) {
+			return irName
+		}
+	}
+	return ""
 }
 
 // HAProxyParser parses HAProxy metrics into a common form.

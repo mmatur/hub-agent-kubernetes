@@ -101,6 +101,8 @@ func (h Histogram) ServiceName() string {
 
 // ScrapeState contains the state used while scraping.
 type ScrapeState struct {
+	Ingresses            map[string]struct{}
+	IngressRoutes        map[string]struct{}
 	ServiceIngresses     map[string][]string
 	ServiceIngressRoutes map[string][]string
 	TraefikServiceNames  map[string]string

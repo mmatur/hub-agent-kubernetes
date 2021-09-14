@@ -98,3 +98,23 @@ traefik_service_requests_total{code="400",method="GET",protocol="http",service="
 traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-whoami2-80@kubernetes"} 16
 traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-whoami3-80@kubernetescrd"} 15
 traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-myIngressRoute-6f97418635c7e18853da@kubernetescrd"} 17
+# HELP traefik_router_request_duration_seconds How long it took to process the request on a router, partitioned by service, status code, protocol, and method.
+# TYPE traefik_router_request_duration_seconds histogram
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80",le="0.1"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80",le="0.3"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80",le="1.2"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80",le="5"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80",le="+Inf"} 1
+traefik_router_request_duration_seconds_sum{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80"} 0.0137623
+traefik_router_request_duration_seconds_count{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80",le="0.1"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80",le="0.3"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80",le="1.2"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80",le="5"} 1
+traefik_router_request_duration_seconds_bucket{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80",le="+Inf"} 1
+traefik_router_request_duration_seconds_sum{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80"} 0.0216373
+traefik_router_request_duration_seconds_count{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80"} 1
+# HELP traefik_router_requests_total How many HTTP requests are processed on a router, partitioned by service, status code, protocol, and method.
+# TYPE traefik_router_requests_total counter
+traefik_router_requests_total{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="whoami-whoami-80"} 2
+traefik_router_requests_total{code="200",method="GET",protocol="http",router="default-myIngressRoute-example-com@kubernetescrd",service="whoami-whoami-80"} 1
