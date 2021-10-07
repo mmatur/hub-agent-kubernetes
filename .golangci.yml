@@ -186,3 +186,7 @@ issues:
     - path: pkg/acp/admission/reviewer/nginx_ingress.go
       linters:
         - nestif
+    # Harmful to code readability.
+    - path: pkg/acp/admission/webhook.go
+      linters:
+        - errname

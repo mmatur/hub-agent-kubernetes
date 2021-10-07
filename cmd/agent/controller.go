@@ -160,7 +160,7 @@ func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interfa
 }
 
 func writePID() error {
-	f, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

@@ -32,21 +32,39 @@ func (r reviewerMock) Review(_ context.Context, ar admv1.AdmissionReview) (map[s
 func TestWebhook_ServeHTTP(t *testing.T) {
 	var (
 		ingressWithACP = admv1.AdmissionRequest{
-			UID: "uid",
+			UID:  "uid",
+			Name: "my-ingress",
+			Kind: metav1.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "Ingress",
+			},
 			Object: runtime.RawExtension{
 				Raw: []byte(`{"metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}}}`),
 			},
 		}
 
 		ingressWithoutACP = admv1.AdmissionRequest{
-			UID: "uid",
+			UID:  "uid",
+			Name: "my-ingress",
+			Kind: metav1.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "Ingress",
+			},
 			Object: runtime.RawExtension{
 				Raw: []byte(`{}`),
 			},
 		}
 
 		ingressWithACPRemoved = admv1.AdmissionRequest{
-			UID: "uid",
+			UID:  "uid",
+			Name: "my-ingress",
+			Kind: metav1.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "Ingress",
+			},
 			OldObject: runtime.RawExtension{
 				Raw: []byte(`{"metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}}}`),
 			},
@@ -56,9 +74,15 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 		}
 
 		deleteIngressWithACP = admv1.AdmissionRequest{
-			UID: "uid",
+			UID:  "uid",
+			Name: "my-ingress",
+			Kind: metav1.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "Ingress",
+			},
 			OldObject: runtime.RawExtension{
-				Raw: []byte(`{"metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}}}`),
+				Raw: []byte(`{"kind":"Ingress","metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}}}`),
 			},
 			Operation: admv1.Delete,
 		}
@@ -156,7 +180,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Status:  "Failure",
-					Message: "reviewing resource \"\" of kind \"/, Kind=\": boom",
+					Message: `reviewing resource "my-ingress" of kind "networking.k8s.io/v1, Kind=Ingress" in namespace "": boom`,
 				},
 			},
 		},
@@ -174,8 +198,11 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 				UID:     "uid",
 				Allowed: false,
 				Result: &metav1.Status{
-					Status:  "Failure",
-					Message: "no reviewer found for resource \"\" of kind \"/, Kind=\"",
+					Status: "Failure",
+					Message: `unsupported or ambiguous Ingress Controller for resource "my-ingress" of kind "networking.k8s.io/v1, Kind=Ingress" in namespace "". ` +
+						`Supported Ingress Controllers are: Traefik, Nginx and HAProxy; ` +
+						`consider explicitly setting the "ingressClassName" property in your resource ` +
+						`or the "kubernetes.io/ingress.class" annotation (deprecated) or setting a default Ingress Controller if none is set`,
 				},
 			},
 		},

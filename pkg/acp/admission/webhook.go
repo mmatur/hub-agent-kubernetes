@@ -94,7 +94,7 @@ func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, 
 
 	rev, revErr := findReviewer(h.reviewers, ar)
 	if revErr != nil {
-		// We had an error looking for a reviewer for this resource but it's not using ACPs,
+		// We had an error looking for a reviewer for this resource, but it's not using ACPs,
 		// so just warn the user.
 		if !usesACP {
 			return nil, &reviewerWarning{err: revErr}
@@ -103,16 +103,21 @@ func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, 
 	}
 
 	if rev == nil {
-		// We could not find a reviewer for this resource but it's not using ACPs, don't do anything.
+		// We could not find a reviewer for this resource, but it's not using ACPs, don't do anything.
 		if !usesACP {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("no reviewer found for resource %q of kind %q", ar.Request.Name, ar.Request.Kind)
+		return nil, fmt.Errorf("unsupported or ambiguous Ingress Controller for resource %q of kind %q in namespace %q. "+
+			"Supported Ingress Controllers are: Traefik, Nginx and HAProxy; "+
+			`consider explicitly setting the "ingressClassName" property in your resource `+
+			`or the "kubernetes.io/ingress.class" annotation (deprecated) `+
+			"or setting a default Ingress Controller if none is set",
+			ar.Request.Name, ar.Request.Kind, ar.Request.Namespace)
 	}
 
 	resourcePatch, err := rev.Review(ctx, ar)
 	if err != nil {
-		return nil, fmt.Errorf("reviewing resource %q of kind %q: %w", ar.Request.Name, ar.Request.Kind, err)
+		return nil, fmt.Errorf("reviewing resource %q of kind %q in namespace %q: %w", ar.Request.Name, ar.Request.Kind, ar.Request.Namespace, err)
 	}
 
 	policyPatch, err := canonicalizePolicyName(ar.Request)
