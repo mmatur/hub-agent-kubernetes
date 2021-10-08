@@ -32,10 +32,11 @@ func (f *Fetcher) getIngresses(clusterID string) (map[string]*Ingress, error) {
 				ControllerType: getControllerType(ingress, ingressClasses),
 				Annotations:    sanitizeAnnotations(ingress.Annotations),
 			},
-			TLS:            ingress.Spec.TLS,
-			DefaultBackend: ingress.Spec.DefaultBackend,
-			Rules:          ingress.Spec.Rules,
-			Services:       getIngressServices(ingress),
+			IngressClassName: ingress.Spec.IngressClassName,
+			TLS:              ingress.Spec.TLS,
+			DefaultBackend:   ingress.Spec.DefaultBackend,
+			Rules:            ingress.Spec.Rules,
+			Services:         getIngressServices(ingress),
 		}
 
 		result[ingressKey(ing.ResourceMeta)] = ing

@@ -86,10 +86,11 @@ type Ingress struct {
 	ResourceMeta
 	IngressMeta
 
-	TLS            []netv1.IngressTLS    `json:"tls,omitempty"`
-	Rules          []netv1.IngressRule   `json:"rules,omitempty"`
-	DefaultBackend *netv1.IngressBackend `json:"defaultBackend,omitempty"`
-	Services       []string              `json:"services,omitempty"`
+	IngressClassName *string               `json:"ingressClassName,omitempty"`
+	TLS              []netv1.IngressTLS    `json:"tls,omitempty"`
+	Rules            []netv1.IngressRule   `json:"rules,omitempty"`
+	DefaultBackend   *netv1.IngressBackend `json:"defaultBackend,omitempty"`
+	Services         []string              `json:"services,omitempty"`
 }
 
 // IngressRoute describes a Traefik IngressRoute.

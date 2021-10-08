@@ -30,6 +30,7 @@ func TestFetcher_GetIngresses(t *testing.T) {
 				},
 				ControllerType: "myIngressController",
 			},
+			IngressClassName: stringPtr("myIngressClass"),
 			TLS: []netv1.IngressTLS{
 				{
 					Hosts:      []string{"foo.com"},
