@@ -15,16 +15,14 @@ type tableInfo struct {
 }
 
 type tableKey struct {
-	IngressController string
-	Ingress           string
-	Service           string
+	Ingress string
+	Service string
 }
 
 func toTableKey(grp DataPointGroup) tableKey {
 	return tableKey{
-		IngressController: grp.IngressController,
-		Ingress:           grp.Ingress,
-		Service:           grp.Service,
+		Ingress: grp.Ingress,
+		Service: grp.Service,
 	}
 }
 
@@ -95,14 +93,14 @@ func (s *Store) Populate(tbl string, grps []DataPointGroup) error {
 }
 
 // Insert inserts a value for an ingress and service.
-func (s *Store) Insert(ic string, svcs map[SetKey]DataPoint) {
+func (s *Store) Insert(svcs map[SetKey]DataPoint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	table := s.data["1m"]
 
 	for k, pnt := range svcs {
-		key := tableKey{IngressController: ic, Ingress: k.Ingress, Service: k.Service}
+		key := tableKey(k)
 		pnts := table[key]
 		pnts = append(pnts, pnt)
 		table[key] = pnts
@@ -112,7 +110,7 @@ func (s *Store) Insert(ic string, svcs map[SetKey]DataPoint) {
 // ForEachFunc represents a function that will be called while iterating over a table.
 // Each time this function is called, a unique ingress controller and service will
 // be given with their set of points.
-type ForEachFunc func(ic, ingr, svc string, pnts DataPoints)
+type ForEachFunc func(ingr, svc string, pnts DataPoints)
 
 // ForEach iterates over a table, executing fn for each row.
 func (s *Store) ForEach(tbl string, fn ForEachFunc) {
@@ -125,7 +123,7 @@ func (s *Store) ForEach(tbl string, fn ForEachFunc) {
 	}
 
 	for k, v := range table {
-		fn(k.IngressController, k.Ingress, k.Service, v)
+		fn(k.Ingress, k.Service, v)
 	}
 }
 
@@ -149,7 +147,7 @@ func (s *Store) ForEachUnmarked(tbl string, fn ForEachFunc) WaterMarks {
 			continue
 		}
 
-		fn(k.IngressController, k.Ingress, k.Service, v[mark:])
+		fn(k.Ingress, k.Service, v[mark:])
 	}
 
 	return newMarks

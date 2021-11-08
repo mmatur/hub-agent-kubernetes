@@ -37,7 +37,7 @@ func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
 	}, map[string][]string{
 		"test:foo": {"svc3@ns"},
 	})
-	require.NoError(t, err)
+	require.Empty(t, err)
 
 	assert.Nil(t, got)
 }
@@ -66,7 +66,7 @@ func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
 			TimeRange:  10 * time.Minute,
 		},
 	}, nil)
-	require.NoError(t, err)
+	require.Empty(t, err)
 
 	assert.Nil(t, got)
 }
@@ -95,7 +95,7 @@ func TestThresholdProcessor_NoAlert(t *testing.T) {
 			TimeRange:  10 * time.Minute,
 		},
 	}, nil)
-	require.NoError(t, err)
+	require.Empty(t, err)
 
 	assert.Nil(t, got)
 }
@@ -151,7 +151,7 @@ func TestThresholdProcessor_NoAlert10Minute(t *testing.T) {
 		},
 	}, nil)
 
-	require.NoError(t, err)
+	require.Empty(t, err)
 	assert.Nil(t, got)
 }
 
@@ -173,7 +173,7 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(context.Background(), &Rule{
+	got, errs := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
 		Ingress: "ing@ns",
 		Service: "svc@ns",
@@ -187,7 +187,7 @@ func TestThresholdProcessor_Alert(t *testing.T) {
 			TimeRange:  10 * time.Minute,
 		},
 	}, nil)
-	require.NoError(t, err)
+	require.Empty(t, errs)
 
 	newPnts := make([]Point, len(metricsData.DataPoints))
 	for i, pnt := range metricsData.DataPoints {
@@ -236,7 +236,7 @@ func TestThresholdProcessor_AlertWithAnnotation(t *testing.T) {
 	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(context.Background(), &Rule{
+	got, errs := threshProc.Process(context.Background(), &Rule{
 		ID:         "123",
 		Ingress:    "",
 		Service:    "",
@@ -253,7 +253,7 @@ func TestThresholdProcessor_AlertWithAnnotation(t *testing.T) {
 	}, map[string][]string{
 		"test:foo": {"svc@ns", "svc2@ns"},
 	})
-	require.NoError(t, err)
+	require.Empty(t, errs)
 
 	newPnts := make([]Point, len(metricsData.DataPoints))
 	for i, pnt := range metricsData.DataPoints {
@@ -346,7 +346,7 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(context.Background(), &Rule{
+	got, errs := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
 		Ingress: "ing@ns",
 		Service: "svc@ns",
@@ -360,8 +360,7 @@ func TestThresholdProcessor_Alert10Minute(t *testing.T) {
 			TimeRange:  40 * time.Minute,
 		},
 	}, nil)
-
-	require.NoError(t, err)
+	require.Empty(t, errs)
 
 	var newPnts []Point
 	for _, pnt := range data[:4] {
@@ -451,7 +450,7 @@ func TestThresholdProcessor_AlertMergedServices(t *testing.T) {
 	threshProc := NewThresholdProcessor(store, logs)
 	threshProc.nowFunc = func() time.Time { return now }
 
-	got, err := threshProc.Process(context.Background(), &Rule{
+	got, errs := threshProc.Process(context.Background(), &Rule{
 		ID:      "123",
 		Ingress: "ing@ns",
 		Service: "svc@ns",
@@ -465,8 +464,7 @@ func TestThresholdProcessor_AlertMergedServices(t *testing.T) {
 			TimeRange:  40 * time.Minute,
 		},
 	}, nil)
-
-	require.NoError(t, err)
+	require.Empty(t, errs)
 
 	logBytes, err := compress([]byte("fake logs"))
 	require.NoError(t, err)
@@ -513,17 +511,17 @@ type mockThresholdStore struct {
 	group metrics.DataPointGroup
 }
 
-func (t mockThresholdStore) ForEach(table string, fn metrics.ForEachFunc) {
-	fn(table, t.group.Ingress, t.group.Service, t.group.DataPoints)
+func (t mockThresholdStore) ForEach(_ string, fn metrics.ForEachFunc) {
+	fn(t.group.Ingress, t.group.Service, t.group.DataPoints)
 }
 
 type mockMultiThresholdStore struct {
 	groups []metrics.DataPointGroup
 }
 
-func (t mockMultiThresholdStore) ForEach(table string, fn metrics.ForEachFunc) {
+func (t mockMultiThresholdStore) ForEach(_ string, fn metrics.ForEachFunc) {
 	for _, group := range t.groups {
-		fn(table, group.Ingress, group.Service, group.DataPoints)
+		fn(group.Ingress, group.Service, group.DataPoints)
 	}
 }
 

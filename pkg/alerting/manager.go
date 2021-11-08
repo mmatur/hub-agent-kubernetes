@@ -11,7 +11,7 @@ import (
 
 // Processor represents a rule processor.
 type Processor interface {
-	Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, error)
+	Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, []error)
 }
 
 // Manager manages rule synchronization and scheduling.
@@ -118,8 +118,8 @@ func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
 					continue
 				}
 
-				newAlerts, err := proc.Process(ctx, &rule, m.svcAnnotations)
-				if err != nil {
+				newAlerts, errs := proc.Process(ctx, &rule, m.svcAnnotations)
+				for _, err := range errs {
 					log.Error().Err(err).Str("ruleID", rule.ID).Msg("Unable to process the rule")
 				}
 				if newAlerts == nil {

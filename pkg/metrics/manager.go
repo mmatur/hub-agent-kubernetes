@@ -137,12 +137,11 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	for _, name := range tbls {
 		tbl := name
 
-		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(ic, ingr, svc string, pnts DataPoints) {
+		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(ingr, svc string, pnts DataPoints) {
 			toSend[tbl] = append(toSend[tbl], DataPointGroup{
-				IngressController: ic,
-				Ingress:           ingr,
-				Service:           svc,
-				DataPoints:        pnts,
+				Ingress:    ingr,
+				Service:    svc,
+				DataPoints: pnts,
 			})
 		})
 	}
@@ -165,11 +164,10 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 
 func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-chan struct{}) {
 	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
-		Ingresses:            m.getIngresses(),
-		IngressRoutes:        m.getIngressRoutes(),
-		ServiceIngresses:     m.getSvcIngresses(),
-		ServiceIngressRoutes: m.getSvcIngressRoutes(),
-		TraefikServiceNames:  m.getTraefikServiceNames(),
+		Ingresses:           m.getIngresses(),
+		IngressRoutes:       m.getIngressRoutes(),
+		ServiceIngresses:    m.getSvcIngresses(),
+		TraefikServiceNames: m.getTraefikServiceNames(),
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to scrape metrics")
@@ -189,11 +187,10 @@ func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-
 
 		case <-tick.C:
 			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
-				Ingresses:            m.getIngresses(),
-				IngressRoutes:        m.getIngressRoutes(),
-				ServiceIngresses:     m.getSvcIngresses(),
-				ServiceIngressRoutes: m.getSvcIngressRoutes(),
-				TraefikServiceNames:  m.getTraefikServiceNames(),
+				Ingresses:           m.getIngresses(),
+				IngressRoutes:       m.getIngressRoutes(),
+				ServiceIngresses:    m.getSvcIngresses(),
+				TraefikServiceNames: m.getTraefikServiceNames(),
 			})
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to scrape metrics")
@@ -215,7 +212,7 @@ func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-
 				pnts[key] = pnt
 			}
 
-			m.store.Insert(name, pnts)
+			m.store.Insert(pnts)
 
 			ref = mtrcSet
 		}
@@ -235,21 +232,6 @@ func (m *Manager) getSvcIngresses() map[string][]string {
 	}
 
 	return svcIngresses
-}
-
-func (m *Manager) getSvcIngressRoutes() map[string][]string {
-	cluster := m.state.Load().(*state.Cluster)
-
-	svcIngressRoute := map[string][]string{}
-	for ingrRouteName, ingr := range cluster.IngressRoutes {
-		for _, svc := range ingr.Services {
-			ingrs := svcIngressRoute[svc]
-			ingrs = append(ingrs, ingrRouteName)
-			svcIngressRoute[svc] = ingrs
-		}
-	}
-
-	return svcIngressRoute
 }
 
 func (m *Manager) getTraefikServiceNames() map[string]string {

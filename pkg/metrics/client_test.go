@@ -14,20 +14,19 @@ import (
 )
 
 func TestClient_GetPreviousData(t *testing.T) {
-	schema, err := avro.Parse(protocol.MetricsV1Schema)
+	schema, err := avro.Parse(protocol.MetricsV2Schema)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/data", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
-		assert.Equal(t, "avro/binary;v1", r.Header.Get("Accept"))
+		assert.Equal(t, "avro/binary;v2", r.Header.Get("Accept"))
 
 		data := map[string][]metrics.DataPointGroup{
 			"1m": {
 				{
-					IngressController: "foo",
-					Ingress:           "bar",
-					Service:           "baz",
+					Ingress: "bar",
+					Service: "baz",
 					DataPoints: []metrics.DataPoint{
 						{
 							Timestamp: 21,
@@ -52,9 +51,8 @@ func TestClient_GetPreviousData(t *testing.T) {
 	want := map[string][]metrics.DataPointGroup{
 		"1m": {
 			{
-				IngressController: "foo",
-				Ingress:           "bar",
-				Service:           "baz",
+				Ingress: "bar",
+				Service: "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,
@@ -83,15 +81,14 @@ func TestClient_GetPreviousDataHandlesHTTPError(t *testing.T) {
 }
 
 func TestClient_Send(t *testing.T) {
-	schema, err := avro.Parse(protocol.MetricsV1Schema)
+	schema, err := avro.Parse(protocol.MetricsV2Schema)
 	require.NoError(t, err)
 
 	data := map[string][]metrics.DataPointGroup{
 		"1m": {
 			{
-				IngressController: "foo",
-				Ingress:           "bar",
-				Service:           "baz",
+				Ingress: "bar",
+				Service: "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,
@@ -104,7 +101,7 @@ func TestClient_Send(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/metrics", r.URL.Path)
 		assert.Equal(t, "Bearer some_test_token", r.Header.Get("Authorization"))
-		assert.Equal(t, "avro/binary;v1", r.Header.Get("Content-Type"))
+		assert.Equal(t, "avro/binary;v2", r.Header.Get("Content-Type"))
 
 		got := map[string][]metrics.DataPointGroup{}
 		err = avro.NewDecoderForSchema(schema, r.Body).Decode(&got)
@@ -129,9 +126,8 @@ func TestClient_SendHandlesHTTPError(t *testing.T) {
 	data := map[string][]metrics.DataPointGroup{
 		"1m": {
 			{
-				IngressController: "foo",
-				Ingress:           "bar",
-				Service:           "baz",
+				Ingress: "bar",
+				Service: "baz",
 				DataPoints: []metrics.DataPoint{
 					{
 						Timestamp: 21,

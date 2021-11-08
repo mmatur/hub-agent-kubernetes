@@ -30,7 +30,7 @@ func NewClient(client *http.Client, baseURL, token string) (*Client, error) {
 		return nil, fmt.Errorf("invalid metrics client url: %w", err)
 	}
 
-	metricsSchema, err := avro.Parse(protocol.MetricsV1Schema)
+	metricsSchema, err := avro.Parse(protocol.MetricsV2Schema)
 	if err != nil {
 		return nil, fmt.Errorf("invalid metrics schema: %w", err)
 	}
@@ -56,7 +56,7 @@ func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string]
 	}
 
 	c.setAuthHeader(req)
-	req.Header.Set("Accept", "avro/binary;v1")
+	req.Header.Set("Accept", "avro/binary;v2")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -98,7 +98,7 @@ func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) err
 	}
 
 	c.setAuthHeader(req)
-	req.Header.Set("Content-Type", "avro/binary;v1")
+	req.Header.Set("Content-Type", "avro/binary;v2")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

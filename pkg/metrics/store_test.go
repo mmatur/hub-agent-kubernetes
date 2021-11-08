@@ -34,10 +34,9 @@ func TestStore_PopulateAndForEach(t *testing.T) {
 
 	err := store.Populate("1m", []DataPointGroup{
 		{
-			IngressController: "foo",
-			Ingress:           "bar",
-			Service:           "baz",
-			DataPoints:        pnts,
+			Ingress:    "bar",
+			Service:    "baz",
+			DataPoints: pnts,
 		},
 	})
 
@@ -57,12 +56,12 @@ func TestStore_Insert(t *testing.T) {
 
 	store := NewStore()
 
-	store.Insert("foo", map[SetKey]DataPoint{
+	store.Insert(map[SetKey]DataPoint{
 		{Ingress: "foo", Service: "bar"}: datapoint,
 	})
 
 	var got []DataPoint
-	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ingr, svc string, pnts DataPoints) {
 		got = append(got, pnts...)
 	})
 
@@ -83,32 +82,30 @@ func TestStore_RollUp(t *testing.T) {
 
 	_ = store.Populate("1m", []DataPointGroup{
 		{
-			IngressController: "foo",
-			Ingress:           "bar",
-			Service:           "baz",
-			DataPoints:        genDataPoints(t, now, numPnts, time.Minute),
+			Ingress:    "bar",
+			Service:    "baz",
+			DataPoints: genDataPoints(t, now, numPnts, time.Minute),
 		},
 	})
 	_ = store.Populate("10m", []DataPointGroup{
 		{
-			IngressController: "foo",
-			Ingress:           "bar",
-			Service:           "baz",
-			DataPoints:        genDataPoints(t, now, 10, 10*time.Minute),
+			Ingress:    "bar",
+			Service:    "baz",
+			DataPoints: genDataPoints(t, now, 10, 10*time.Minute),
 		},
 	})
 
 	store.RollUp()
 
-	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, numPnts)
 	})
 
-	store.ForEach("10m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("10m", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 11)
 	})
 
-	store.ForEach("1h", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1h", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 2)
 	})
 }
@@ -125,28 +122,26 @@ func TestStore_Cleanup(t *testing.T) {
 
 	_ = store.Populate("1m", []DataPointGroup{
 		{
-			IngressController: "foo",
-			Ingress:           "bar",
-			Service:           "baz",
-			DataPoints:        genDataPoints(t, now, numPnts, time.Minute),
+			Ingress:    "bar",
+			Service:    "baz",
+			DataPoints: genDataPoints(t, now, numPnts, time.Minute),
 		},
 	})
 	_ = store.Populate("10m", []DataPointGroup{
 		{
-			IngressController: "foo",
-			Ingress:           "bar",
-			Service:           "baz",
-			DataPoints:        genDataPoints(t, now, 10, 10*time.Minute),
+			Ingress:    "bar",
+			Service:    "baz",
+			DataPoints: genDataPoints(t, now, 10, 10*time.Minute),
 		},
 	})
 
 	store.Cleanup()
 
-	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 10)
 	})
 
-	store.ForEach("10m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("10m", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 6)
 	})
 }
@@ -161,14 +156,14 @@ func TestStore_CleanupDoesntRemoveUnmarked(t *testing.T) {
 
 	pnts := genDataPoints(t, now, 103, time.Minute)
 	for _, pnt := range pnts {
-		store.Insert("foo", map[SetKey]DataPoint{
+		store.Insert(map[SetKey]DataPoint{
 			{Ingress: "foo", Service: "bar"}: pnt,
 		})
 	}
 
 	store.Cleanup()
 
-	store.ForEach("1m", func(ic, ingr, svc string, pnts DataPoints) {
+	store.ForEach("1m", func(ingr, svc string, pnts DataPoints) {
 		assert.Len(t, pnts, 103)
 	})
 }

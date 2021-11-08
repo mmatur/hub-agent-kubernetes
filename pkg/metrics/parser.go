@@ -32,13 +32,7 @@ func (p NginxParser) Parse(m *dto.MetricFamily, _ ScrapeState) []Metric {
 				continue
 			}
 
-			// Add the ingress metric.
-			ingrHist := *hist
-			ingrHist.Name = MetricRequestDuration
-			ingrHist.Ingress = ingress
-			metrics = append(metrics, &ingrHist)
-
-			// Add the service metric.
+			// Add the service through the ingress metric.
 			svcHist := *hist
 			svcHist.Name = MetricRequestDuration
 			svcHist.Ingress = ingress
@@ -48,8 +42,8 @@ func (p NginxParser) Parse(m *dto.MetricFamily, _ ScrapeState) []Metric {
 
 	case "nginx_ingress_controller_requests":
 		for _, mtrc := range m.Metric {
-			reqs := CounterFromMetric(mtrc)
-			if reqs == nil {
+			counter := CounterFromMetric(mtrc)
+			if counter == 0 {
 				continue
 			}
 
@@ -58,20 +52,25 @@ func (p NginxParser) Parse(m *dto.MetricFamily, _ ScrapeState) []Metric {
 				continue
 			}
 
-			// Add the ingress metric.
-			ingrReqs := *reqs
-			ingrReqs.Name = MetricRequests
-			ingrReqs.Ingress = ingress
-			metrics = append(metrics, &ingrReqs)
-			metrics = append(metrics, getErrorMetric(&ingrReqs, mtrc.Label, "status")...)
+			// Add the service through the ingress metric.
+			metrics = append(metrics, &Counter{
+				Name:    MetricRequests,
+				Ingress: ingress,
+				Service: service,
+				Value:   counter,
+			})
 
-			// Add the service metric.
-			svcReqs := *reqs
-			svcReqs.Name = MetricRequests
-			svcReqs.Ingress = ingress
-			svcReqs.Service = service
-			metrics = append(metrics, &svcReqs)
-			metrics = append(metrics, getErrorMetric(&svcReqs, mtrc.Label, "status")...)
+			metricErrorName := getMetricErrorName(mtrc.Label, "status")
+			if metricErrorName == "" {
+				continue
+			}
+
+			metrics = append(metrics, &Counter{
+				Name:    metricErrorName,
+				Ingress: ingress,
+				Service: service,
+				Value:   counter,
+			})
 		}
 	}
 
@@ -125,151 +124,134 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 	return metrics
 }
 
-func (p TraefikParser) parseServiceRequestDuration(metric []*dto.Metric, state ScrapeState) []Metric {
-	var metrics []Metric
+func (p TraefikParser) parseServiceRequestDuration(metrics []*dto.Metric, state ScrapeState) []Metric {
+	var enrichedMetrics []Metric
 
-	for _, mtrc := range metric {
-		hist := HistogramFromMetric(mtrc)
+	for _, metric := range metrics {
+		hist := HistogramFromMetric(metric)
 		if hist == nil {
 			continue
 		}
 
-		svc, ingresses := p.guessService(mtrc.Label, state)
-		if svc == "" || len(ingresses) == 0 {
+		// Service metrics doesn't hold information about the ingress it went through.
+		svc := p.guessService(metric.Label, state)
+		if svc == "" {
 			continue
 		}
+		hist.Name = MetricRequestDuration
+		hist.Service = svc
 
-		metrics = append(metrics, getRequestDurationMetrics(hist, svc, ingresses)...)
+		enrichedMetrics = append(enrichedMetrics, hist)
 	}
 
-	return metrics
+	return enrichedMetrics
 }
 
-func (p TraefikParser) parseServiceRequestTotal(metric []*dto.Metric, state ScrapeState) []Metric {
-	var metrics []Metric
+func (p TraefikParser) parseServiceRequestTotal(metrics []*dto.Metric, state ScrapeState) []Metric {
+	var enrichedMetrics []Metric
 
-	for _, mtrc := range metric {
-		reqs := CounterFromMetric(mtrc)
-		if reqs == nil {
+	for _, metric := range metrics {
+		counter := CounterFromMetric(metric)
+		if counter == 0 {
 			continue
 		}
 
-		svc, ingresses := p.guessService(mtrc.Label, state)
-		if svc == "" || len(ingresses) == 0 {
+		svc := p.guessService(metric.Label, state)
+		if svc == "" {
 			continue
 		}
 
-		metrics = append(metrics, getRequestMetrics(reqs, svc, ingresses, mtrc.Label)...)
+		// Service metrics doesn't hold information about the ingress it went through.
+		enrichedMetrics = append(enrichedMetrics, &Counter{
+			Name:    MetricRequests,
+			Service: svc,
+			Value:   counter,
+		})
+
+		metricErrorName := getMetricErrorName(metric.Label, "code")
+		if metricErrorName == "" {
+			continue
+		}
+		enrichedMetrics = append(enrichedMetrics, &Counter{
+			Name:    metricErrorName,
+			Service: svc,
+			Value:   counter,
+		})
 	}
 
-	return metrics
+	return enrichedMetrics
 }
 
-func (p TraefikParser) parseRouterRequestDuration(metric []*dto.Metric, state ScrapeState) []Metric {
-	var metrics []Metric
+func (p TraefikParser) parseRouterRequestDuration(metrics []*dto.Metric, state ScrapeState) []Metric {
+	var enrichedMetrics []Metric
 
-	for _, mtrc := range metric {
-		hist := HistogramFromMetric(mtrc)
+	for _, metric := range metrics {
+		hist := HistogramFromMetric(metric)
 		if hist == nil {
 			continue
 		}
 
-		ingress := p.guessIngress(mtrc.Label, state)
+		ingress := p.guessIngress(metric.Label, state)
 		if ingress == "" {
 			continue
 		}
 
+		// Service can't be accurately obtained on router metrics. The service label holds the service name to which the
+		// router will deliver the traffic, not the leaf node of the service tree (e.g. load-balancer, wrr).
 		hist.Name = MetricRequestDuration
 		hist.Ingress = ingress
 
-		metrics = append(metrics, hist)
+		enrichedMetrics = append(enrichedMetrics, hist)
 	}
 
-	return metrics
+	return enrichedMetrics
 }
 
-func (p TraefikParser) parseRouterRequestTotal(metric []*dto.Metric, state ScrapeState) []Metric {
-	var metrics []Metric
+func (p TraefikParser) parseRouterRequestTotal(metrics []*dto.Metric, state ScrapeState) []Metric {
+	var enrichedMetrics []Metric
 
-	for _, mtrc := range metric {
-		reqs := CounterFromMetric(mtrc)
-		if reqs == nil {
+	for _, metric := range metrics {
+		counter := CounterFromMetric(metric)
+		if counter == 0 {
 			continue
 		}
 
-		ingress := p.guessIngress(mtrc.Label, state)
+		ingress := p.guessIngress(metric.Label, state)
 		if ingress == "" {
 			continue
 		}
 
-		reqs.Name = MetricRequests
-		reqs.Ingress = ingress
+		// Service can't be accurately obtained on router metrics. The service label holds the service name to which the
+		// router will deliver the traffic, not the leaf node of the service tree (e.g. load-balancer, wrr).
+		enrichedMetrics = append(enrichedMetrics, &Counter{
+			Name:    MetricRequests,
+			Ingress: ingress,
+			Value:   counter,
+		})
 
-		metrics = append(metrics, reqs)
+		metricErrorName := getMetricErrorName(metric.Label, "code")
+		if metricErrorName == "" {
+			continue
+		}
+		enrichedMetrics = append(enrichedMetrics, &Counter{
+			Name:    metricErrorName,
+			Ingress: ingress,
+			Value:   counter,
+		})
 	}
 
-	return metrics
+	return enrichedMetrics
 }
 
-func (p TraefikParser) guessService(lbls []*dto.LabelPair, state ScrapeState) (service string, ingresses []string) {
+func (p TraefikParser) guessService(lbls []*dto.LabelPair, state ScrapeState) string {
 	name := getLabel(lbls, "service")
 
 	parts := strings.SplitN(name, "@", 2)
 	if len(parts) != 2 {
-		return "", nil
-	}
-	name, typ := parts[0], parts[1]
-
-	if typ == "kubernetes" {
-		svcName, hasSvc := state.TraefikServiceNames[name]
-		if !hasSvc {
-			return "", nil
-		}
-
-		ingrs, hasIngrs := state.ServiceIngresses[svcName]
-		if !hasIngrs {
-			return "", nil
-		}
-
-		return svcName, ingrs
+		return ""
 	}
 
-	if svcName, hasSvc := state.TraefikServiceNames[name]; hasSvc {
-		routes, hasRoutes := state.ServiceIngressRoutes[svcName]
-		if !hasRoutes {
-			return "", nil
-		}
-
-		return svcName, routes
-	}
-
-	return p.guessIngressRoute(name, state.ServiceIngressRoutes)
-}
-
-func (p TraefikParser) guessIngressRoute(name string, svcs map[string][]string) (service string, ingresses []string) {
-	if ingrs, ok := p.cache[name]; ok {
-		svc := ingrs[0]
-		return svc, ingrs[1:]
-	}
-
-	for svc, ingrs := range svcs {
-		for _, ingr := range ingrs {
-			parts := strings.SplitN(ingr, "@", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			// Remove the `.kind.group` from the namespace.
-			parts[1] = strings.SplitN(parts[1], ".", 2)[0]
-
-			guess := parts[1] + "-" + parts[0] + "-"
-			if strings.HasPrefix(name, guess) {
-				p.cache[name] = append([]string{svc}, ingr)
-
-				return svc, []string{ingr}
-			}
-		}
-	}
-	return "", nil
+	return state.TraefikServiceNames[parts[0]]
 }
 
 func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (ingress string) {
@@ -311,13 +293,13 @@ func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (i
 
 // HAProxyParser parses HAProxy metrics into a common form.
 type HAProxyParser struct {
-	cache map[string][]string
+	cache map[string]string
 }
 
 // NewHAProxyParser returns an HAProxy metrics parser.
 func NewHAProxyParser() HAProxyParser {
 	return HAProxyParser{
-		cache: map[string][]string{},
+		cache: map[string]string{},
 	}
 }
 
@@ -336,47 +318,65 @@ func (p HAProxyParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, state)
-			if svc == "" || len(ingresses) == 0 {
+			svc := p.guessService(mtrc.Label, state)
+			if svc == "" {
 				continue
 			}
 
+			// This metric doesn't hold information about the ingress it went through.
 			hist := &Histogram{}
 			hist.Relative = true
 			hist.Count = 1024
 			hist.Sum = mtrc.Gauge.GetValue() * 1024
+			hist.Name = MetricRequestDuration
+			hist.Service = svc
 
-			metrics = append(metrics, getRequestDurationMetrics(hist, svc, ingresses)...)
+			metrics = append(metrics, hist)
 		}
 
 	case "haproxy_backend_http_responses_total":
 		for _, mtrc := range m.Metric {
-			reqs := CounterFromMetric(mtrc)
-			if reqs == nil {
+			counter := CounterFromMetric(mtrc)
+			if counter == 0 {
 				continue
 			}
 
-			svc, ingresses := p.guessService(mtrc.Label, state)
-			if svc == "" || len(ingresses) == 0 {
+			svc := p.guessService(mtrc.Label, state)
+			if svc == "" {
 				continue
 			}
 
-			metrics = append(metrics, getRequestMetrics(reqs, svc, ingresses, mtrc.Label)...)
+			// This metric doesn't hold information about the ingress it went through.
+			metrics = append(metrics, &Counter{
+				Name:    MetricRequests,
+				Service: svc,
+				Value:   counter,
+			})
+
+			metricErrorName := getMetricErrorName(mtrc.Label, "code")
+			if metricErrorName == "" {
+				continue
+			}
+
+			metrics = append(metrics, &Counter{
+				Name:    metricErrorName,
+				Service: svc,
+				Value:   counter,
+			})
 		}
 	}
 
 	return metrics
 }
 
-func (p HAProxyParser) guessService(lbls []*dto.LabelPair, state ScrapeState) (service string, ingresses []string) {
+func (p HAProxyParser) guessService(lbls []*dto.LabelPair, state ScrapeState) string {
 	name := getLabel(lbls, "proxy")
 
-	if ingrs, ok := p.cache[name]; ok {
-		svc := ingrs[0]
-		return svc, ingrs[1:]
+	if svc, ok := p.cache[name]; ok {
+		return svc
 	}
 
-	for svc, ingrs := range state.ServiceIngresses {
+	for svc := range state.ServiceIngresses {
 		parts := strings.SplitN(svc, "@", 2)
 		if len(parts) != 2 {
 			continue
@@ -385,65 +385,30 @@ func (p HAProxyParser) guessService(lbls []*dto.LabelPair, state ScrapeState) (s
 		for _, sep := range []string{"_", "-"} {
 			guess := parts[1] + sep + parts[0] + sep
 			if strings.HasPrefix(name, guess) {
-				p.cache[name] = append([]string{svc}, ingrs...)
+				p.cache[name] = svc
 
-				return svc, ingrs
+				return svc
 			}
 		}
 	}
 
-	return "", nil
+	return ""
 }
 
-func getRequestDurationMetrics(h *Histogram, svc string, ingresses []string) []Metric {
-	h.Name = MetricRequestDuration
-
-	metrics := make([]Metric, 0, len(ingresses))
-	for _, ingr := range ingresses {
-		hist := *h
-		hist.Ingress = ingr
-		hist.Service = svc
-
-		metrics = append(metrics, &hist)
-	}
-
-	return metrics
-}
-
-func getRequestMetrics(c *Counter, svc string, ingresses []string, lbls []*dto.LabelPair) []Metric {
-	c.Name = MetricRequests
-
-	metrics := make([]Metric, 0, len(ingresses))
-	for _, ingr := range ingresses {
-		reqs := *c
-		reqs.Ingress = ingr
-		reqs.Service = svc
-
-		metrics = append(metrics, &reqs)
-		metrics = append(metrics, getErrorMetric(&reqs, lbls, "code")...)
-	}
-
-	return metrics
-}
-
-func getErrorMetric(c *Counter, lbls []*dto.LabelPair, statusName string) []Metric {
+func getMetricErrorName(lbls []*dto.LabelPair, statusName string) string {
 	status := getLabel(lbls, statusName)
 	if status == "" {
-		return nil
+		return ""
 	}
 
 	switch status[0] {
 	case '5':
-		reqErrs := *c
-		reqErrs.Name = MetricRequestErrors
-		return []Metric{&reqErrs}
+		return MetricRequestErrors
 	case '4':
-		reqCErrs := *c
-		reqCErrs.Name = MetricRequestClientErrors
-		return []Metric{&reqCErrs}
+		return MetricRequestClientErrors
+	default:
+		return ""
 	}
-
-	return nil
 }
 
 func getLabel(lbls []*dto.LabelPair, name string) string {

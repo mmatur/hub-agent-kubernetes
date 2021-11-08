@@ -44,15 +44,13 @@ type Counter struct {
 
 // CounterFromMetric returns a counter metric from a prometheus
 // metric.
-func CounterFromMetric(m *dto.Metric) *Counter {
+func CounterFromMetric(m *dto.Metric) uint64 {
 	c := m.Counter
-	if c == nil || c.GetValue() == 0 {
-		return nil
+	if c == nil {
+		return 0
 	}
 
-	return &Counter{
-		Value: uint64(c.GetValue()),
-	}
+	return uint64(c.GetValue())
 }
 
 // IngressName returns the metric ingress name.
@@ -101,11 +99,10 @@ func (h Histogram) ServiceName() string {
 
 // ScrapeState contains the state used while scraping.
 type ScrapeState struct {
-	Ingresses            map[string]struct{}
-	IngressRoutes        map[string]struct{}
-	ServiceIngresses     map[string][]string
-	ServiceIngressRoutes map[string][]string
-	TraefikServiceNames  map[string]string
+	Ingresses           map[string]struct{}
+	IngressRoutes       map[string]struct{}
+	ServiceIngresses    map[string][]string
+	TraefikServiceNames map[string]string
 }
 
 // Parser represents a platform-specific metrics parser.

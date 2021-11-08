@@ -45,12 +45,12 @@ func NewThresholdProcessor(t ThresholdStore, logs LogProvider) *ThresholdProcess
 }
 
 // Process processes a threshold rule returning an alert or nil.
-func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, error) {
+func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, []error) {
 	tbl := rule.Threshold.Table()
 	gran := rule.Threshold.Granularity()
 
 	groupSet := map[string][]*metrics.DataPointGroup{}
-	p.store.ForEach(tbl, func(_, ingr, svc string, pnts metrics.DataPoints) {
+	p.store.ForEach(tbl, func(ingr, svc string, pnts metrics.DataPoints) {
 		// current metrics don't match both regular rule and annotation selector.
 		if !(ingr == rule.Ingress && svc == rule.Service) && !matchAnnotation(svc, rule.Annotation, svcAnnotations) {
 			return
@@ -78,6 +78,7 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotat
 
 	minTS := p.nowFunc().UTC().Truncate(gran).Add(-1 * gran).Add(-1 * rule.Threshold.TimeRange).Unix()
 	var alerts []Alert
+	var errs []error
 	for _, group := range groups {
 		var newPnts []Point
 		for _, pnt := range group.DataPoints {
@@ -87,7 +88,7 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotat
 
 			value, err := getValue(rule.Threshold.Metric, pnt)
 			if err != nil {
-				return nil, err
+				errs = append(errs, err)
 			}
 			newPnts = append(newPnts, Point{
 				Timestamp: pnt.Timestamp,
@@ -97,17 +98,17 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotat
 
 		// Not enough points.
 		if len(newPnts) < rule.Threshold.Occurrence {
-			return nil, nil
+			continue
 		}
 
 		count := p.countOccurrences(rule, newPnts)
 		if count < rule.Threshold.Occurrence {
-			return nil, nil
+			continue
 		}
 
 		logs, err := p.getLogs(ctx, group.Service)
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
 		}
 
 		alerts = append(alerts, Alert{
@@ -119,7 +120,8 @@ func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotat
 			Threshold: rule.Threshold,
 		})
 	}
-	return alerts, nil
+
+	return alerts, errs
 }
 
 func mergeGroups(groupSet map[string][]*metrics.DataPointGroup) []*metrics.DataPointGroup {

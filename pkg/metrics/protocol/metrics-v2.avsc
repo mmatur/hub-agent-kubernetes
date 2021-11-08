@@ -8,10 +8,6 @@
       "namespace": "org.traefik.hub",
       "fields": [
         {
-          "name": "ingress_controller",
-          "type": "string"
-        },
-        {
           "name": "ingress",
           "type": "string"
         },
