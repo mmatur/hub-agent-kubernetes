@@ -22,4 +22,6 @@ type IngressRouteExpansion interface{}
 
 type MiddlewareExpansion interface{}
 
+type TLSOptionExpansion interface{}
+
 type TraefikServiceExpansion interface{}

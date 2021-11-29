@@ -12,6 +12,7 @@ import (
 const (
 	ResourceKindIngressRoute   = "IngressRoute"
 	ResourceKindTraefikService = "TraefikService"
+	ResourceKindTLSOption      = "TLSOption"
 )
 
 func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, error) {
@@ -40,6 +41,12 @@ func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, 
 			tls = &IngressRouteTLS{
 				Domains:    ingressRoute.Spec.TLS.Domains,
 				SecretName: ingressRoute.Spec.TLS.SecretName,
+			}
+			if ingressRoute.Spec.TLS.Options != nil {
+				tls.Options = &TLSOptionRef{
+					Name:      ingressRoute.Spec.TLS.Options.Name,
+					Namespace: ingressRoute.Spec.TLS.Options.Namespace,
+				}
 			}
 		}
 

@@ -271,12 +271,9 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			kubeClient.Resources = append(kubeClient.Resources, &metav1.APIResourceList{
 				GroupVersion: traefikv1alpha1.SchemeGroupVersion.String(),
 				APIResources: []metav1.APIResource{
-					{
-						Kind: ResourceKindIngressRoute,
-					},
-					{
-						Kind: ResourceKindTraefikService,
-					},
+					{Kind: ResourceKindIngressRoute},
+					{Kind: ResourceKindTraefikService},
+					{Kind: ResourceKindTLSOption},
 				},
 			})
 

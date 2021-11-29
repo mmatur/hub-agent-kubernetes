@@ -102,11 +102,12 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, hubClientSet h
 
 	hasTraefikCRDs, err := hasTraefikCRDs(clientSet.Discovery())
 	if err != nil {
-		return nil, fmt.Errorf("check presence of Traefik IngressRoute CRD: %w", err)
+		return nil, fmt.Errorf("check presence of Traefik IngressRoute, TraefikService and TLSOption CRD: %w", err)
 	}
 	if hasTraefikCRDs {
 		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
 		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
+		traefikFactory.Traefik().V1alpha1().TLSOptions().Informer()
 	} else {
 		msg := "The agent has been installed in a cluster where the Traefik Proxy CustomResourceDefinitions are not installed. " +
 			"If you want to install these CustomResourceDefinitions and take advantage of them in Traefik Hub, " +
@@ -168,6 +169,11 @@ func (f *Fetcher) FetchState() (*Cluster, error) {
 		return nil, err
 	}
 
+	cluster.TLSOptions, err = f.getTLSOptions()
+	if err != nil {
+		return nil, err
+	}
+
 	cluster.Services, cluster.TraefikServiceNames, err = f.getServices(cluster.Apps)
 	if err != nil {
 		return nil, err
@@ -210,7 +216,7 @@ func hasTraefikCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
 		return false, err
 	}
 
-	for _, kind := range []string{ResourceKindIngressRoute, ResourceKindTraefikService} {
+	for _, kind := range []string{ResourceKindIngressRoute, ResourceKindTraefikService, ResourceKindTLSOption} {
 		var exists bool
 		for _, resource := range crdList.APIResources {
 			if resource.Kind == kind {

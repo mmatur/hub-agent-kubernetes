@@ -17,6 +17,7 @@ type Cluster struct {
 	Services              map[string]*Service
 	IngressControllers    map[string]*IngressController
 	AccessControlPolicies map[string]*AccessControlPolicy
+	TLSOptions            map[string]*TLSOptions
 
 	TraefikServiceNames map[string]string `dir:"-"`
 }
@@ -107,6 +108,13 @@ type IngressRoute struct {
 type IngressRouteTLS struct {
 	Domains    []traefikv1alpha1.Domain `json:"domains,omitempty"`
 	SecretName string                   `json:"secretName,omitempty"`
+	Options    *TLSOptionRef            `json:"options,omitempty"`
+}
+
+// TLSOptionRef references TLSOptions.
+type TLSOptionRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // Route represents a Traefik IngressRoute route.
@@ -161,4 +169,17 @@ type AccessControlPolicyDigestAuth struct {
 	Realm                    string `json:"realm,omitempty"`
 	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
 	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
+}
+
+// TLSOptions holds TLS options.
+type TLSOptions struct {
+	Name                     string                     `json:"name"`
+	Namespace                string                     `json:"namespace"`
+	MinVersion               string                     `json:"minVersion,omitempty"`
+	MaxVersion               string                     `json:"maxVersion,omitempty"`
+	CipherSuites             []string                   `json:"cipherSuites,omitempty"`
+	CurvePreferences         []string                   `json:"curvePreferences,omitempty"`
+	ClientAuth               traefikv1alpha1.ClientAuth `json:"clientAuth"`
+	SniStrict                bool                       `json:"sniStrict"`
+	PreferServerCipherSuites bool                       `json:"preferServerCipherSuites"`
 }
