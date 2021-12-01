@@ -2,563 +2,801 @@ package alerting
 
 import (
 	"context"
-	"math/rand"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent/pkg/metrics"
 )
 
-func TestThresholdProcessor_NoMatchingRule(t *testing.T) {
+func TestThresholdProcessor_Process(t *testing.T) {
 	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	store := mockThresholdStore{
-		group: generateData(t, "ing@ns", "svc@ns", now, 3, 10, 3),
+	serviceLogs := []byte("here are my logs")
+	serviceCompressedLogs := []byte{
+		0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xca, 0x48, 0x2d, 0x4a, 0x55, 0x48,
+		0x2c, 0x4a, 0x55, 0xc8, 0xad, 0x54, 0xc8, 0xc9, 0x4f, 0x2f, 0x06, 0x04, 0x00, 0x00, 0xff, 0xff,
+		0x20, 0x9a, 0x9e, 0x8d, 0x10, 0x00, 0x00, 0x00,
 	}
-	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, err := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc2@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  10 * time.Minute,
-		},
-	}, map[string][]string{
-		"test:foo": {"svc3@ns"},
-	})
-	require.Empty(t, err)
-
-	assert.Nil(t, got)
-}
-
-func TestThresholdProcessor_NotEnoughPoints(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	store := mockThresholdStore{
-		group: generateData(t, "ing@ns", "svc@ns", now, 2, 10, 2),
+	type expected struct {
+		alert      *Alert
+		requireErr require.ErrorAssertionFunc
 	}
-	logs := mockLogProvider{}
 
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, err := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc2@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  10 * time.Minute,
-		},
-	}, nil)
-	require.Empty(t, err)
-
-	assert.Nil(t, got)
-}
-
-func TestThresholdProcessor_NoAlert(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	store := mockThresholdStore{
-		group: generateData(t, "ing@ns", "svc@ns", now, 3, 10, 2),
-	}
-	logs := mockLogProvider{}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, err := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc2@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  10 * time.Minute,
-		},
-	}, nil)
-	require.Empty(t, err)
-
-	assert.Nil(t, got)
-}
-
-func TestThresholdProcessor_NoAlert10Minute(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	data := metrics.DataPoints{
+	tests := []struct {
+		desc     string
+		rule     *Rule
+		on       func(view *mockDataPointsFinder, logs *mockLogProvider)
+		expected expected
+	}{
 		{
-			Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 30, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-	}
-	store := mockThresholdStore{
-		group: metrics.DataPointGroup{
-			Ingress:    "ing",
-			Service:    "svc",
-			DataPoints: data,
-		},
-	}
-	logs := mockLogProvider{}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, err := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  40 * time.Minute,
-		},
-	}, nil)
-
-	require.Empty(t, err)
-	assert.Nil(t, got)
-}
-
-func TestThresholdProcessor_Alert(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	metricsData := generateData(t, "ing@ns", "svc@ns", now, 3, 15, 3)
-	store := mockThresholdStore{
-		group: metricsData,
-	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			assert.Equal(t, "svc", name)
-			assert.Equal(t, "ns", namespace)
-
-			return []byte("fake logs"), nil
-		},
-	}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, errs := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  10 * time.Minute,
-		},
-	}, nil)
-	require.Empty(t, errs)
-
-	newPnts := make([]Point, len(metricsData.DataPoints))
-	for i, pnt := range metricsData.DataPoints {
-		newPnts[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
-	}
-	logBytes, err := compress([]byte("fake logs"))
-	require.NoError(t, err)
-
-	want := []Alert{
-		{
-			RuleID:  "123",
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			Points:  newPnts,
-			Logs:    logBytes,
-			Threshold: &Threshold{
-				Metric: "requestsPerSecond",
-				Condition: ThresholdCondition{
-					Above: true,
-					Value: 10,
-				},
-				Occurrence: 3,
-				TimeRange:  10 * time.Minute,
-			},
-		},
-	}
-	assert.Equal(t, want, got)
-}
-
-func TestThresholdProcessor_AlertWithAnnotation(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	metricsData := generateData(t, "ing@ns", "svc@ns", now, 3, 15, 3)
-	metricsData2 := generateData(t, "ing2@ns", "svc2@ns", now, 3, 15, 3)
-	store := mockMultiThresholdStore{
-		groups: []metrics.DataPointGroup{
-			metricsData,
-			metricsData2,
-		},
-	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			return []byte("fake logs"), nil
-		},
-	}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, errs := threshProc.Process(context.Background(), &Rule{
-		ID:         "123",
-		Ingress:    "",
-		Service:    "",
-		Annotation: "test:foo",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  10 * time.Minute,
-		},
-	}, map[string][]string{
-		"test:foo": {"svc@ns", "svc2@ns"},
-	})
-	require.Empty(t, errs)
-
-	newPnts := make([]Point, len(metricsData.DataPoints))
-	for i, pnt := range metricsData.DataPoints {
-		newPnts[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
-	}
-	newPnts2 := make([]Point, len(metricsData2.DataPoints))
-	for i, pnt := range metricsData2.DataPoints {
-		newPnts2[i] = Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS}
-	}
-	logBytes, err := compress([]byte("fake logs"))
-	require.NoError(t, err)
-
-	want := []Alert{
-		{
-			RuleID:  "123",
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			Points:  newPnts,
-			Logs:    logBytes,
-			Threshold: &Threshold{
-				Metric: "requestsPerSecond",
-				Condition: ThresholdCondition{
-					Above: true,
-					Value: 10,
-				},
-				Occurrence: 3,
-				TimeRange:  10 * time.Minute,
-			},
-		},
-		{
-			RuleID:  "123",
-			Ingress: "ing2@ns",
-			Service: "svc2@ns",
-			Points:  newPnts2,
-			Logs:    logBytes,
-			Threshold: &Threshold{
-				Metric: "requestsPerSecond",
-				Condition: ThresholdCondition{
-					Above: true,
-					Value: 10,
-				},
-				Occurrence: 3,
-				TimeRange:  10 * time.Minute,
-			},
-		},
-	}
-	assert.ElementsMatch(t, want, got)
-}
-
-func TestThresholdProcessor_Alert10Minute(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	data := metrics.DataPoints{
-		{
-			Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.78,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 30, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.78,
-		},
-	}
-	store := mockThresholdStore{
-		group: metrics.DataPointGroup{
-			Ingress:    "ing@ns",
-			Service:    "svc@ns",
-			DataPoints: data,
-		},
-	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			assert.Equal(t, "svc", name)
-			assert.Equal(t, "ns", namespace)
-
-			return []byte("fake logs"), nil
-		},
-	}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, errs := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 10,
-			},
-			Occurrence: 3,
-			TimeRange:  40 * time.Minute,
-		},
-	}, nil)
-	require.Empty(t, errs)
-
-	var newPnts []Point
-	for _, pnt := range data[:4] {
-		newPnts = append(newPnts, Point{Timestamp: pnt.Timestamp, Value: pnt.ReqPerS})
-	}
-	logBytes, err := compress([]byte("fake logs"))
-	require.NoError(t, err)
-
-	want := []Alert{
-		{
-			RuleID:  "123",
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			Points:  newPnts,
-			Logs:    logBytes,
-			Threshold: &Threshold{
-				Metric: "requestsPerSecond",
-				Condition: ThresholdCondition{
-					Above: true,
-					Value: 10,
-				},
-				Occurrence: 3,
-				TimeRange:  40 * time.Minute,
-			},
-		},
-	}
-	assert.Equal(t, want, got)
-}
-
-func TestThresholdProcessor_AlertMergedServices(t *testing.T) {
-	now := time.Date(2021, 1, 1, 8, 21, 43, 0, time.UTC)
-	data := metrics.DataPoints{
-		{
-			Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.77,
-			Seconds:   60,
-			Requests:  947,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.77,
-			Seconds:   60,
-			Requests:  587,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.77,
-			Seconds:   60,
-			Requests:  947,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
-			ReqPerS:   15.77,
-			Seconds:   60,
-			Requests:  947,
-		},
-		{
-			Timestamp: time.Date(2021, 1, 1, 7, 30, 0, 0, time.UTC).Unix(),
-			ReqPerS:   9.78,
-			Seconds:   60,
-			Requests:  587,
-		},
-	}
-	store := mockMultiThresholdStore{
-		groups: []metrics.DataPointGroup{
-			{
-				Ingress:    "ing@ns",
-				Service:    "svc@ns",
-				DataPoints: data,
-			},
-			{
-				Ingress:    "ing@ns",
-				Service:    "svc@ns",
-				DataPoints: data,
-			},
-		},
-	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			assert.Equal(t, "svc", name)
-			assert.Equal(t, "ns", namespace)
-
-			return []byte("fake logs"), nil
-		},
-	}
-
-	threshProc := NewThresholdProcessor(store, logs)
-	threshProc.nowFunc = func() time.Time { return now }
-
-	got, errs := threshProc.Process(context.Background(), &Rule{
-		ID:      "123",
-		Ingress: "ing@ns",
-		Service: "svc@ns",
-		Threshold: &Threshold{
-			Metric: "requestsPerSecond",
-			Condition: ThresholdCondition{
-				Above: true,
-				Value: 30,
-			},
-			Occurrence: 3,
-			TimeRange:  40 * time.Minute,
-		},
-	}, nil)
-	require.Empty(t, errs)
-
-	logBytes, err := compress([]byte("fake logs"))
-	require.NoError(t, err)
-
-	want := []Alert{
-		{
-			RuleID:  "123",
-			Ingress: "ing@ns",
-			Service: "svc@ns",
-			Points: []Point{
-				{
-					Timestamp: time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC).Unix(),
-					Value:     31.566666666666666,
-				},
-				{
-					Timestamp: time.Date(2021, 1, 1, 8, 0, 0, 0, time.UTC).Unix(),
-					Value:     19.566666666666666,
-				},
-				{
-					Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(),
-					Value:     31.566666666666666,
-				},
-				{
-					Timestamp: time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC).Unix(),
-					Value:     31.566666666666666,
+			desc: "No alert: Rule with no service and ingress",
+			rule: &Rule{
+				ID: "rule-1",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
 				},
 			},
-			Logs: logBytes,
-			Threshold: &Threshold{
-				Metric: "requestsPerSecond",
-				Condition: ThresholdCondition{
-					Above: true,
-					Value: 30,
+			expected: expected{requireErr: require.Error},
+		},
+		{
+			desc: "Alert: Rule with service needs 1 occurrence: rule matches 1 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
 				},
-				Occurrence: 3,
-				TimeRange:  40 * time.Minute,
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return(serviceLogs, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 80},
+					},
+					Logs: serviceCompressedLogs,
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with service needs 1 occurrence: rule matches 2 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 101},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return(serviceLogs, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 101},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 110},
+					},
+					Logs: serviceCompressedLogs,
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "No Alert: Rule with service: rule matches 0 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+			},
+		},
+		{
+			desc: "Alert: Rule with service needs 2 occurrences: rule matches 2 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 2,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 101},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return(serviceLogs, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 101},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 110},
+					},
+					Logs: serviceCompressedLogs,
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 2,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "No Alert: Rule with service needs 2 occurrences: rule matches 1 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 2,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 110},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+			},
+		},
+		{
+			desc: "Alert: Rule with service needs 1 occurrences (below): rule matches 1 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: false, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 110},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return(serviceLogs, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 110},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 80},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 110},
+					},
+					Logs: serviceCompressedLogs,
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: false, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "No Alert: Rule with service needs 2 occurrences (below): rule matches 1 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: false, Value: 100},
+					Occurrence: 2,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 110},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+			},
+		},
+		{
+			desc: "Alert: Rule with service needs 2 occurrences (below): rule matches 2 data point",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: false, Value: 100},
+					Occurrence: 2,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 0},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return(serviceLogs, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 0},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 80},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 110},
+					},
+					Logs: serviceCompressedLogs,
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: false, Value: 100},
+						Occurrence: 2,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with service but unable to get logs",
+			rule: &Rule{
+				ID:      "rule-1",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: false, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByService", "1m", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 110},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return([]byte{}, errors.New("boom")).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 110},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 80},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: false, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with ingress",
+			rule: &Rule{
+				ID:      "rule-1",
+				Ingress: "ingress-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByIngress", "1m", "ingress-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "ingress-1@myns",
+					Service: "",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 80},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with service and ingress",
+			rule: &Rule{
+				ID:      "rule-1",
+				Ingress: "ingress-1@myns",
+				Service: "service-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  5 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByIngressAndService", "1m", "ingress-1@myns", "service-1@myns",
+						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+
+				logs.
+					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
+					Return([]byte{}, errors.New("boom")).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "ingress-1@myns",
+					Service: "service-1@myns",
+					Points: []Point{
+						{Timestamp: now.Add(-4 * time.Minute).Unix(), Value: 90},
+						{Timestamp: now.Add(-3 * time.Minute).Unix(), Value: 120},
+						{Timestamp: now.Add(-2 * time.Minute).Unix(), Value: 80},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  5 * time.Minute,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with threshold time range > 24h: use 1d table and 24h granularity",
+			rule: &Rule{
+				ID:      "rule-1",
+				Ingress: "ingress-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  48 * time.Hour,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByIngress", "1d", "ingress-1@myns",
+						time.Date(2020, 12, 29, 0, 0, 0, 0, time.UTC),
+						time.Date(2020, 12, 31, 0, 0, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: time.Date(2020, 12, 30, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 90},
+						{Timestamp: time.Date(2020, 12, 31, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 120},
+						{Timestamp: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 80},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "ingress-1@myns",
+					Service: "",
+					Points: []Point{
+						{Timestamp: time.Date(2020, 12, 30, 0, 0, 0, 0, time.UTC).Unix(), Value: 90},
+						{Timestamp: time.Date(2020, 12, 31, 0, 0, 0, 0, time.UTC).Unix(), Value: 120},
+						{Timestamp: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Unix(), Value: 80},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  48 * time.Hour,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with threshold time range > 1h: use 1h table and 1h granularity",
+			rule: &Rule{
+				ID:      "rule-1",
+				Ingress: "ingress-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  10 * time.Hour,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByIngress", "1h", "ingress-1@myns",
+						time.Date(2020, 12, 31, 21, 0, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 7, 0, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: time.Date(2021, 1, 1, 2, 0, 0, 0, time.UTC).Unix(), ReqPerS: 120},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "ingress-1@myns",
+					Service: "",
+					Points: []Point{
+						{Timestamp: time.Date(2021, 1, 1, 2, 0, 0, 0, time.UTC).Unix(), Value: 120},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  10 * time.Hour,
+					},
+				},
+			},
+		},
+		{
+			desc: "Alert: Rule with threshold time range > 10m: use 10m table and 10m granularity",
+			rule: &Rule{
+				ID:      "rule-1",
+				Ingress: "ingress-1@myns",
+				Threshold: &Threshold{
+					Metric:     "requestsPerSecond",
+					Condition:  ThresholdCondition{Above: true, Value: 100},
+					Occurrence: 1,
+					TimeRange:  30 * time.Minute,
+				},
+			},
+			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+				view.
+					On("FindByIngress", "10m", "ingress-1@myns",
+						time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC),
+						time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC),
+					).
+					Return(metrics.DataPoints{
+						{Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(), ReqPerS: 120},
+					}, nil).
+					Once()
+			},
+			expected: expected{
+				requireErr: require.NoError,
+				alert: &Alert{
+					RuleID:  "rule-1",
+					Ingress: "ingress-1@myns",
+					Service: "",
+					Points: []Point{
+						{Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(), Value: 120},
+					},
+					Threshold: &Threshold{
+						Metric:     "requestsPerSecond",
+						Condition:  ThresholdCondition{Above: true, Value: 100},
+						Occurrence: 1,
+						TimeRange:  30 * time.Minute,
+					},
+				},
 			},
 		},
 	}
-	assert.Equal(t, want, got)
-}
 
-type mockThresholdStore struct {
-	group metrics.DataPointGroup
-}
+	for _, test := range tests {
+		test := test
 
-func (t mockThresholdStore) ForEach(_ string, fn metrics.ForEachFunc) {
-	fn(t.group.Ingress, t.group.Service, t.group.DataPoints)
-}
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 
-type mockMultiThresholdStore struct {
-	groups []metrics.DataPointGroup
-}
+			logs := &mockLogProvider{}
+			logs.Test(t)
 
-func (t mockMultiThresholdStore) ForEach(_ string, fn metrics.ForEachFunc) {
-	for _, group := range t.groups {
-		fn(group.Ingress, group.Service, group.DataPoints)
+			view := &mockDataPointsFinder{}
+			view.Test(t)
+
+			if test.on != nil {
+				test.on(view, logs)
+			}
+
+			threshProc := NewThresholdProcessor(view, logs)
+			threshProc.nowFunc = func() time.Time { return now }
+
+			alert, err := threshProc.Process(context.Background(), test.rule)
+
+			logs.AssertExpectations(t)
+			view.AssertExpectations(t)
+
+			assert.Equal(t, test.expected.alert, alert)
+			test.expected.requireErr(t, err)
+		})
 	}
+}
+
+func TestGetValue(t *testing.T) {
+	type expected struct {
+		value float64
+		err   bool
+	}
+
+	tests := []struct {
+		desc     string
+		metric   string
+		point    metrics.DataPoint
+		expected expected
+	}{
+		{
+			desc:     "with requests per second metric",
+			metric:   "requestsPerSecond",
+			point:    metrics.DataPoint{ReqPerS: 100},
+			expected: expected{value: 100},
+		},
+		{
+			desc:     "with request errors per second metric",
+			metric:   "requestErrorsPerSecond",
+			point:    metrics.DataPoint{RequestErrPerS: 100},
+			expected: expected{value: 100},
+		},
+		{
+			desc:     "with request client errors per second metric",
+			metric:   "requestClientErrorsPerSecond",
+			point:    metrics.DataPoint{RequestClientErrPerS: 100},
+			expected: expected{value: 100},
+		},
+		{
+			desc:     "with average response time metric",
+			metric:   "averageResponseTime",
+			point:    metrics.DataPoint{AvgResponseTime: 100},
+			expected: expected{value: 100},
+		},
+		{
+			desc:   "with unknown metric",
+			metric: "requestsPerPotatoes",
+			point: metrics.DataPoint{
+				Timestamp:               1,
+				ReqPerS:                 2,
+				RequestErrPerS:          3,
+				RequestErrPercent:       4,
+				RequestClientErrPerS:    5,
+				RequestClientErrPercent: 6,
+				AvgResponseTime:         7,
+				Seconds:                 8,
+				Requests:                9,
+				RequestErrs:             10,
+				RequestClientErrs:       11,
+				ResponseTimeSum:         12,
+				ResponseTimeCount:       13,
+			},
+			expected: expected{err: true},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			value, err := getValue(test.metric, test.point)
+			if test.expected.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expected.value, value)
+		})
+	}
+}
+
+type mockDataPointsFinder struct {
+	mock.Mock
+}
+
+func (m *mockDataPointsFinder) FindByIngressAndService(table, ingress, service string, from, to time.Time) (metrics.DataPoints, error) {
+	call := m.Called(table, ingress, service, from, to)
+
+	return call.Get(0).(metrics.DataPoints), call.Error(1)
+}
+
+func (m *mockDataPointsFinder) FindByService(table, service string, from, to time.Time) metrics.DataPoints {
+	call := m.Called(table, service, from, to)
+
+	if dataPoints := call.Get(0); dataPoints != nil {
+		return dataPoints.(metrics.DataPoints)
+	}
+	return nil
+}
+
+func (m *mockDataPointsFinder) FindByIngress(table, ingress string, from, to time.Time) metrics.DataPoints {
+	return m.Called(table, ingress, from, to).Get(0).(metrics.DataPoints)
 }
 
 type mockLogProvider struct {
-	getServiceLogsFn func(namespace, name string, lines, maxLen int) ([]byte, error)
+	mock.Mock
 }
 
-func (m mockLogProvider) GetServiceLogs(_ context.Context, namespace, name string, lines, maxLen int) ([]byte, error) {
-	return m.getServiceLogsFn(namespace, name, lines, maxLen)
-}
+func (m *mockLogProvider) GetServiceLogs(_ context.Context, namespace, name string, lines, maxLen int) ([]byte, error) {
+	call := m.Called(namespace, name, lines, maxLen)
 
-func generateData(t *testing.T, ingress, service string, now time.Time, points, threshold, occurrences int) metrics.DataPointGroup {
-	t.Helper()
-
-	group := metrics.DataPointGroup{
-		Ingress:    ingress,
-		Service:    service,
-		DataPoints: metrics.DataPoints{},
-	}
-
-	for i := points; i > 0; i-- {
-		var val float64
-		if occurrences > 0 {
-			val = float64(threshold) + rand.Float64()*float64(threshold) //nolint:gosec // No need to crypto randomness in this test.
-			occurrences--
-		} else {
-			val = rand.Float64() * float64(threshold) //nolint:gosec // No need to crypto randomness in this test.
-		}
-
-		group.DataPoints = append(group.DataPoints, metrics.DataPoint{
-			Timestamp:            now.Add(time.Duration(-i) * time.Minute).Unix(),
-			ReqPerS:              val,
-			RequestErrPerS:       val,
-			RequestClientErrPerS: val,
-			AvgResponseTime:      val,
-		})
-	}
-
-	return group
+	return call.Get(0).([]byte), call.Error(1)
 }

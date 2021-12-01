@@ -108,7 +108,7 @@ func (s *Store) Insert(svcs map[SetKey]DataPoint) {
 }
 
 // ForEachFunc represents a function that will be called while iterating over a table.
-// Each time this function is called, a unique ingress controller and service will
+// Each time this function is called, a unique ingress and service will
 // be given with their set of points.
 type ForEachFunc func(ingr, svc string, pnts DataPoints)
 

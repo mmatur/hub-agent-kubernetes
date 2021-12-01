@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,9 +18,11 @@ const (
 	logMaxLineLength = 200
 )
 
-// ThresholdStore represents a metric storage engine.
-type ThresholdStore interface {
-	ForEach(tbl string, fn metrics.ForEachFunc)
+// DataPointsFinder is capable of finding data points for given criteria.
+type DataPointsFinder interface {
+	FindByIngressAndService(table, ingress, service string, from, to time.Time) (metrics.DataPoints, error)
+	FindByService(table, service string, from, to time.Time) metrics.DataPoints
+	FindByIngress(table, ingress string, from, to time.Time) metrics.DataPoints
 }
 
 // LogProvider implements an object that can provide logs for a service.
@@ -29,167 +32,82 @@ type LogProvider interface {
 
 // ThresholdProcessor processes threshold rules.
 type ThresholdProcessor struct {
-	store ThresholdStore
-	logs  LogProvider
+	dataPoints DataPointsFinder
+	logs       LogProvider
 
 	nowFunc func() time.Time
 }
 
 // NewThresholdProcessor returns a threshold processor.
-func NewThresholdProcessor(t ThresholdStore, logs LogProvider) *ThresholdProcessor {
+func NewThresholdProcessor(dataPoints DataPointsFinder, logs LogProvider) *ThresholdProcessor {
 	return &ThresholdProcessor{
-		store:   t,
-		logs:    logs,
-		nowFunc: time.Now,
+		dataPoints: dataPoints,
+		logs:       logs,
+		nowFunc:    time.Now,
 	}
 }
 
 // Process processes a threshold rule returning an alert or nil.
-func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, []error) {
-	tbl := rule.Threshold.Table()
-	gran := rule.Threshold.Granularity()
+func (p *ThresholdProcessor) Process(ctx context.Context, rule *Rule) (*Alert, error) {
+	table := rule.Threshold.Table()
+	granularity := rule.Threshold.Granularity()
 
-	groupSet := map[string][]*metrics.DataPointGroup{}
-	p.store.ForEach(tbl, func(ingr, svc string, pnts metrics.DataPoints) {
-		// current metrics don't match both regular rule and annotation selector.
-		if !(ingr == rule.Ingress && svc == rule.Service) && !matchAnnotation(svc, rule.Annotation, svcAnnotations) {
-			return
+	// Compute the time range (inclusive) the alert wants to be triggered on. The granularity is subtracted to
+	// avoid capturing the last data point which is not yet complete.
+	to := p.nowFunc().UTC().Truncate(granularity).Add(-granularity)
+	from := to.Add(-rule.Threshold.TimeRange)
+
+	var dataPoints metrics.DataPoints
+
+	switch {
+	case rule.Ingress != "" && rule.Service != "":
+		var err error
+
+		dataPoints, err = p.dataPoints.FindByIngressAndService(table, rule.Ingress, rule.Service, from, to)
+		if err != nil {
+			return nil, err
+		}
+	case rule.Service != "":
+		dataPoints = p.dataPoints.FindByService(table, rule.Service, from, to)
+	case rule.Ingress != "":
+		dataPoints = p.dataPoints.FindByIngress(table, rule.Ingress, from, to)
+	default:
+		return nil, errors.New("invalid rule")
+	}
+
+	var points []Point
+	for _, datapoint := range dataPoints {
+		value, err := getValue(rule.Threshold.Metric, datapoint)
+		if err != nil {
+			return nil, err
 		}
 
-		if rule.Service == "" && rule.Annotation == "" && len(groupSet) == 1 {
-			// If this is not a service alert, just take the first ingress.
-			return
-		}
-
-		groupKey := ingr + ":" + svc
-		group := groupSet[groupKey]
-		group = append(group, &metrics.DataPointGroup{
-			Ingress:    ingr,
-			Service:    svc,
-			DataPoints: pnts,
+		points = append(points, Point{
+			Timestamp: datapoint.Timestamp,
+			Value:     value,
 		})
-		groupSet[groupKey] = group
-	})
-	if len(groupSet) == 0 {
+	}
+
+	// Check if an alert has to be raised.
+	count := p.countOccurrences(rule, points)
+	if count < rule.Threshold.Occurrence {
 		return nil, nil
 	}
 
-	groups := mergeGroups(groupSet)
-
-	minTS := p.nowFunc().UTC().Truncate(gran).Add(-1 * gran).Add(-1 * rule.Threshold.TimeRange).Unix()
-	var alerts []Alert
-	var errs []error
-	for _, group := range groups {
-		var newPnts []Point
-		for _, pnt := range group.DataPoints {
-			if pnt.Timestamp <= minTS {
-				continue
-			}
-
-			value, err := getValue(rule.Threshold.Metric, pnt)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			newPnts = append(newPnts, Point{
-				Timestamp: pnt.Timestamp,
-				Value:     value,
-			})
-		}
-
-		// Not enough points.
-		if len(newPnts) < rule.Threshold.Occurrence {
-			continue
-		}
-
-		count := p.countOccurrences(rule, newPnts)
-		if count < rule.Threshold.Occurrence {
-			continue
-		}
-
-		logs, err := p.getLogs(ctx, group.Service)
-		if err != nil {
-			errs = append(errs, err)
-		}
-
-		alerts = append(alerts, Alert{
-			RuleID:    rule.ID,
-			Ingress:   group.Ingress,
-			Service:   group.Service,
-			Points:    newPnts,
-			Logs:      logs,
-			Threshold: rule.Threshold,
-		})
+	// Grab pod logs selected by the service if there are some.
+	logs, err := p.getLogs(ctx, rule.Service)
+	if err != nil {
+		log.Error().Err(err).Str("service", rule.Service).Msg("Unable to get logs")
 	}
 
-	return alerts, errs
-}
-
-func mergeGroups(groupSet map[string][]*metrics.DataPointGroup) []*metrics.DataPointGroup {
-	res := make([]*metrics.DataPointGroup, 0, len(groupSet))
-	for _, groups := range groupSet {
-		if len(groups) == 1 {
-			res = append(res, groups[0])
-			continue
-		}
-
-		// Make a copy of the first group so we dont change metrics data.
-		group := &metrics.DataPointGroup{
-			Ingress:    groups[0].Ingress,
-			Service:    groups[0].Service,
-			DataPoints: make([]metrics.DataPoint, len(groups[0].DataPoints)),
-		}
-		copy(group.DataPoints, groups[0].DataPoints)
-
-		counts := map[int]int{}
-		for i := 1; i < len(groups); i++ {
-			curr := groups[i]
-			for j, pnt := range group.DataPoints {
-				newPnt, ok := getDataPoint(curr.DataPoints, pnt.Timestamp)
-				if !ok {
-					continue
-				}
-
-				pnt.Seconds += newPnt.Seconds
-				pnt.Requests += newPnt.Requests
-				pnt.RequestErrs += newPnt.RequestErrs
-				pnt.RequestClientErrs += newPnt.RequestClientErrs
-				pnt.ResponseTimeSum += newPnt.ResponseTimeSum
-				pnt.ResponseTimeCount += newPnt.ResponseTimeCount
-				group.DataPoints[j] = pnt
-				counts[j]++
-			}
-		}
-
-		for i, pnt := range group.DataPoints {
-			count, ok := counts[i]
-			if !ok || count < 1 {
-				continue
-			}
-
-			pnt.Seconds /= int64(count + 1)
-			pnt.ReqPerS = float64(pnt.Requests) / float64(pnt.Seconds)
-			pnt.RequestErrPerS = float64(pnt.RequestErrs) / float64(pnt.Seconds)
-			pnt.RequestErrPercent = float64(pnt.RequestErrs) / float64(pnt.Requests)
-			pnt.RequestClientErrPerS = float64(pnt.RequestClientErrs) / float64(pnt.Seconds)
-			pnt.RequestClientErrPercent = float64(pnt.RequestClientErrs) / float64(pnt.Requests)
-			pnt.AvgResponseTime = pnt.ResponseTimeSum / float64(pnt.ResponseTimeCount)
-			group.DataPoints[i] = pnt
-		}
-
-		res = append(res, group)
-	}
-
-	return res
-}
-
-func getDataPoint(pnts []metrics.DataPoint, ts int64) (metrics.DataPoint, bool) {
-	for _, pnt := range pnts {
-		if pnt.Timestamp == ts {
-			return pnt, true
-		}
-	}
-
-	return metrics.DataPoint{}, false
+	return &Alert{
+		RuleID:    rule.ID,
+		Ingress:   rule.Ingress,
+		Service:   rule.Service,
+		Points:    points,
+		Logs:      logs,
+		Threshold: rule.Threshold,
+	}, nil
 }
 
 func (p *ThresholdProcessor) countOccurrences(rule *Rule, pnts []Point) int {
@@ -217,14 +135,12 @@ func (p *ThresholdProcessor) getLogs(ctx context.Context, service string) ([]byt
 
 	logs, err := p.logs.GetServiceLogs(ctx, parts[1], parts[0], logLines, logMaxLineLength)
 	if err != nil {
-		log.Error().Err(err).Str("service", service).Msg("Unable to get logs")
-		return nil, nil
+		return nil, fmt.Errorf("fetch service logs: %w", err)
 	}
 
 	logs, err = compress(logs)
 	if err != nil {
-		log.Error().Err(err).Str("service", service).Msg("Unable to compress logs")
-		return nil, nil
+		return nil, fmt.Errorf("compress logs: %w", err)
 	}
 
 	return logs, nil
@@ -258,17 +174,4 @@ func compress(b []byte) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
-}
-
-func matchAnnotation(svcName, ruleAnnotation string, svcAnnotations map[string][]string) bool {
-	for annotation, services := range svcAnnotations {
-		if ruleAnnotation == annotation {
-			for _, svc := range services {
-				if svcName == svc {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }

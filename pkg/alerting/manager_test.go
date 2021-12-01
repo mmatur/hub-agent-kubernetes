@@ -2,125 +2,793 @@ package alerting
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/hub-agent/pkg/metrics"
 )
 
-func TestManager_SendsAlerts(t *testing.T) {
-	sentCh := make(chan struct{})
-	srv := platformServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(sentCh)
-	}))
+const (
+	alertRefreshInterval   = 10 * time.Minute
+	alertSchedulerInterval = time.Minute
+)
 
-	client, err := NewClient(http.DefaultClient, srv.URL, "test-token")
-	require.NoError(t, err)
+// alertSchedulerInterval is the interval at which the scheduler
+// runs rule checks.
 
-	now := time.Now().UTC()
-
-	store := mockThresholdStore{
-		group: metrics.DataPointGroup{
+func TestManager_refreshRules(t *testing.T) {
+	rules := []Rule{
+		{
+			ID:      "123",
 			Ingress: "ing@ns",
 			Service: "svc@ns",
-			DataPoints: []metrics.DataPoint{
-				{
-					Timestamp: now.Add(-3 * time.Minute).Unix(),
-					ReqPerS:   11.1,
+			Threshold: &Threshold{
+				Metric: "requestsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 10,
 				},
-				{
-					Timestamp: now.Add(-2 * time.Minute).Unix(),
-					ReqPerS:   12.3,
+				Occurrence: 3,
+				TimeRange:  10 * time.Minute,
+			},
+		},
+		{
+			ID:      "234",
+			Service: "svc@ns",
+			Threshold: &Threshold{
+				Metric: "averageResponseTime",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 100,
 				},
-				{
-					Timestamp: now.Add(-time.Minute).Unix(),
-					ReqPerS:   11.7,
+				Occurrence: 2,
+				TimeRange:  1 * time.Hour,
+			},
+		},
+		{
+			ID:      "234",
+			Ingress: "ing@ns",
+			Threshold: &Threshold{
+				Metric: "requestClientErrorsPerSecond",
+				Condition: ThresholdCondition{
+					Above: true,
+					Value: 5,
 				},
+				Occurrence: 3,
+				TimeRange:  10 * time.Minute,
 			},
 		},
 	}
-	logs := mockLogProvider{
-		getServiceLogsFn: func(namespace, name string, lines, maxLen int) ([]byte, error) {
-			assert.Equal(t, "svc", name)
-			assert.Equal(t, "ns", namespace)
 
-			return []byte("fake logs"), nil
+	backend := &backendMock{}
+	backend.On("GetRules").Return(rules, nil).Once()
+
+	mgr := NewManager(backend, nil, alertRefreshInterval, alertSchedulerInterval)
+
+	err := mgr.refreshRules(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, rules, mgr.rules)
+}
+
+func TestManager_refreshRules_handlesClientError(t *testing.T) {
+	backend := &backendMock{}
+	backend.
+		On("GetRules").
+		Return(nil, errors.New("boom")).
+		Once()
+
+	mgr := NewManager(backend, nil, alertRefreshInterval, alertSchedulerInterval)
+
+	err := mgr.refreshRules(context.Background())
+	require.Error(t, err)
+}
+
+func TestManager_checkAlerts(t *testing.T) {
+	tests := []struct {
+		desc     string
+		rules    []Rule
+		on       func(rules []Rule, processor map[string]Processor, backend *backendMock)
+		expected require.ErrorAssertionFunc
+	}{
+		{
+			desc: "one threshold rule, alert triggered and sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				rule := rules[0]
+				alert := Alert{
+					RuleID:  rule.ID,
+					Ingress: rule.Ingress,
+					Service: rule.Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rule.Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rule).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{alert}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alert}).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "one threshold rule, alert triggered but don't need to be sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				rule := rules[0]
+				alert := Alert{
+					RuleID:  rule.ID,
+					Ingress: rule.Ingress,
+					Service: rule.Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rule.Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rule).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{}, nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "one threshold rule, alert is not triggered",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(nil, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				var alerts []Alert
+				backend.
+					On("PreflightAlerts", alerts).
+					Return([]Alert{}, nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "failed to send alert",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				rule := rules[0]
+				alert := Alert{
+					RuleID:  rule.ID,
+					Ingress: rule.Ingress,
+					Service: rule.Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rule.Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rule).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{alert}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alert}).
+					Return(errors.New("boom")).
+					Once()
+			},
+			expected: require.Error,
+		},
+		{
+			desc: "failed to check alert, no alert has to be sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				rule := rules[0]
+				alert := Alert{
+					RuleID:  rule.ID,
+					Ingress: rule.Ingress,
+					Service: rule.Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rule.Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rule).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return(nil, errors.New("boom")).
+					Once()
+			},
+			expected: require.Error,
+		},
+		{
+			desc: "failed to process rule",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(nil, errors.New("boom")).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				var alerts []Alert
+				backend.
+					On("PreflightAlerts", alerts).
+					Return([]Alert{}, nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "two threshold rule, two alerts triggered and sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+				{
+					ID:      "234",
+					Ingress: "web@myns",
+					Service: "api@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				alerts := []Alert{
+					{
+						RuleID:  rules[0].ID,
+						Ingress: rules[0].Ingress,
+						Service: rules[0].Service,
+						Points: []Point{
+							{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+							{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+						},
+						Logs:      []byte("logs 1"),
+						Threshold: rules[0].Threshold,
+					},
+					{
+						RuleID:  rules[1].ID,
+						Ingress: rules[1].Ingress,
+						Service: rules[1].Service,
+						Points: []Point{
+							{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+							{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+						},
+						Logs:      []byte("logs 2"),
+						Threshold: rules[1].Threshold,
+					},
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(&alerts[0], nil).
+					Once()
+				processor.
+					On("Process", &rules[1]).
+					Return(&alerts[1], nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", alerts).
+					Return(alerts, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", alerts).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "two threshold rule, one alert triggered and sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+				{
+					ID:      "234",
+					Ingress: "web@myns",
+					Service: "api@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				alert := Alert{
+					RuleID:  rules[0].ID,
+					Ingress: rules[0].Ingress,
+					Service: rules[0].Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rules[0].Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(&alert, nil).
+					Once()
+				processor.
+					On("Process", &rules[1]).
+					Return(nil, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{alert}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alert}).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "two threshold rule, only one needs to be sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+				{
+					ID:      "234",
+					Ingress: "web@myns",
+					Service: "api@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				alerts := []Alert{
+					{
+						RuleID:  rules[0].ID,
+						Ingress: rules[0].Ingress,
+						Service: rules[0].Service,
+						Points: []Point{
+							{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+							{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+						},
+						Logs:      []byte("logs 1"),
+						Threshold: rules[0].Threshold,
+					},
+					{
+						RuleID:  rules[1].ID,
+						Ingress: rules[1].Ingress,
+						Service: rules[1].Service,
+						Points: []Point{
+							{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+							{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+						},
+						Logs:      []byte("logs 2"),
+						Threshold: rules[1].Threshold,
+					},
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(&alerts[0], nil).
+					Once()
+				processor.
+					On("Process", &rules[1]).
+					Return(&alerts[1], nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", alerts).
+					Return([]Alert{alerts[0]}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alerts[0]}).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "two threshold rule, one failed to be processed the other is sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+				{
+					ID:      "234",
+					Ingress: "web@myns",
+					Service: "api@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				alert := Alert{
+					RuleID:  rules[1].ID,
+					Ingress: rules[1].Ingress,
+					Service: rules[1].Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rules[1].Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[0]).
+					Return(nil, errors.New("boom")).
+					Once()
+				processor.
+					On("Process", &rules[1]).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{alert}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alert}).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
+		},
+		{
+			desc: "one rule type is unknown, the other is sent",
+			rules: []Rule{
+				{
+					ID:      "123",
+					Ingress: "web@myns",
+					Service: "whoami@myns",
+				},
+				{
+					ID:      "234",
+					Ingress: "web@myns",
+					Service: "api@myns",
+					Threshold: &Threshold{
+						Metric: "requestsPerSecond",
+						Condition: ThresholdCondition{
+							Above: true,
+							Value: 100,
+						},
+						Occurrence: 2,
+						TimeRange:  time.Hour,
+					},
+				},
+			},
+			on: func(rules []Rule, processors map[string]Processor, backend *backendMock) {
+				alert := Alert{
+					RuleID:  rules[1].ID,
+					Ingress: rules[1].Ingress,
+					Service: rules[1].Service,
+					Points: []Point{
+						{Timestamp: time.Now().Add(-30 * time.Minute).Unix(), Value: 110},
+						{Timestamp: time.Now().Add(-20 * time.Minute).Unix(), Value: 100},
+					},
+					Logs:      []byte("logs"),
+					Threshold: rules[1].Threshold,
+				}
+
+				processor := &processorMock{}
+				processor.
+					On("Process", &rules[1]).
+					Return(&alert, nil).
+					Once()
+
+				processors[ThresholdType] = processor
+
+				backend.
+					On("PreflightAlerts", []Alert{alert}).
+					Return([]Alert{alert}, nil).
+					Once()
+
+				backend.
+					On("SendAlerts", []Alert{alert}).
+					Return(nil).
+					Once()
+			},
+			expected: require.NoError,
 		},
 	}
-	mgr := NewManager(client, map[string]Processor{
-		ThresholdType: NewThresholdProcessor(store, logs),
-	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(func() {
-		cancel()
-	})
+	for _, test := range tests {
+		test := test
 
-	go func() {
-		err = mgr.Run(ctx, 10*time.Minute, time.Second)
-		assert.NoError(t, err)
-	}()
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 
-	select {
-	case <-sentCh:
-		return
-	case <-time.After(5 * time.Second):
-		t.Errorf("alert send expected but not received")
+			backend := &backendMock{}
+			processors := make(map[string]Processor)
+
+			test.on(test.rules, processors, backend)
+
+			mgr := NewManager(backend, processors, time.Second, time.Second)
+			mgr.rules = test.rules
+
+			err := mgr.checkAlerts(context.Background())
+			test.expected(t, err)
+
+			for _, proc := range processors {
+				m := proc.(*processorMock)
+				m.AssertExpectations(t)
+			}
+			backend.AssertExpectations(t)
+		})
 	}
 }
 
-func platformServer(t *testing.T, handler http.Handler) *httptest.Server {
-	t.Helper()
+type backendMock struct {
+	mock.Mock
+}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/rules", func(w http.ResponseWriter, r *http.Request) {
-		rules := []Rule{
-			{
-				ID:      "123",
-				Ingress: "ing@ns",
-				Service: "svc@ns",
-				Threshold: &Threshold{
-					Metric: "requestsPerSecond",
-					Condition: ThresholdCondition{
-						Above: true,
-						Value: 10,
-					},
-					Occurrence: 3,
-					TimeRange:  10 * time.Minute,
-				},
-			},
-		}
+func (b *backendMock) GetRules(_ context.Context) ([]Rule, error) {
+	call := b.Called()
 
-		err := json.NewEncoder(w).Encode(rules)
-		require.NoError(t, err)
-	})
-	mux.HandleFunc("/preflight", func(w http.ResponseWriter, r *http.Request) {
-		var data []struct {
-			ID int `json:"id"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&data)
-		require.NoError(t, err)
-
-		var ids []int
-		for _, alert := range data {
-			ids = append(ids, alert.ID)
-		}
-
-		err = json.NewEncoder(w).Encode(ids)
-		require.NoError(t, err)
-	})
-
-	if handler != nil {
-		mux.Handle("/notify", handler)
+	err := call.Error(1)
+	if rules := call.Get(0); rules != nil {
+		return rules.([]Rule), err
 	}
 
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
+	return nil, err
+}
 
-	return srv
+func (b *backendMock) PreflightAlerts(_ context.Context, alerts []Alert) ([]Alert, error) {
+	call := b.Called(alerts)
+
+	err := call.Error(1)
+	if res := call.Get(0); res != nil {
+		return res.([]Alert), err
+	}
+
+	return nil, err
+}
+
+func (b *backendMock) SendAlerts(_ context.Context, alerts []Alert) error {
+	return b.Called(alerts).Error(0)
+}
+
+type processorMock struct {
+	mock.Mock
+}
+
+func (p *processorMock) Process(_ context.Context, rule *Rule) (*Alert, error) {
+	call := p.Called(rule)
+
+	err := call.Error(1)
+	if alert := call.Get(0); alert != nil {
+		return alert.(*Alert), err
+	}
+
+	return nil, err
 }

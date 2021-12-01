@@ -2,154 +2,154 @@ package alerting
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/topology/state"
 )
 
 // Processor represents a rule processor.
 type Processor interface {
-	Process(ctx context.Context, rule *Rule, svcAnnotations map[string][]string) ([]Alert, []error)
+	Process(ctx context.Context, rule *Rule) (*Alert, error)
+}
+
+// Backend is capable of serving rules and sending alerts.
+type Backend interface {
+	GetRules(ctx context.Context) ([]Rule, error)
+	PreflightAlerts(ctx context.Context, alerts []Alert) ([]Alert, error)
+	SendAlerts(ctx context.Context, alerts []Alert) error
 }
 
 // Manager manages rule synchronization and scheduling.
 type Manager struct {
-	client *Client
+	backend Backend
 
 	rulesMu sync.Mutex
 	rules   []Rule
 
 	procs map[string]Processor
 
-	svcAnnotationsMu sync.Mutex
-	svcAnnotations   map[string][]string
+	refreshInterval   time.Duration
+	schedulerInterval time.Duration
 
 	nowFunc func() time.Time
 }
 
 // NewManager returns an alert manager.
-func NewManager(client *Client, procs map[string]Processor) *Manager {
+// The alertRefreshInterval is the interval to fetch configuration, including alert rules.
+// The alertSchedulerInterval is the interval at which the scheduler runs rule checks.
+func NewManager(backend Backend, procs map[string]Processor, refreshInterval, schedulerInterval time.Duration) *Manager {
 	return &Manager{
-		client:  client,
-		procs:   procs,
-		nowFunc: time.Now,
+		backend:           backend,
+		procs:             procs,
+		refreshInterval:   refreshInterval,
+		schedulerInterval: schedulerInterval,
+		nowFunc:           time.Now,
 	}
 }
 
 // Run runs the alert manager.
-func (m *Manager) Run(ctx context.Context, refreshInterval, schedulerInterval time.Duration) error {
-	rules, err := m.client.GetRules(ctx)
+func (m *Manager) Run(ctx context.Context) error {
+	rules, err := m.backend.GetRules(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("get rules: %w", err)
 	}
 
 	m.rules = rules
 
-	go m.runScheduler(ctx, schedulerInterval)
+	go func() {
+		schedulerTicker := time.NewTicker(m.schedulerInterval)
+		defer schedulerTicker.Stop()
 
-	m.runRefresh(ctx, refreshInterval)
-
-	return nil
-}
-
-// TopologyStateChanged is called every time the topology state changes.
-func (m *Manager) TopologyStateChanged(ctx context.Context, cluster *state.Cluster) {
-	m.svcAnnotationsMu.Lock()
-	defer m.svcAnnotationsMu.Unlock()
-
-	m.svcAnnotations = make(map[string][]string)
-	for _, svc := range cluster.Services {
-		for k, v := range svc.Annotations {
-			key := k + ":" + v
-			m.svcAnnotations[key] = append(m.svcAnnotations[key], svc.Name+"@"+svc.Namespace)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-schedulerTicker.C:
+				if err = m.checkAlerts(ctx); err != nil {
+					log.Error().Err(err).Msg("Unable to check alerts")
+				}
+			}
 		}
-	}
-}
+	}()
 
-func (m *Manager) runRefresh(ctx context.Context, refreshInterval time.Duration) {
-	refreshTicker := time.NewTicker(refreshInterval)
+	refreshTicker := time.NewTicker(m.refreshInterval)
 	defer refreshTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-refreshTicker.C:
-			m.rulesMu.Lock()
-
-			rules, err := m.client.GetRules(ctx)
-			if err != nil {
-				m.rulesMu.Unlock()
-
+			if err = m.refreshRules(ctx); err != nil {
 				log.Error().Err(err).Msg("Unable to get rules")
-				continue
 			}
-
-			m.rules = rules
-
-			m.rulesMu.Unlock()
 		}
 	}
 }
 
-func (m *Manager) runScheduler(ctx context.Context, schInterval time.Duration) {
-	schedulerTicker := time.NewTicker(schInterval)
-	defer schedulerTicker.Stop()
+func (m *Manager) refreshRules(ctx context.Context) error {
+	m.rulesMu.Lock()
+	defer m.rulesMu.Unlock()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-schedulerTicker.C:
-			m.rulesMu.Lock()
-			m.svcAnnotationsMu.Lock()
-
-			var alerts []Alert
-
-			for _, rule := range m.rules {
-				rule := rule
-				log.Debug().Str("ruleId", rule.ID).Msg("Processing rule")
-
-				proc, ok := m.procs[rule.Type()]
-				if !ok {
-					log.Error().Str("type", rule.Type()).Msg("Unknown rule type")
-					continue
-				}
-
-				newAlerts, errs := proc.Process(ctx, &rule, m.svcAnnotations)
-				for _, err := range errs {
-					log.Error().Err(err).Str("ruleID", rule.ID).Msg("Unable to process the rule")
-				}
-				if newAlerts == nil {
-					continue
-				}
-
-				alerts = append(alerts, newAlerts...)
-			}
-
-			m.rulesMu.Unlock()
-			m.svcAnnotationsMu.Unlock()
-
-			log.Debug().Int("count", len(alerts)).Msg("Checking alerts to send")
-
-			sendAlerts, err := m.client.PreflightAlerts(ctx, alerts)
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to send preflight alerts")
-				continue
-			}
-
-			log.Debug().Int("count", len(sendAlerts)).Msg("Sending alerts")
-
-			if len(sendAlerts) == 0 {
-				continue
-			}
-
-			err = m.client.SendAlerts(ctx, sendAlerts)
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to send alerts")
-			}
-		}
+	rules, err := m.backend.GetRules(ctx)
+	if err != nil {
+		return fmt.Errorf("get rules: %w", err)
 	}
+
+	m.rules = rules
+
+	return nil
+}
+
+func (m *Manager) checkAlerts(ctx context.Context) error {
+	m.rulesMu.Lock()
+
+	var alerts []Alert
+	for _, rule := range m.rules {
+		rule := rule
+		log.Debug().Str("rule_id", rule.ID).Msg("Processing rule")
+
+		proc, ok := m.procs[rule.Type()]
+		if !ok {
+			log.Error().
+				Str("rule_id", rule.ID).
+				Str("type", rule.Type()).
+				Msg("Unknown rule type")
+			continue
+		}
+
+		alert, err := proc.Process(ctx, &rule)
+		if err != nil {
+			log.Error().Err(err).Str("rule_id", rule.ID).Msg("Unable to process the rule")
+		}
+		if alert == nil {
+			continue
+		}
+
+		alerts = append(alerts, *alert)
+	}
+
+	m.rulesMu.Unlock()
+
+	log.Debug().Int("count", len(alerts)).Msg("Checking alerts to send")
+
+	// Make a preflight request even if there is no alerts as it's also used for resolving existing alerts.
+	sendAlerts, err := m.backend.PreflightAlerts(ctx, alerts)
+	if err != nil {
+		return fmt.Errorf("send preflight alerts: %w", err)
+	}
+
+	log.Debug().Int("count", len(sendAlerts)).Msg("Sending alerts")
+
+	if len(sendAlerts) == 0 {
+		return nil
+	}
+
+	if err = m.backend.SendAlerts(ctx, sendAlerts); err != nil {
+		return fmt.Errorf("send alerts: %w", err)
+	}
+
+	return nil
 }

@@ -45,10 +45,9 @@ func (p DataPoints) Aggregate() DataPoint {
 
 // DataPointGroup contains a unique group of data points (primary keys).
 type DataPointGroup struct {
-	IngressController string      `avro:"ingress_controller"`
-	Ingress           string      `avro:"ingress"`
-	Service           string      `avro:"service"`
-	DataPoints        []DataPoint `avro:"data_points"`
+	Ingress    string      `avro:"ingress"`
+	Service    string      `avro:"service"`
+	DataPoints []DataPoint `avro:"data_points"`
 }
 
 // DataPoint contains fully aggregated metrics.

@@ -11,10 +11,9 @@ const (
 // Rule defines evaluation configuration for alerting
 // on metrics.
 type Rule struct {
-	ID         string `json:"id"`
-	Ingress    string `json:"ingress"`
-	Service    string `json:"service"`
-	Annotation string `json:"annotation"`
+	ID      string `json:"id"`
+	Ingress string `json:"ingress"`
+	Service string `json:"service"`
 
 	Threshold *Threshold `json:"threshold"`
 }
@@ -35,8 +34,7 @@ type Threshold struct {
 	TimeRange  time.Duration      `json:"timeRange"`
 }
 
-// Table returns the metrics table containing the
-// data points.
+// Table returns the metrics table containing the data points.
 func (t Threshold) Table() string {
 	switch {
 	case t.TimeRange > 24*time.Hour:
