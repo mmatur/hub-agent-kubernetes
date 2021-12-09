@@ -16,7 +16,14 @@ const (
 	flagLogFormat = "log-format"
 )
 
-func mainWithCode() int {
+func main() {
+	err := run()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error while executing command")
+	}
+}
+
+func run() error {
 	app := &cli.App{
 		Name:  "Hub agent CLI",
 		Usage: "Manages a Traefik Hub agent installation",
@@ -30,17 +37,7 @@ func mainWithCode() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	err := app.RunContext(ctx, os.Args)
-	if err != nil {
-		log.Error().Err(err).Msg("Error while executing command")
-		return 255
-	}
-
-	return 0
-}
-
-func main() {
-	os.Exit(mainWithCode())
+	return app.RunContext(ctx, os.Args)
 }
 
 func globalFlags() []cli.Flag {
