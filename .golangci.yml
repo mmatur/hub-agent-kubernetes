@@ -99,7 +99,7 @@ linters-settings:
 
     # Misc:
     - alias: jwtreq
-      pkg: "github.com/dgrijalva/jwt-go/request"
+      pkg: "github.com/golang-jwt/jwt/v4/request"
 
 linters:
   enable-all: true
