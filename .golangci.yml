@@ -107,6 +107,7 @@ linters:
     - maligned # deprecated
     - interfacer # deprecated
     - scopelint # deprecated
+    - golint # deprecated
     - sqlclosecheck # not relevant (SQL)
     - rowserrcheck # not relevant (SQL)
     - cyclop # duplicate of gocyclo
@@ -126,6 +127,10 @@ linters:
     - forcetypeassert
     - bodyclose # Too many false positives: https://github.com/timakin/bodyclose/issues/30
     - ifshort # disable due to false-positive, the linter will be fixed https://github.com/esimonov/ifshort
+    - varnamelen
+    - nilnil
+    - ireturn
+    - contextcheck
 
 issues:
   exclude-use-default: false

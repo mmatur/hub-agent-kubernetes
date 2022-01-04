@@ -165,7 +165,7 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, s
 }
 
 func (s *Scraper) scrapeMetrics(ctx context.Context, target string) ([]*dto.MetricFamily, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
 	if err != nil {
 		return nil, err
 	}

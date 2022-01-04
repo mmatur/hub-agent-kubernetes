@@ -13,7 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2"
 )
 
 const (
@@ -41,8 +41,10 @@ func TestNew(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name:    "base64 signing secret",
-			jwtCfg:  Config{SigningSecret: base64.StdEncoding.EncodeToString([]byte("foobar")), SigningSecretBase64Encoded: true},
+			name: "base64 signing secret",
+			jwtCfg: Config{
+				SigningSecret: base64.StdEncoding.EncodeToString([]byte("foobar")), SigningSecretBase64Encoded: true,
+			},
 			wantErr: assert.NoError,
 		},
 		{
@@ -167,7 +169,7 @@ func TestServeHTTP(t *testing.T) {
 			require.NoError(t, err)
 
 			rec := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/", nil)
+			req, err := http.NewRequest(http.MethodGet, "/", http.NoBody)
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+test.token)
 
@@ -184,7 +186,7 @@ func TestServeHTTP(t *testing.T) {
 			if test.jwtCfg.TokenQueryKey != "" {
 				tokenQueryKey = test.jwtCfg.TokenQueryKey
 			}
-			req, err = http.NewRequest(http.MethodGet, "/?"+tokenQueryKey+"="+test.token, nil)
+			req, err = http.NewRequest(http.MethodGet, "/?"+tokenQueryKey+"="+test.token, http.NoBody)
 			require.NoError(t, err)
 
 			middleware.ServeHTTP(rec, req)

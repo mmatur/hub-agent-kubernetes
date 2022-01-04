@@ -50,7 +50,7 @@ func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string]
 		return nil, fmt.Errorf("creating metrics previous data url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pquerna/cachecontrol"
-	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2"
 )
 
 // KeySet allows to get a signing key from a JWK set.
@@ -90,6 +90,7 @@ func (k *FileKeySet) readKeySet() error {
 	if err != nil {
 		return fmt.Errorf("unable to open key set file: %w", err)
 	}
+	//nolint:gosec // We don't really care if there is an error closing this file as we don't write to it.
 	defer func() { _ = f.Close() }()
 
 	var keySet jose.JSONWebKeySet
@@ -222,7 +223,7 @@ func (s *RemoteKeySet) isExpired() bool {
 }
 
 func fetchKeys(ctx context.Context, client *http.Client, url string) (*jose.JSONWebKeySet, time.Time, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to build fetch keys request: %w", err)
 	}

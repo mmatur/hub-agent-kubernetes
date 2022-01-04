@@ -33,30 +33,38 @@ func TestDigestAuthUsers(t *testing.T) {
 		realm              string
 	}{
 		{
-			desc:               "Should authenticate users",
-			givenUsers:         []string{"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36"},
+			desc: "Should authenticate users",
+			givenUsers: []string{
+				"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36",
+			},
 			username:           "test2",
 			password:           "test2",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
-			desc:               "Should not authenticate unknown user",
-			givenUsers:         []string{"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36"},
+			desc: "Should not authenticate unknown user",
+			givenUsers: []string{
+				"test2:hub:5bbbb797a1cc41589e591ed7be86f951", "test3:hub:ef4329f9ca625d97a89c0572d367bc36",
+			},
 			username:           "foo",
 			password:           "bar",
 			expectedStatusCode: http.StatusUnauthorized,
 		},
 		{
-			desc:               "Should authenticate the correct user based on the realm",
-			givenUsers:         []string{"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
+			desc: "Should authenticate the correct user based on the realm",
+			givenUsers: []string{
+				"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4",
+			},
 			username:           "test",
 			password:           "test2",
 			realm:              "traefiker",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
-			desc:               "Should not authenticate user from unknown realm",
-			givenUsers:         []string{"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4"},
+			desc: "Should not authenticate user from unknown realm",
+			givenUsers: []string{
+				"test:hub:d061460985b8212db4b9465a846615e2", "test:traefiker:a3d334dff2645b914918de78bec50bf4",
+			},
 			username:           "test",
 			password:           "test2",
 			realm:              "otherRealm",
@@ -81,7 +89,7 @@ func TestDigestAuthUsers(t *testing.T) {
 			ts := httptest.NewServer(handler)
 			defer ts.Close()
 
-			req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+			req, err := http.NewRequest(http.MethodGet, ts.URL, http.NoBody)
 			require.NoError(t, err)
 			digestRequest := newDigestRequest(test.username, test.password, http.DefaultClient)
 
@@ -105,7 +113,7 @@ func TestDigestAuthUserHeader(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+	req, err := http.NewRequest(http.MethodGet, ts.URL, http.NoBody)
 	require.NoError(t, err)
 	digestRequest := newDigestRequest("test2", "test2", http.DefaultClient)
 

@@ -164,13 +164,15 @@ func writePID() error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
 
 	pid := os.Getpid()
 	if _, err = f.WriteString(strconv.Itoa(pid)); err != nil {
+		_ = f.Close()
 		return err
+	}
+
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("close: %w", err)
 	}
 
 	return nil

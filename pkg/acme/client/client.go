@@ -65,7 +65,7 @@ func (c *Client) Obtain(ctx context.Context, domains []string) (Certificate, err
 	query.Set("domains", strings.Join(domains, ","))
 	baseURL.RawQuery = query.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
 	if err != nil {
 		return Certificate{}, fmt.Errorf("build request: %w", err)
 	}

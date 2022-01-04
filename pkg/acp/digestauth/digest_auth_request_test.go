@@ -57,7 +57,7 @@ func (r *digestRequest) Do(req *http.Request) (*http.Response, error) {
 }
 
 func (r *digestRequest) makeParts(req *http.Request) (map[string]string, error) {
-	authReq, err := http.NewRequest(req.Method, req.URL.String(), nil)
+	authReq, err := http.NewRequest(req.Method, req.URL.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (r *digestRequest) makeAuthorization(req *http.Request, parts map[string]st
 		ha2,
 	})
 	return fmt.Sprintf(
-		`Digest username="%s", realm="%s", nonce="%s", uri="%s", algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s", opaque="%s"`,
+		`Digest username=%q, realm=%q, nonce=%q, uri=%q, algorithm=%s, qop=%s, nc=%s, cnonce=%q, response=%q, opaque=%q`,
 		r.username,
 		parts[realm],
 		parts[nonce],

@@ -120,7 +120,7 @@ type AccessControlConfig struct {
 
 // GetConfig returns the agent configuration.
 func (c *Client) GetConfig(ctx context.Context) (Config, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/config", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/config", http.NoBody)
 	if err != nil {
 		return Config{}, fmt.Errorf("build request: %w", err)
 	}
@@ -152,7 +152,7 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 
 // Ping sends a ping to the platform to inform that the agent is alive.
 func (c *Client) Ping(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/ping", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/ping", http.NoBody)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}

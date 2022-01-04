@@ -40,7 +40,7 @@ func (c *Client) GetRules(ctx context.Context) ([]Rule, error) {
 		return nil, fmt.Errorf("creating alerting rules url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

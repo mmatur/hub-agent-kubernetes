@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"syscall"
 
@@ -32,7 +32,7 @@ func (c refreshConfigCmd) build() *cli.Command {
 func (c refreshConfigCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
 
-	data, err := ioutil.ReadFile(pidFilePath)
+	data, err := os.ReadFile(pidFilePath)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to read PID file")
 		return err

@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"io/ioutil"
 	"os"
 )
 
@@ -22,7 +21,7 @@ func (f FileOrContent) Read() ([]byte, error) {
 	var content []byte
 	if f.IsPath() {
 		var err error
-		content, err = ioutil.ReadFile(f.String())
+		content, err = os.ReadFile(f.String())
 		if err != nil {
 			return nil, err
 		}
