@@ -20,6 +20,7 @@ func TestFetcher_GetServices(t *testing.T) {
 		"myService@myns": {
 			Name:      "myService",
 			Namespace: "myns",
+			ClusterID: "cluster-id",
 			Annotations: map[string]string{
 				"my.annotation": "foo",
 			},
@@ -117,7 +118,7 @@ func TestFetcher_GetServices(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
-	gotSvcs, gotNames, err := f.getServices(apps)
+	gotSvcs, gotNames, err := f.getServices("cluster-id", apps)
 	require.NoError(t, err)
 
 	assert.Equal(t, wantSvcs, gotSvcs)
@@ -129,6 +130,7 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 		"myService@myns": {
 			Name:      "myService",
 			Namespace: "myns",
+			ClusterID: "cluster-id",
 			Annotations: map[string]string{
 				"my.annotation": "foo",
 			},
@@ -231,7 +233,7 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, hubClient, traefikClient, "v1.20.1", "cluster-id")
 	require.NoError(t, err)
 
-	gotSvcs, gotNames, err := f.getServices(apps)
+	gotSvcs, gotNames, err := f.getServices("cluster-id", apps)
 	require.NoError(t, err)
 
 	assert.Equal(t, wantSvcs, gotSvcs)

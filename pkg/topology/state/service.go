@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (f *Fetcher) getServices(apps map[string]*App) (map[string]*Service, map[string]string, error) {
+func (f *Fetcher) getServices(clusterID string, apps map[string]*App) (map[string]*Service, map[string]string, error) {
 	services, err := f.k8s.Core().V1().Services().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, nil, err
@@ -43,6 +43,7 @@ func (f *Fetcher) getServices(apps map[string]*App) (map[string]*Service, map[st
 		svcs[svcName] = &Service{
 			Name:          service.Name,
 			Namespace:     service.Namespace,
+			ClusterID:     clusterID,
 			Annotations:   sanitizeAnnotations(service.Annotations),
 			Selector:      service.Spec.Selector,
 			Apps:          selectApps(apps, service),

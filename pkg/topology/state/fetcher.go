@@ -174,7 +174,7 @@ func (f *Fetcher) FetchState() (*Cluster, error) {
 		return nil, err
 	}
 
-	cluster.Services, cluster.TraefikServiceNames, err = f.getServices(cluster.Apps)
+	cluster.Services, cluster.TraefikServiceNames, err = f.getServices(cluster.ID, cluster.Apps)
 	if err != nil {
 		return nil, err
 	}

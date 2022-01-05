@@ -65,6 +65,7 @@ type IngressController struct {
 type Service struct {
 	Name          string             `json:"name"`
 	Namespace     string             `json:"namespace"`
+	ClusterID     string             `json:"clusterId"`
 	Type          corev1.ServiceType `json:"type"`
 	Selector      map[string]string  `json:"selector"`
 	Apps          []string           `json:"apps,omitempty"`
