@@ -71,13 +71,12 @@ jobs:
         env:
           DOCKER_BUILDX_ARGS: --push
         run: |
-          make multi-arch-image
+          make multi-arch-image-latest
 
       - name: Build multi arch experimental image
         if: github.repository == 'traefik/hub-agent' && github.ref == 'refs/heads/master'
         env:
           DOCKER_BUILDX_ARGS: --push
-          DOCKER_IMAGE_TAG: experimental
         run: |
-          make multi-arch-image
+          make multi-arch-image-experimental
           make multi-arch-image-${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}-$(date +%s)
