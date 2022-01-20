@@ -80,4 +80,4 @@ jobs:
           DOCKER_IMAGE_TAG: experimental
         run: |
           make multi-arch-image
-          make multi-arch-image-${SEMAPHORE_GIT_BRANCH}-${SEMAPHORE_GIT_SHA:0:7}-$(date +%s)
+          make multi-arch-image-${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}-$(date +%s)
