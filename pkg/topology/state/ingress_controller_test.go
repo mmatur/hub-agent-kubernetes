@@ -76,10 +76,67 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
+				},
+			},
+		},
+		{
+			desc:    "One ingress controller from Deployment with both public hostname & ip",
+			fixture: "one-ingress-controller-from-deployment.yml",
+			services: map[string]*Service{
+				"myService@myns": {
+					Name:      "myService",
+					Namespace: "myns",
+					Selector: map[string]string{
+						"my.label": "foo",
+					},
+					status: corev1.ServiceStatus{
+						LoadBalancer: corev1.LoadBalancerStatus{
+							Ingress: []corev1.LoadBalancerIngress{
+								{
+									IP: "1.2.3.4",
+								},
+								{
+									Hostname: "hostname.traefik.io",
+								},
+							},
+						},
+					},
+				},
+			},
+			apps: map[string]*App{
+				"Deployment/myApp@myns": {
+					Name:          "myApp",
+					Namespace:     "myns",
+					Kind:          "Deployment",
+					Replicas:      3,
+					ReadyReplicas: 2,
+					podLabels: map[string]string{
+						"my.label": "foo",
+					},
+					Images: []string{"traefik:latest"},
+				},
+			},
+			want: map[string]*IngressController{
+				"myApp@myns": {
+					App: App{
+						Name:          "myApp",
+						Namespace:     "myns",
+						Kind:          "Deployment",
+						Replicas:      3,
+						ReadyReplicas: 2,
+						Images:        []string{"traefik:latest"},
+						podLabels: map[string]string{
+							"my.label": "foo",
+						},
+					},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "hostname.traefik.io"},
 				},
 			},
 		},
@@ -113,10 +170,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      nil,
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: nil,
 				},
 			},
 		},
@@ -170,10 +227,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom", "http://4.5.6.7:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom", "http://4.5.6.7:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -227,10 +284,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass", "myIngressClass2"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass", "myIngressClass2"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -284,10 +341,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -341,10 +398,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -398,10 +455,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"myIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"myIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 			},
 		},
@@ -485,10 +542,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeTraefik,
-					IngressClasses: []string{"fooIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"fooIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 				"nginx@myns": {
 					App: App{
@@ -502,9 +559,9 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "bar",
 						},
 					},
-					Type:           IngressControllerTypeNginxOfficial,
-					IngressClasses: []string{"barIngressClass"},
-					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
+					Type:            IngressControllerTypeNginxOfficial,
+					IngressClasses:  []string{"barIngressClass"},
+					PublicEndpoints: []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
 		},
@@ -588,10 +645,10 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "foo",
 						},
 					},
-					Type:           IngressControllerTypeNginxCommunity,
-					IngressClasses: []string{"fooIngressClass"},
-					MetricsURLs:    []string{"http://1.2.3.4:9090/custom"},
-					PublicIPs:      []string{"1.2.3.4", "4.5.6.7"},
+					Type:            IngressControllerTypeNginxCommunity,
+					IngressClasses:  []string{"fooIngressClass"},
+					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
+					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
 				"nginx@myns": {
 					App: App{
@@ -605,9 +662,9 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 							"my.label": "bar",
 						},
 					},
-					Type:           IngressControllerTypeNginxOfficial,
-					IngressClasses: []string{"barIngressClass"},
-					PublicIPs:      []string{"11.12.13.14", "7.8.9.10"},
+					Type:            IngressControllerTypeNginxOfficial,
+					IngressClasses:  []string{"barIngressClass"},
+					PublicEndpoints: []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
 		},
@@ -1058,12 +1115,12 @@ func TestGuessMetricsURL(t *testing.T) {
 	}
 }
 
-func TestFindPublicIPs(t *testing.T) {
+func TestFindPublicEndpoints(t *testing.T) {
 	tests := []struct {
-		desc     string
-		services map[string]*Service
-		pod      *corev1.Pod
-		wantIPs  []string
+		desc          string
+		services      map[string]*Service
+		pod           *corev1.Pod
+		wantEndpoints []string
 	}{
 		{
 			desc: "Labels, no services",
@@ -1132,7 +1189,7 @@ func TestFindPublicIPs(t *testing.T) {
 					},
 				},
 			},
-			wantIPs: []string{"foo"},
+			wantEndpoints: []string{"foo"},
 		},
 		{
 			desc: "Two services, one matches",
@@ -1181,7 +1238,7 @@ func TestFindPublicIPs(t *testing.T) {
 					},
 				},
 			},
-			wantIPs: []string{"foo"},
+			wantEndpoints: []string{"foo"},
 		},
 		{
 			desc: "Two services, both match",
@@ -1237,7 +1294,7 @@ func TestFindPublicIPs(t *testing.T) {
 					},
 				},
 			},
-			wantIPs: []string{"bar", "baz", "foo"},
+			wantEndpoints: []string{"bar", "baz", "foo"},
 		},
 	}
 
@@ -1246,9 +1303,9 @@ func TestFindPublicIPs(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			svs := findPublicIPs(test.services, test.pod)
+			svs := findPublicEndpoints(test.services, test.pod)
 
-			assert.Equal(t, test.wantIPs, svs)
+			assert.Equal(t, test.wantEndpoints, svs)
 		})
 	}
 }

@@ -75,7 +75,7 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 				Type: ctrlType,
 
 				// TODO What should we do if an IngressController does not have a service, log, status field?
-				PublicIPs: findPublicIPs(services, pod),
+				PublicEndpoints: findPublicEndpoints(services, pod),
 			}
 
 			result[key] = ic
@@ -334,10 +334,10 @@ func findApp(apps map[string]*App, pod *corev1.Pod) App {
 	return result[0]
 }
 
-func findPublicIPs(svcs map[string]*Service, pod *corev1.Pod) []string {
-	var ips []string
+func findPublicEndpoints(svcs map[string]*Service, pod *corev1.Pod) []string {
+	var endpoints []string
 
-	knownIPs := make(map[string]struct{})
+	knownPublicEndpoints := make(map[string]struct{})
 	for _, service := range svcs {
 		if service.Namespace != pod.Namespace || len(service.status.LoadBalancer.Ingress) == 0 {
 			continue
@@ -356,19 +356,24 @@ func findPublicIPs(svcs map[string]*Service, pod *corev1.Pod) []string {
 			continue
 		}
 
-		for _, ip := range service.status.LoadBalancer.Ingress {
-			if _, exists := knownIPs[ip.IP]; exists {
+		for _, ing := range service.status.LoadBalancer.Ingress {
+			endpoint := ing.IP
+			if endpoint == "" {
+				endpoint = ing.Hostname
+			}
+
+			if _, exists := knownPublicEndpoints[endpoint]; exists {
 				continue
 			}
 
-			knownIPs[ip.IP] = struct{}{}
-			ips = append(ips, ip.IP)
+			knownPublicEndpoints[endpoint] = struct{}{}
+			endpoints = append(endpoints, endpoint)
 		}
 	}
 
-	sort.Strings(ips)
+	sort.Strings(endpoints)
 
-	return ips
+	return endpoints
 }
 
 func marshalToIngressClassNetworkingV1(ing *netv1beta1.IngressClass) (*netv1.IngressClass, error) {

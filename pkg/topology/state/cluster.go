@@ -55,10 +55,10 @@ type App struct {
 type IngressController struct {
 	App
 
-	Type           string   `json:"type"`
-	IngressClasses []string `json:"ingressClasses,omitempty"`
-	MetricsURLs    []string `json:"metricsURLs,omitempty"`
-	PublicIPs      []string `json:"publicIPs,omitempty"`
+	Type            string   `json:"type"`
+	IngressClasses  []string `json:"ingressClasses,omitempty"`
+	MetricsURLs     []string `json:"metricsURLs,omitempty"`
+	PublicEndpoints []string `json:"publicEndpoints,omitempty"`
 }
 
 // Service describes a Service.
