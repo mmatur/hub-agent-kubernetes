@@ -118,3 +118,4 @@ traefik_router_request_duration_seconds_count{code="200",method="GET",protocol="
 # TYPE traefik_router_requests_total counter
 traefik_router_requests_total{code="200",method="GET",protocol="http",router="myIngress-default-example-com@kubernetes",service="default-whoami-80@kubernetes"} 2
 traefik_router_requests_total{code="200",method="GET",protocol="http",router="default-myIngressRoute-6f97418635c7e18853da@kubernetescrd",service="default-myIngressRoute-6f97418635c7e18853da@kubernetescrd"} 1
+traefik_router_requests_total{code="200",method="GET",protocol="http",router="websecure-app-obe-whoami-obelix-containous-cloud@kubernetes",service="whoami-whoami-obelix-80@kubernetes"} 38

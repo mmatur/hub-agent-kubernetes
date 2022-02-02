@@ -268,7 +268,12 @@ func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (i
 			guess := strings.ReplaceAll(ingressName, "@", "-")
 			// Remove the `.kind.group` from the namespace.
 			guess = strings.SplitN(guess, ".", 2)[0]
-			if strings.HasPrefix(name, guess) {
+			// The name of ingresses follow this rule:
+			//     [entrypointName-]ingressName-ingressNamespace-ingressHost-ingressPath[-hash]@kubernetes
+			// If the ingress uses an entry point that has TLS or middlewares enabled, its name is prefixed by the entry point name
+			// An optional hash is added in case of a name conflict
+			// Since an entry point name can contain "-", checking if ingressName-ingressNamespace is contained in `name` should be fine.
+			if strings.Contains(name, guess) {
 				return ingressName
 			}
 		}
