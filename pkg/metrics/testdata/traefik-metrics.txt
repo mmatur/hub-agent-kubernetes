@@ -93,6 +93,7 @@ traefik_service_request_duration_seconds_sum{code="200",method="GET",protocol="h
 traefik_service_request_duration_seconds_count{code="200",method="GET",protocol="http",service="default-whoami-80@kubernetes"} 12
 # HELP traefik_service_requests_total How many HTTP requests processed on a service, partitioned by status code, protocol, and method.
 # TYPE traefik_service_requests_total counter
+traefik_service_requests_total{code="200",method="GET",protocol="http",service="whoami-app-traefik-01cb3b7148a6096f7b2c@kubernetescrd"} 66
 traefik_service_requests_total{code="200",method="GET",protocol="http",service="default-whoami-sdfsdfsdsd@kubernetes"} 12
 traefik_service_requests_total{code="400",method="GET",protocol="http",service="default-whoami-80@kubernetes"} 14
 traefik_service_requests_total{code="500",method="GET",protocol="http",service="default-whoami2-80@kubernetes"} 16

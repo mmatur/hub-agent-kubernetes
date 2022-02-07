@@ -251,7 +251,15 @@ func (p TraefikParser) guessService(lbls []*dto.LabelPair, state ScrapeState) st
 		return ""
 	}
 
-	return state.TraefikServiceNames[parts[0]]
+	// In the case where an ingressRoute has a single route with a single service
+	// Traefik create a service with the name of the ingressRoute
+	for ingress, service := range state.TraefikServiceNames {
+		if strings.Contains(parts[0], ingress) {
+			return service
+		}
+	}
+
+	return ""
 }
 
 func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (ingress string) {

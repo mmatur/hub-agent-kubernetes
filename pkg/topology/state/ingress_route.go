@@ -15,25 +15,38 @@ const (
 	ResourceKindTLSOption      = "TLSOption"
 )
 
-func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, error) {
+func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, map[string]string, error) {
 	ingressRoutes, err := f.traefik.Traefik().V1alpha1().IngressRoutes().Lister().List(labels.Everything())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	result := make(map[string]*IngressRoute)
+	var traefikServices map[string]string
 	for _, ingressRoute := range ingressRoutes {
 		var routes []Route
 		for _, route := range ingressRoute.Spec.Routes {
 			services, err := f.getRouteServices(ingressRoute.Namespace, route)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			routes = append(routes, Route{
 				Match:    route.Match,
 				Services: services,
 			})
+
+			if len(route.Services) == 1 && route.Services[0].Kind != ResourceKindTraefikService {
+				namespace := ingressRoute.Namespace
+				if route.Services[0].Namespace != "" {
+					namespace = route.Services[0].Namespace
+				}
+				if traefikServices == nil {
+					traefikServices = make(map[string]string)
+				}
+
+				traefikServices[ingressRoute.Namespace+"-"+ingressRoute.Name] = objectKey(route.Services[0].Name, namespace)
+			}
 		}
 
 		var tls *IngressRouteTLS
@@ -70,7 +83,7 @@ func (f *Fetcher) getIngressRoutes(clusterID string) (map[string]*IngressRoute, 
 		result[ingressKey(ing.ResourceMeta)] = ing
 	}
 
-	return result, nil
+	return result, traefikServices, nil
 }
 
 func (f *Fetcher) getRouteServices(ingressRouteNamespace string, route traefikv1alpha1.Route) ([]RouteService, error) {
