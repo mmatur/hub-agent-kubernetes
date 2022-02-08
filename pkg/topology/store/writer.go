@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ldez/go-git-cmd-wrapper/v2/add"
+	"github.com/ldez/go-git-cmd-wrapper/v2/branch"
 	"github.com/ldez/go-git-cmd-wrapper/v2/checkout"
 	"github.com/ldez/go-git-cmd-wrapper/v2/commit"
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
@@ -22,22 +23,24 @@ import (
 
 // Write writes the given cluster state in the current git repository.
 func (s *Store) Write(ctx context.Context, st *state.Cluster) error {
-	// Creating new branch from checkout.
-	output, err := git.CheckoutWithContext(ctx, checkout.NewBranch(st.ID), git.CmdExecutor(s.gitExecutor))
+	output, err := git.Branch(branch.List, branch.Format("refname:short"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
-		if !strings.Contains(output, fmt.Sprintf("A branch named '%s' already exists.", st.ID)) {
-			return fmt.Errorf("create local branch: %w %s", err, output)
-		}
+		return fmt.Errorf("list branches: %w %s", err, output)
+	}
 
-		// Simple checkout if the branch already exists.
+	if strings.Contains(output, st.ID) {
+		// The branch already exists.
 		output, err = git.CheckoutWithContext(ctx, checkout.Branch(st.ID), git.CmdExecutor(s.gitExecutor))
 		if err != nil {
 			return fmt.Errorf("checkout local branch: %w %s", err, output)
 		}
-	}
-	// If the branch did not already exist.
-	if !strings.Contains(output, "Already on") {
-		// Pulling remote changes if any.
+	} else {
+		// Creating new branch from checkout.
+		output, err = git.CheckoutWithContext(ctx, checkout.NewBranch(st.ID), git.CmdExecutor(s.gitExecutor))
+		if err != nil {
+			return fmt.Errorf("checkout new local branch: %w %s", err, output)
+		}
+
 		output, err = git.PullWithContext(ctx, pull.FfOnly, pull.Repository("origin"), pull.Refspec(st.ID), git.CmdExecutor(s.gitExecutor))
 		if err != nil && !strings.Contains(output, fmt.Sprintf("couldn't find remote ref %s", st.ID)) {
 			return fmt.Errorf("git pull: %w: %s", err, output)
