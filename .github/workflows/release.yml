@@ -1,14 +1,13 @@
-name: Build on branches
+name: Release
 
 on:
   push:
-    branches:
-      - master
-      - deploy
-jobs:
+    tags:
+    - 'v*'
 
+jobs:
   branches:
-    name: Build on branches
+    name: Release
     runs-on: ubuntu-20.04
     env:
       GO_VERSION: 1.16
@@ -67,9 +66,8 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build multi arch image
-        if: github.repository == 'traefik/hub-agent' && github.ref == 'refs/heads/master'
         env:
           DOCKER_BUILDX_ARGS: --push
         run: |
-          make multi-arch-image-experimental
-          make multi-arch-image-${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}-$(date +%s)
+          make multi-arch-image-latest
+          make multi-arch-image-${{github.ref_name}}
