@@ -131,6 +131,7 @@ linters:
     - nilnil
     - ireturn
     - contextcheck
+    - errchkjson
 
 issues:
   exclude-use-default: false
@@ -147,6 +148,10 @@ issues:
         - noctx
         - gochecknoinits
         - gochecknoglobals
+        - maintidx
+    - path: pkg/crd/api/.*
+      linters:
+        - tagliatelle
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
         - gochecknoglobals

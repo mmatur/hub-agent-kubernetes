@@ -90,7 +90,6 @@ func (k *FileKeySet) readKeySet() error {
 	if err != nil {
 		return fmt.Errorf("unable to open key set file: %w", err)
 	}
-	//nolint:gosec // We don't really care if there is an error closing this file as we don't write to it.
 	defer func() { _ = f.Close() }()
 
 	var keySet jose.JSONWebKeySet
