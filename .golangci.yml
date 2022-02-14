@@ -196,6 +196,9 @@ issues:
     - path: pkg/acp/admission/reviewer/nginx_ingress.go
       linters:
         - nestif
+    - path: pkg/version/version.go
+      linters:
+        - gochecknoglobals
     # Harmful to code readability.
     - path: pkg/acp/admission/webhook.go
       linters:

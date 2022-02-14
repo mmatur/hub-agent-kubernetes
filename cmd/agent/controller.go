@@ -13,6 +13,7 @@ import (
 	"github.com/traefik/hub-agent/pkg/platform"
 	"github.com/traefik/hub-agent/pkg/topology/state"
 	"github.com/traefik/hub-agent/pkg/topology/store"
+	"github.com/traefik/hub-agent/pkg/version"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,6 +62,8 @@ func (c controllerCmd) build() *cli.Command {
 
 func (c controllerCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
+
+	version.Log()
 
 	if err := writePID(); err != nil {
 		return fmt.Errorf("write pid: %w", err)

@@ -15,6 +15,7 @@ import (
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent/pkg/kube"
 	"github.com/traefik/hub-agent/pkg/logger"
+	"github.com/traefik/hub-agent/pkg/version"
 	"github.com/urfave/cli/v2"
 )
 
@@ -50,6 +51,8 @@ func (c authServerCmd) build() *cli.Command {
 
 func (c authServerCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
+
+	version.Log()
 
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {

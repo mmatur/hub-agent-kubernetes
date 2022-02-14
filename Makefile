@@ -27,7 +27,7 @@ test: clean
 
 build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
-	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "main.version=${VERSION}" -X "main.commit=${SHA}" -X "main.date=${BUILD_DATE}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
+	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "github.com/traefik/hub-agent/pkg/version.date=${BUILD_DATE}" -X "github.com/traefik/hub-agent/pkg/version.version=${VERSION}" -X "github.com/traefik/hub-agent/pkg/version.commit=${SHA}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
 
 image: export GOOS := linux
 image: export GOARCH := amd64

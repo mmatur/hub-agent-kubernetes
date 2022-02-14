@@ -8,6 +8,7 @@ import (
 
 	"github.com/ettle/strcase"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent/pkg/version"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,12 +26,14 @@ func main() {
 
 func run() error {
 	app := &cli.App{
-		Name:  "Hub agent CLI",
-		Usage: "Manages a Traefik Hub agent installation",
+		Name:    "Hub agent CLI",
+		Usage:   "Manages a Traefik Hub agent installation",
+		Version: version.String(),
 		Commands: []*cli.Command{
 			newControllerCmd().build(),
 			newAuthServerCmd().build(),
 			newRefreshConfigCmd().build(),
+			newVersionCmd().build(),
 		},
 	}
 
