@@ -23,7 +23,7 @@ import (
 
 // Write writes the given cluster state in the current git repository.
 func (s *Store) Write(ctx context.Context, st *state.Cluster) error {
-	output, err := git.Branch(branch.List, branch.Format("refname:short"), git.CmdExecutor(s.gitExecutor))
+	output, err := git.Branch(branch.List, branch.Format("%(refname:short)"), git.CmdExecutor(s.gitExecutor))
 	if err != nil {
 		return fmt.Errorf("list branches: %w %s", err, output)
 	}
