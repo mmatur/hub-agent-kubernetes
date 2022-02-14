@@ -141,11 +141,11 @@ func (m *Manager) checkAlerts(ctx context.Context) error {
 		return fmt.Errorf("send preflight alerts: %w", err)
 	}
 
-	log.Debug().Int("count", len(sendAlerts)).Msg("Sending alerts")
-
 	if len(sendAlerts) == 0 {
 		return nil
 	}
+
+	log.Debug().Int("count", len(sendAlerts)).Msg("Sending alerts")
 
 	if err = m.backend.SendAlerts(ctx, sendAlerts); err != nil {
 		return fmt.Errorf("send alerts: %w", err)
