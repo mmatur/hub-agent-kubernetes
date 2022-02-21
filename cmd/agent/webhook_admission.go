@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp/admission"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
 	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
@@ -58,7 +57,7 @@ func acpFlags() []cli.Flag {
 	}
 }
 
-func webhookAdmission(ctx context.Context, cliCtx *cli.Context, cfg platform.AccessControlConfig, configWatcher *platform.ConfigWatcher, platformClient *platform.Client) error {
+func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client) error {
 	var (
 		listenAddr     = cliCtx.String("acp-server.listen-addr")
 		certFile       = cliCtx.String("acp-server.cert")
@@ -70,14 +69,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, cfg platform.Acc
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	quotas := quota.New(cfg.MaxSecuredRoutes)
-	configWatcher.AddListener(func(cfg platform.Config) {
-		quotas.UpdateMax(cfg.AccessControl.MaxSecuredRoutes)
-	})
-
-	go quota.NewReporter(platformClient, quotas, time.Minute).Run(ctx)
-
-	h, err := setupAdmissionHandler(ctx, authServerAddr, quotas)
+	h, err := setupAdmissionHandler(ctx, authServerAddr)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -129,7 +121,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, cfg platform.Acc
 	return nil
 }
 
-func setupAdmissionHandler(ctx context.Context, authServerAddr string, quotas *quota.Quota) (http.Handler, error) {
+func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Handler, error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -181,10 +173,10 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string, quotas *q
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
 	reviewers := []admission.Reviewer{
-		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter, quotas),
-		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs, quotas),
-		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs, quotas),
-		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter, quotas),
+		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
+		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
+		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
+		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 
 	return admission.NewHandler(reviewers), nil

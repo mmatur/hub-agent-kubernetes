@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent/pkg/acp"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	"github.com/traefik/hub-agent/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent/pkg/acp/jwt"
@@ -114,7 +113,7 @@ func TestHAProxyIngress_CanReviewChecksKind(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			review := NewHAProxyIngress("", i, policyGetterMock(policies), quota.New(999))
+			review := NewHAProxyIngress("", i, policyGetterMock(policies))
 
 			var ing netv1.Ingress
 			b, err := json.Marshal(ing)
@@ -225,7 +224,7 @@ func TestHAProxyIngress_CanReviewChecksIngressClass(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return nil
 			}
-			review := NewHAProxyIngress("", i, policyGetterMock(policies), quota.New(999))
+			review := NewHAProxyIngress("", i, policyGetterMock(policies))
 
 			ing := netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -263,7 +262,7 @@ func TestHAProxyIngress_CanReviewChecksIngressClass(t *testing.T) {
 
 func TestHAProxyIngress_HandleACPName(t *testing.T) {
 	factory := func(policies PolicyGetter) reviewer {
-		return NewHAProxyIngress("", ingressClassesMock{}, policies, quota.New(999))
+		return NewHAProxyIngress("", ingressClassesMock{}, policies)
 	}
 
 	ingressHandleACPName(t, factory)
@@ -483,7 +482,7 @@ func TestHAProxyIngress_Review(t *testing.T) {
 			policies := func(canonicalName string) *acp.Config {
 				return &test.config
 			}
-			rev := NewHAProxyIngress("http://hub-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies), quota.New(999))
+			rev := NewHAProxyIngress("http://hub-agent.default.svc.cluster.local", ingressClassesMock{}, policyGetterMock(policies))
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -538,37 +537,4 @@ func TestHAProxyIngress_Review(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestHAProxyIngress_ReviewRespectsQuotas(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		return NewHAProxyIngress("", ingressClassesMock{}, policies, quotas)
-	}
-
-	reviewRespectsQuotas(t, factory)
-}
-
-func TestHAProxyIngress_ReviewReleasesQuotasOnDelete(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		return NewHAProxyIngress("", ingressClassesMock{}, policies, quotas)
-	}
-
-	reviewReleasesQuotasOnDelete(t, factory)
-}
-
-func TestHAProxyIngress_reviewReleasesQuotasOnAnnotationRemove(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		return NewHAProxyIngress("", ingressClassesMock{}, policies, quotas)
-	}
-
-	reviewReleasesQuotasOnAnnotationRemove(t, factory)
 }

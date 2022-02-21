@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent/pkg/acp"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	admv1 "k8s.io/api/admission/v1"
 )
 
@@ -20,15 +19,13 @@ const annotationTraefikMiddlewares = "traefik.ingress.kubernetes.io/router.middl
 type TraefikIngress struct {
 	ingressClasses     IngressClasses
 	fwdAuthMiddlewares FwdAuthMiddlewares
-	quotas             QuotaTransaction
 }
 
 // NewTraefikIngress returns a Traefik ingress reviewer.
-func NewTraefikIngress(ingClasses IngressClasses, fwdAuthMiddlewares FwdAuthMiddlewares, quotas QuotaTransaction) *TraefikIngress {
+func NewTraefikIngress(ingClasses IngressClasses, fwdAuthMiddlewares FwdAuthMiddlewares) *TraefikIngress {
 	return &TraefikIngress{
 		ingressClasses:     ingClasses,
 		fwdAuthMiddlewares: fwdAuthMiddlewares,
-		quotas:             quotas,
 	}
 }
 
@@ -93,9 +90,6 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 
 	if ar.Request.Operation == admv1.Delete {
 		log.Ctx(ctx).Info().Msg("Deleting Ingress resource")
-		if err := releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
-			return nil, err
-		}
 		return nil, nil
 	}
 
@@ -106,12 +100,6 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 
 	prevPolName := oldIng.Metadata.Annotations[AnnotationHubAuth]
 	polName := ing.Metadata.Annotations[AnnotationHubAuth]
-
-	if prevPolName != "" && polName == "" {
-		if err = releaseQuotas(r.quotas, ar.Request.Name, ar.Request.Namespace); err != nil {
-			return nil, err
-		}
-	}
 
 	if prevPolName == "" && polName == "" {
 		log.Ctx(ctx).Debug().Msg("No ACP defined")
@@ -128,19 +116,6 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 	}
 
 	if polName != "" {
-		var tx *quota.Tx
-		tx, err = r.quotas.Tx(resourceID(ar.Request.Name, ar.Request.Namespace), countRoutes(ing.Spec))
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if err != nil {
-				tx.Rollback()
-			} else {
-				tx.Commit()
-			}
-		}()
-
 		var middlewareName string
 		middlewareName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ing.Metadata.Namespace)
 		if err != nil {

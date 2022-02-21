@@ -133,7 +133,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	group.Go(func() error {
-		return webhookAdmission(ctx, cliCtx, agentCfg.AccessControl, configWatcher, platformClient)
+		return webhookAdmission(ctx, cliCtx, platformClient)
 	})
 
 	group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })

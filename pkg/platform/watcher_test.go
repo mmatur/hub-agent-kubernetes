@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 
 func TestConfigWatcher_Run(t *testing.T) {
 	cfg := Config{
-		AccessControl: AccessControlConfig{MaxSecuredRoutes: 1},
+		Metrics: MetricsConfig{Interval: 30 * time.Second},
 	}
 
 	client := setupClient(t, cfg)
@@ -43,14 +43,18 @@ func TestConfigWatcher_Run(t *testing.T) {
 	ctx := context.Background()
 	go configWatcher.Run(ctx)
 
-	<-wait
+	select {
+	case <-wait:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 
 	assert.Equal(t, cfg, gotCfg)
 }
 
 func TestConfigWatcher_RunHandlesSIGHUP(t *testing.T) {
 	cfg := Config{
-		AccessControl: AccessControlConfig{MaxSecuredRoutes: 1},
+		Metrics: MetricsConfig{Interval: 30 * time.Second},
 	}
 	client := setupClient(t, cfg)
 	configWatcher := NewConfigWatcher(time.Hour, client)
@@ -89,7 +93,11 @@ func TestConfigWatcher_RunHandlesSIGHUP(t *testing.T) {
 		}
 	}()
 
-	<-wait
+	select {
+	case <-wait:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 
 	assert.Equal(t, cfg, gotCfg)
 }

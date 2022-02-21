@@ -24,7 +24,7 @@ func (a APIError) Error() string {
 	return fmt.Sprintf("failed with code %d: %s", a.StatusCode, a.Message)
 }
 
-// Client allows to interact with the cluster service.
+// Client allows interacting with the cluster service.
 type Client struct {
 	baseURL    string
 	token      string
@@ -95,9 +95,8 @@ func (c *Client) Link(ctx context.Context, kubeID string) (string, error) {
 
 // Config holds the configuration of the offer.
 type Config struct {
-	Topology      TopologyConfig      `json:"topology"`
-	Metrics       MetricsConfig       `json:"metrics"`
-	AccessControl AccessControlConfig `json:"accessControl"`
+	Topology TopologyConfig `json:"topology"`
+	Metrics  MetricsConfig  `json:"metrics"`
 }
 
 // TopologyConfig holds the topology part of the offer config.
@@ -111,11 +110,6 @@ type TopologyConfig struct {
 type MetricsConfig struct {
 	Interval time.Duration `json:"interval"`
 	Tables   []string      `json:"tables"`
-}
-
-// AccessControlConfig holds the configuration of the access control section of the offer config.
-type AccessControlConfig struct {
-	MaxSecuredRoutes int `json:"maxSecuredRoutes"`
 }
 
 // GetConfig returns the agent configuration.
@@ -153,40 +147,6 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 // Ping sends a ping to the platform to inform that the agent is alive.
 func (c *Client) Ping(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/ping", http.NoBody)
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed with code %d", resp.StatusCode)
-	}
-	return nil
-}
-
-// ReportSecuredRoutesInUse reports the number of secured routes in use to the platform.
-func (c *Client) ReportSecuredRoutesInUse(ctx context.Context, n int) error {
-	payload := struct {
-		Name    string `json:"name"`
-		Current int    `json:"current"`
-	}{
-		Name:    "maxSecuredRoutes",
-		Current: n,
-	}
-
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal quota usage request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+"/quotas", bytes.NewReader(b))
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}

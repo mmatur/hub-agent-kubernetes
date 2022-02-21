@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent/pkg/acp"
 	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/quota"
 	"github.com/traefik/hub-agent/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent/pkg/acp/jwt"
@@ -26,7 +25,7 @@ func TestTraefikIngress_HandleACPName(t *testing.T) {
 	factory := func(policies PolicyGetter) reviewer {
 		fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
 
-		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
+		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 	}
 
 	ingressHandleACPName(t, factory)
@@ -127,7 +126,7 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 				return nil
 			}
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := NewTraefikIngress(i, fwdAuthMdlwrs, quota.New(999))
+			review := NewTraefikIngress(i, fwdAuthMdlwrs)
 
 			var ing netv1.Ingress
 			b, err := json.Marshal(ing)
@@ -239,7 +238,7 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 				return nil
 			}
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := NewTraefikIngress(i, fwdAuthMdlwrs, quota.New(999))
+			review := NewTraefikIngress(i, fwdAuthMdlwrs)
 
 			ing := netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -358,7 +357,7 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				return test.config
 			}
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
+			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 
 			oldIng := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -472,7 +471,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				return test.config
 			}
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quota.New(999))
+			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -512,57 +511,6 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 	}
 }
 
-func TestTraefikIngress_ReviewRespectsQuotas(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
-			"",
-			policies,
-			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
-		)
-
-		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
-	}
-
-	reviewRespectsQuotas(t, factory)
-}
-
-func TestTraefikIngress_ReviewReleasesQuotasOnDelete(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
-			"",
-			policies,
-			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
-		)
-
-		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
-	}
-
-	reviewReleasesQuotasOnDelete(t, factory)
-}
-
-func TestTraefikIngress_reviewReleasesQuotasOnAnnotationRemove(t *testing.T) {
-	factory := func(quotas QuotaTransaction) reviewer {
-		policies := policyGetterMock(func(string) *acp.Config {
-			return &acp.Config{JWT: &jwt.Config{}}
-		})
-		fwdAuthMdlwrs := NewFwdAuthMiddlewares(
-			"",
-			policies,
-			traefikkubemock.NewSimpleClientset().TraefikV1alpha1(),
-		)
-
-		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs, quotas)
-	}
-
-	reviewReleasesQuotasOnAnnotationRemove(t, factory)
-}
-
 type policyGetterMock func(canonicalName string) *acp.Config
 
 func (m policyGetterMock) GetConfig(canonicalName string) (*acp.Config, error) {
@@ -580,12 +528,4 @@ func (m ingressClassesMock) GetController(name string) (string, error) {
 
 func (m ingressClassesMock) GetDefaultController() (string, error) {
 	return m.getDefaultControllerFunc()
-}
-
-type quotaMock struct {
-	txFunc func(resourceID string, amount int) (*quota.Tx, error)
-}
-
-func (q quotaMock) Tx(resourceID string, amount int) (*quota.Tx, error) {
-	return q.txFunc(resourceID, amount)
 }

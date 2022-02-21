@@ -53,30 +53,6 @@ func parseRawIngresses(newRaw, oldRaw []byte) (newIng, oldIng ingress, err error
 	return newIng, oldIng, nil
 }
 
-// countRoutes counts the number of routes exposed by a single ingress.
-// An ingress with no rule counts as 1 route.
-func countRoutes(spec ingressSpec) int {
-	var count int
-	if len(spec.Rules) == 0 {
-		return 1
-	}
-
-	for _, rule := range spec.Rules {
-		if rule.HTTP == nil {
-			count++
-			continue
-		}
-
-		count += len(rule.HTTP.Paths)
-	}
-
-	return count
-}
-
-func resourceID(name, ns string) string {
-	return name + "@" + ns
-}
-
 // parseIngressClass parses a raw, JSON-marshaled ingress and returns the ingress class it refers to.
 func parseIngressClass(obj []byte) (ingClassName, ingClassAnno string, err error) {
 	var ing struct {
@@ -122,17 +98,6 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 		return nil, errors.New("unsupported ACP type")
 	}
 	return headerToFwd, nil
-}
-
-func releaseQuotas(q QuotaTransaction, name, ns string) error {
-	tx, err := q.Tx(resourceID(name, ns), 0)
-	if err != nil {
-		return err
-	}
-
-	tx.Commit()
-
-	return nil
 }
 
 func isDefaultIngressClassValue(value string) bool {
