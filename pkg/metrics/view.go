@@ -171,9 +171,15 @@ func mergeGroups(groups []DataPoints) DataPoints {
 		point.ReqPerS = float64(point.Requests) / float64(point.Seconds)
 		point.RequestErrPerS = float64(point.RequestErrs) / float64(point.Seconds)
 		point.RequestClientErrPerS = float64(point.RequestClientErrs) / float64(point.Seconds)
-		point.RequestErrPercent = float64(point.RequestErrs) / float64(point.Requests)
-		point.RequestClientErrPercent = float64(point.RequestClientErrs) / float64(point.Requests)
-		point.AvgResponseTime = point.ResponseTimeSum / float64(point.ResponseTimeCount)
+
+		if point.Requests > 0 {
+			point.RequestErrPercent = float64(point.RequestErrs) / float64(point.Requests)
+			point.RequestClientErrPercent = float64(point.RequestClientErrs) / float64(point.Requests)
+		}
+
+		if point.ResponseTimeCount > 0 {
+			point.AvgResponseTime = point.ResponseTimeSum / float64(point.ResponseTimeCount)
+		}
 
 		points = append(points, point)
 	}
