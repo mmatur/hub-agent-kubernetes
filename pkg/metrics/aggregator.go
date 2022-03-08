@@ -85,6 +85,10 @@ type MetricSet struct {
 
 // RelativeTo returns a service metric relative to o.
 func (s MetricSet) RelativeTo(o MetricSet) MetricSet {
+	if s.Requests < o.Requests {
+		return s
+	}
+
 	s.Requests -= o.Requests
 	s.RequestErrors -= o.RequestErrors
 	s.RequestClientErrors -= o.RequestClientErrors
