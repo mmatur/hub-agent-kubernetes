@@ -16,7 +16,7 @@ func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second
 	rc.RetryMax = 4
-	rc.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "metrics_client").Logger())
+	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "metrics_client").Logger())
 
 	httpClient := rc.StandardClient()
 

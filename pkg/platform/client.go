@@ -35,7 +35,7 @@ type Client struct {
 func NewClient(baseURL, token string) *Client {
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = 4
-	rc.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "platform_client").Logger())
+	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "platform_client").Logger())
 
 	return &Client{
 		baseURL:    baseURL,

@@ -8,10 +8,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"k8s.io/klog/v2"
 )
 
-// Setup is configuring the logger.
+// Setup configures the logger.
 func Setup(level, format string) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
@@ -27,18 +26,22 @@ func Setup(level, format string) {
 	default:
 		w = os.Stderr
 	}
+
 	log.Logger = zerolog.New(w).With().Timestamp().Logger()
+	zerolog.DefaultContextLogger = &log.Logger
 
-	logLevel, err := zerolog.ParseLevel(strings.ToLower(level))
-	if err != nil {
-		logLevel = zerolog.InfoLevel
+	logLevel := zerolog.InfoLevel
+	if level != "" {
+		var err error
+		logLevel, err = zerolog.ParseLevel(strings.ToLower(level))
+		if err != nil {
+			log.Error().Err(err).Str("LOG_LEVEL", level).Msg("Unspecified or invalid log level, setting the level to default (INFO)...")
 
-		log.Debug().Err(err).Str("level", level).Msg("Unspecified or invalid log level, setting the level to default (INFO)...")
+			logLevel = zerolog.InfoLevel
+		}
 	}
 
 	zerolog.SetGlobalLevel(logLevel)
 
 	log.Trace().Str("level", logLevel.String()).Msg("Log level set")
-
-	klog.SetLogger(logrWrapper{logger: log.Logger.With().Str("component", "kubernetes").Logger()})
 }

@@ -43,8 +43,10 @@ dev: image-dev
 	k3d image import $(BIN_NAME):dev --cluster=k3s-default-hub
 	kubectl patch deployment -n hub-agent hub-agent-controller -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-controller","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
 	kubectl patch deployment -n hub-agent hub-agent-auth-server -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-auth-server","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl patch deployment -n hub-agent hub-agent-tunnel -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-tunnel","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
 	kubectl rollout restart deployment -n hub-agent hub-agent-controller
 	kubectl rollout restart deployment -n hub-agent hub-agent-auth-server
+	kubectl rollout restart deployment -n hub-agent hub-agent-tunnel
 
 ## Build Multi archs Docker image
 multi-arch-image-%:

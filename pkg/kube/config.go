@@ -27,7 +27,7 @@ func InClusterConfigWithRetrier(maxRetries int) (*rest.Config, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = maxRetries
 	rc.HTTPClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
-	rc.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "kubernetes_client").Logger())
+	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "kubernetes_client").Logger())
 
 	rrt := &retryablehttp.RoundTripper{Client: rc}
 

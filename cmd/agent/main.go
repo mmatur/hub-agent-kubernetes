@@ -33,6 +33,7 @@ func run() error {
 			newControllerCmd().build(),
 			newAuthServerCmd().build(),
 			newRefreshConfigCmd().build(),
+			newTunnelCmd().build(),
 			newVersionCmd().build(),
 		},
 	}
