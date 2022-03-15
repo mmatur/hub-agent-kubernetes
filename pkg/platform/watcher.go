@@ -45,11 +45,11 @@ func (w *ConfigWatcher) Run(ctx context.Context) {
 			return
 		case <-sigCh:
 			if err := w.reload(ctx); err != nil {
-				log.Error().Err(err).Msg("Unable to reload hub-agent configuration after receiving SIGHUP")
+				log.Error().Err(err).Msg("Unable to reload hub-agent-kubernetes configuration after receiving SIGHUP")
 			}
 		case <-t.C:
 			if err := w.reload(ctx); err != nil {
-				log.Error().Err(err).Msg("Unable to reload hub-agent configuration")
+				log.Error().Err(err).Msg("Unable to reload hub-agent-kubernetes configuration")
 			}
 		}
 	}

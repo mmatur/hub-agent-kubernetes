@@ -34,9 +34,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-hub-agent-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-hub-agent-kubernetes-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-hub-agent-go-
+            ${{ runner.os }}-hub-agent-kubernetes-go-
 
       - name: Check and get dependencies
         run: |

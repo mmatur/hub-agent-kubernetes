@@ -2,7 +2,7 @@
 
 set -e -o pipefail
 
-PROJECT_MODULE="github.com/traefik/hub-agent"
+PROJECT_MODULE="github.com/traefik/hub-agent-kubernetes"
 IMAGE_NAME="kubernetes-codegen:latest"
 
 echo "Building codegen Docker image..."

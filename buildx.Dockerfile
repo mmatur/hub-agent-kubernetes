@@ -37,7 +37,7 @@ RUN apk --no-cache --no-progress add ca-certificates tzdata git \
     && rm -rf /var/cache/apk/*
 
 ARG TARGETPLATFORM
-COPY --from=gobuild /go/src/github.com/traefik/hub-agent-kubernetes/dist/$TARGETPLATFORM/hub-agent /
+COPY --from=gobuild /go/src/github.com/traefik/hub-agent-kubernetes/dist/$TARGETPLATFORM/hub-agent-kubernetes /
 
 ENTRYPOINT ["/hub-agent-kubernetes"]
 EXPOSE 80

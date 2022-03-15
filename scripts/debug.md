@@ -10,7 +10,7 @@ debugger to enable remote debugging.
 3. Add a before launch script
 4. Select `Run External Tool`
 5. Add an external tool using the + sign, name it like you want (`setup debugging port-forward` for example)
-6. Set the program to `/<where-you-cloned-the-agent>/hub-agent/scripts/delve-port-forward.sh`
+6. Set the program to `/<where-you-cloned-the-agent>/hub-agent-kubernetes/scripts/delve-port-forward.sh`
 7. Spam ok/apply
 8. Everything should work™, meaning you can set breakpoints anywhere in the agent code and use the build configuration
    you just created.
