@@ -1,4 +1,4 @@
-# Hub Agent
+# Hub Agent for Kubernetes
 
 ## Usage
 
@@ -6,7 +6,7 @@
 
 ```
 NAME:
-   Hub agent CLI - Manages a Traefik Hub agent installation
+   Hub agent for Kubernetes - Manages a Traefik Hub agent installation
 
 USAGE:
    hub-agent-kubernetes [global options] command [command options] [arguments...]
