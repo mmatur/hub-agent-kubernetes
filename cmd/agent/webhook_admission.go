@@ -12,16 +12,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp/admission"
-	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
-	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
-	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
-	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	"github.com/traefik/hub-agent/pkg/kube"
-	"github.com/traefik/hub-agent/pkg/kubevers"
-	"github.com/traefik/hub-agent/pkg/platform"
-	"github.com/traefik/hub-agent/pkg/validationwebhook"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
+	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
+	"github.com/traefik/hub-agent-kubernetes/pkg/validationwebhook"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,13 +40,13 @@ func acpFlags() []cli.Flag {
 			Name:    "acp-server.cert",
 			Usage:   "Certificate used for TLS by the ACP server",
 			EnvVars: []string{"ACP_SERVER_CERT"},
-			Value:   "/var/run/hub-agent/cert.pem",
+			Value:   "/var/run/hub-agent-kubernetes/cert.pem",
 		},
 		&cli.StringFlag{
 			Name:    "acp-server.key",
 			Usage:   "Key used for TLS by the ACP server",
 			EnvVars: []string{"ACP_SERVER_KEY"},
-			Value:   "/var/run/hub-agent/key.pem",
+			Value:   "/var/run/hub-agent-kubernetes/key.pem",
 		},
 		&cli.StringFlag{
 			Name:    "acp-server.auth-server-addr",

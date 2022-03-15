@@ -7,7 +7,7 @@ import (
 
 	goauth "github.com/abbot/go-http-auth"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 )
 
 const defaultRealm = "hub"

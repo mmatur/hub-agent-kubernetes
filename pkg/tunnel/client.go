@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 )
 
 // Client allows interacting with the tunnel service.

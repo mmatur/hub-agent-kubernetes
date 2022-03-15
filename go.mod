@@ -1,4 +1,4 @@
-module github.com/traefik/hub-agent
+module github.com/traefik/hub-agent-kubernetes
 
 go 1.17
 

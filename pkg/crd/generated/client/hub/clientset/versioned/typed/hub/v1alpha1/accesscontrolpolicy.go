@@ -22,8 +22,8 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
-	scheme "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/scheme"
+	v1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	scheme "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

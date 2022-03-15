@@ -10,10 +10,10 @@ RUN apk --no-cache --no-progress add ca-certificates tzdata git libc6-compat \
     && rm -rf /var/cache/apk/*
 
 COPY --from=delve-builder /go/bin/dlv .
-COPY hub-agent .
+COPY hub-agent-kubernetes .
 
 EXPOSE 80
 EXPOSE 443
 EXPOSE 40000
 
-ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "--accept-multiclient", "--continue", "--", "./hub-agent"]
+ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "--accept-multiclient", "--continue", "--", "./hub-agent-kubernetes"]

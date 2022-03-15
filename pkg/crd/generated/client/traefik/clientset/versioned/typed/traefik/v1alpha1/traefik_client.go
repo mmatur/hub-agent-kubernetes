@@ -19,8 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
-	"github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned/scheme"
+	v1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

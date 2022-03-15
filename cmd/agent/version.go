@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/traefik/hub-agent/pkg/version"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 )
 

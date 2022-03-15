@@ -5,14 +5,14 @@ RUN apk --no-cache --no-progress add ca-certificates tzdata git \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
-COPY hub-agent .
+COPY hub-agent-kubernetes .
 
-ENTRYPOINT ["/hub-agent"]
+ENTRYPOINT ["/hub-agent-kubernetes"]
 EXPOSE 80
 EXPOSE 443
 
 # Metadata
-LABEL org.opencontainers.image.source="https://github.com/traefik/hub-agent" \
+LABEL org.opencontainers.image.source="https://github.com/traefik/hub-agent-kubernetes" \
     org.opencontainers.image.vendor="Traefik Labs" \
     org.opencontainers.image.url="https://traefik.io" \
     org.opencontainers.image.title="Traefik Hub" \

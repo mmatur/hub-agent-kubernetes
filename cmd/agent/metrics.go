@@ -5,10 +5,10 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/logger"
-	"github.com/traefik/hub-agent/pkg/metrics"
-	"github.com/traefik/hub-agent/pkg/platform"
-	"github.com/traefik/hub-agent/pkg/topology"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/metrics"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology"
 )
 
 func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform.MetricsConfig, cfgWatcher *platform.ConfigWatcher) (*metrics.Manager, *metrics.Store, error) {

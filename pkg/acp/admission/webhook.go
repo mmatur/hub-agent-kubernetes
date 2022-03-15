@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp"
-	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

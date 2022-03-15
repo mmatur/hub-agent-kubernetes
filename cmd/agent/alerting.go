@@ -6,10 +6,10 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/alerting"
-	"github.com/traefik/hub-agent/pkg/logger"
-	"github.com/traefik/hub-agent/pkg/metrics"
-	"github.com/traefik/hub-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent-kubernetes/pkg/alerting"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/metrics"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
 )
 
 const (

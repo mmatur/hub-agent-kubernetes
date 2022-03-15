@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 
-	"github.com/traefik/hub-agent/pkg/topology"
-	"github.com/traefik/hub-agent/pkg/topology/state"
-	"github.com/traefik/hub-agent/pkg/topology/store"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/store"
 )
 
 func newTopologyWatcher(ctx context.Context, fetcher *state.Fetcher, storeCfg store.Config) (*topology.Watcher, error) {

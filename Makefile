@@ -1,7 +1,7 @@
 .PHONY: clean lint test build \
 		publish publish-latest image image-dev multi-arch-image-%
 
-BIN_NAME := hub-agent
+BIN_NAME := hub-agent-kubernetes
 MAIN_DIRECTORY := ./cmd/agent
 
 TAG_NAME := $(shell git tag -l --contains HEAD)
@@ -27,7 +27,7 @@ test: clean
 
 build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
-	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "github.com/traefik/hub-agent/pkg/version.date=${BUILD_DATE}" -X "github.com/traefik/hub-agent/pkg/version.version=${VERSION}" -X "github.com/traefik/hub-agent/pkg/version.commit=${SHA}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
+	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "github.com/traefik/hub-agent-kubernetes/pkg/version.date=${BUILD_DATE}" -X "github.com/traefik/hub-agent-kubernetes/pkg/version.version=${VERSION}" -X "github.com/traefik/hub-agent-kubernetes/pkg/version.commit=${SHA}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
 
 image: export GOOS := linux
 image: export GOARCH := amd64

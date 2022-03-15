@@ -10,12 +10,12 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp/auth"
-	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
-	"github.com/traefik/hub-agent/pkg/kube"
-	"github.com/traefik/hub-agent/pkg/logger"
-	"github.com/traefik/hub-agent/pkg/version"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/auth"
+	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 )
 

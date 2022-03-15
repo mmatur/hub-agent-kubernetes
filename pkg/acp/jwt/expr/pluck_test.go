@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/hub-agent/pkg/acp/jwt/expr"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt/expr"
 )
 
 func TestPluckClaims(t *testing.T) {

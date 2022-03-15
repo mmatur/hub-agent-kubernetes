@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/traefik/hub-agent/pkg/acme"
-	"github.com/traefik/hub-agent/pkg/acme/client"
-	hubclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
-	traefikclientset "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	"github.com/traefik/hub-agent/pkg/kube"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acme"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acme/client"
+	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"golang.org/x/sync/errgroup"
 	clientset "k8s.io/client-go/kubernetes"
 )

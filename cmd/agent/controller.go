@@ -7,20 +7,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/traefik/hub-agent/pkg/heartbeat"
-	"github.com/traefik/hub-agent/pkg/kube"
-	"github.com/traefik/hub-agent/pkg/logger"
-	"github.com/traefik/hub-agent/pkg/platform"
-	"github.com/traefik/hub-agent/pkg/topology/state"
-	"github.com/traefik/hub-agent/pkg/topology/store"
-	"github.com/traefik/hub-agent/pkg/version"
+	"github.com/traefik/hub-agent-kubernetes/pkg/heartbeat"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/store"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-const pidFilePath = "/var/run/hub-agent.pid"
+const pidFilePath = "/var/run/hub-agent-kubernetes.pid"
 
 type controllerCmd struct {
 	flags []cli.Flag

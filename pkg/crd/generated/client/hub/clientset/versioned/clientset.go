@@ -21,7 +21,7 @@ package versioned
 import (
 	"fmt"
 
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

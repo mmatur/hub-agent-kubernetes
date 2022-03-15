@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )

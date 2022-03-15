@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned"
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1"
-	fakehubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1/fake"
+	clientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1"
+	fakehubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/typed/hub/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/topology/state"
-	"github.com/traefik/hub-agent/pkg/topology/store"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/store"
 )
 
 // ListenerFunc is a function called by the watcher with the

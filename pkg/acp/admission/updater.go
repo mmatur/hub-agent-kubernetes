@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp"
-	"github.com/traefik/hub-agent/pkg/acp/admission/reviewer"
-	"github.com/traefik/hub-agent/pkg/kubevers"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"

@@ -19,7 +19,7 @@ limitations under the License.
 package scheme
 
 import (
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

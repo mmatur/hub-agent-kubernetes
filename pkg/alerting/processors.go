@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/metrics"
+	"github.com/traefik/hub-agent-kubernetes/pkg/metrics"
 )
 
 const (

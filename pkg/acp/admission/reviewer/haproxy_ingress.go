@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp"
-	"github.com/traefik/hub-agent/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 )
 

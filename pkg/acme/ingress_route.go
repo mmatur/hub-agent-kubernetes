@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 )
 

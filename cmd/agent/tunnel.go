@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/traefik/hub-agent/pkg/logger"
-	"github.com/traefik/hub-agent/pkg/tunnel"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/tunnel"
 	"github.com/urfave/cli/v2"
 )
 

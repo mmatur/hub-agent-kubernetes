@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/topology/state"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
 )
 
 const scrapeInterval = time.Minute

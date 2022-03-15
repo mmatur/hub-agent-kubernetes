@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/hub-agent/pkg/acp/jwt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	jose "gopkg.in/square/go-jose.v2"
 )
 

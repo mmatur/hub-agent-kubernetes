@@ -59,7 +59,7 @@ jobs:
           install: true
 
       - name: Login to GHCR
-        if: github.repository == 'traefik/hub-agent'
+        if: github.repository == 'traefik/hub-agent-kubernetes'
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -67,7 +67,7 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build multi arch image
-        if: github.repository == 'traefik/hub-agent' && github.ref == 'refs/heads/master'
+        if: github.repository == 'traefik/hub-agent-kubernetes' && github.ref == 'refs/heads/master'
         env:
           DOCKER_BUILDX_ARGS: --push
         run: |

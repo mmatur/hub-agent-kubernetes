@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	ktypes "k8s.io/apimachinery/pkg/types"

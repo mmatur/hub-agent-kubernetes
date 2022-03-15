@@ -19,8 +19,8 @@ limitations under the License.
 package traefik
 
 import (
-	internalinterfaces "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions/traefik/v1alpha1"
+	internalinterfaces "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions/traefik/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

@@ -23,9 +23,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/clientset/versioned"
-	internalinterfaces "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions/internalinterfaces"
-	traefik "github.com/traefik/hub-agent/pkg/crd/generated/client/traefik/informers/externalversions/traefik"
+	versioned "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	internalinterfaces "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions/internalinterfaces"
+	traefik "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions/traefik"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp"
-	"github.com/traefik/hub-agent/pkg/acp/basicauth"
-	"github.com/traefik/hub-agent/pkg/acp/digestauth"
-	"github.com/traefik/hub-agent/pkg/acp/jwt"
-	hubv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/hub/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

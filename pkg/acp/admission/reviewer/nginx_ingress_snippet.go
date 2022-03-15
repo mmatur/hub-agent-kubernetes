@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 )
 
 const (

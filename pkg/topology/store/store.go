@@ -12,7 +12,7 @@ import (
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
 	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/platform"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
 
 // Config represents the topology store config.

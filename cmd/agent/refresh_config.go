@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/urfave/cli/v2"
 )
 
@@ -43,7 +43,7 @@ func (c refreshConfigCmd) run(cliCtx *cli.Context) error {
 	}
 
 	if err := syscall.Kill(pid, syscall.SIGHUP); err != nil {
-		log.Error().Err(err).Msg("Unable to send SIGHUP to hub-agent")
+		log.Error().Err(err).Msg("Unable to send SIGHUP to hub-agent-kubernetes")
 		return err
 	}
 

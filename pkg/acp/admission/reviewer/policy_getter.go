@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/traefik/hub-agent/pkg/acp"
-	hubinformer "github.com/traefik/hub-agent/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 )
 
 // PolicyGetter allow to get an access control policy configuration.

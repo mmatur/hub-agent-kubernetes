@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/traefik/hub-agent/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

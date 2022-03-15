@@ -8,7 +8,7 @@ import (
 
 	"github.com/ettle/strcase"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/version"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 )
 

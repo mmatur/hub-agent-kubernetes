@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/kubevers"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"

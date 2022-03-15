@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acme/client"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acme/client"
 	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

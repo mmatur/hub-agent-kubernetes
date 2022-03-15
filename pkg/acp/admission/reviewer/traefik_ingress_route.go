@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent/pkg/acp"
-	traefikv1alpha1 "github.com/traefik/hub-agent/pkg/crd/api/traefik/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	admv1 "k8s.io/api/admission/v1"
 )
 
