@@ -209,22 +209,32 @@ func (t *tunnel) launch(tunnelID, token string) error {
 		}
 
 		go func(brokerConn net.Conn) {
-			clusterServiceConn, dialErr := net.Dial("tcp", t.ClusterEndpoint)
-			if dialErr != nil {
-				log.Error().Err(dialErr).Msg("Unable to connect to cluster endpoint")
+			if err = proxy(brokerConn, t.ClusterEndpoint); err != nil {
+				log.Error().Err(err).Msg("Unable to proxy the tunnel traffic to the cluster endpoint")
 			}
-
-			errCh := make(chan error)
-
-			go connCopy(errCh, clusterServiceConn, brokerConn)
-			go connCopy(errCh, brokerConn, clusterServiceConn)
-
-			if cerr := <-errCh; cerr != nil {
-				log.Error().Err(cerr).Msg("Unable to copy conn")
-			}
-			<-errCh
 		}(brokerConn)
 	}
+}
+
+func proxy(sourceConn net.Conn, addr string) error {
+	targetConn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("dial: %w", err)
+	}
+
+	errCh := make(chan error)
+
+	go connCopy(errCh, targetConn, sourceConn)
+	go connCopy(errCh, sourceConn, targetConn)
+
+	err = <-errCh
+	<-errCh
+
+	if err != nil {
+		return fmt.Errorf("copy conn: %w", err)
+	}
+
+	return nil
 }
 
 func connCopy(errCh chan<- error, dst io.WriteCloser, src io.Reader) {

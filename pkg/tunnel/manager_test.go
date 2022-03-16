@@ -105,6 +105,89 @@ func TestManager_updateTunnels(t *testing.T) {
 	manager.tunnelsMu.Unlock()
 }
 
+func Test_proxy(t *testing.T) {
+	echoListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", "0"))
+	require.NoError(t, err)
+
+	// Start an echo server.
+	go func() {
+		conn, aerr := echoListener.Accept()
+		require.NoError(t, aerr)
+
+		buf := make([]byte, 256)
+		read, rerr := conn.Read(buf)
+		require.NoError(t, rerr)
+
+		wrote, werr := conn.Write(buf[:read])
+		require.NoError(t, werr)
+		assert.Equal(t, read, wrote)
+	}()
+
+	proxyListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", "0"))
+	require.NoError(t, err)
+
+	// Start proxy server.
+	go func() {
+		conn, aerr := proxyListener.Accept()
+		require.NoError(t, aerr)
+
+		perr := proxy(conn, echoListener.Addr().String())
+		require.NoError(t, perr)
+	}()
+
+	// Open connection with the proxy
+	conn, err := net.Dial("tcp", proxyListener.Addr().String())
+	require.NoError(t, err)
+	err = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	require.NoError(t, err)
+	err = conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
+	require.NoError(t, err)
+
+	message := []byte("hello")
+
+	wrote, err := conn.Write(message)
+	require.NoError(t, err)
+	assert.Equal(t, len(message), wrote)
+
+	received := make([]byte, 256)
+	read, err := conn.Read(received)
+	require.NoError(t, err)
+	assert.Equal(t, len(message), read)
+
+	assert.Equal(t, message, received[:read])
+}
+
+func Test_proxy_targetUnreachable(t *testing.T) {
+	proxyListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", "0"))
+	require.NoError(t, err)
+
+	var proxyConn net.Conn
+
+	// Start proxy server.
+	ready := make(chan struct{})
+	go func() {
+		var aerr error
+
+		proxyConn, aerr = proxyListener.Accept()
+		require.NoError(t, aerr)
+
+		close(ready)
+	}()
+
+	// Open connection with the proxy
+	conn, err := net.Dial("tcp", proxyListener.Addr().String())
+	require.NoError(t, err)
+	err = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	require.NoError(t, err)
+	err = conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
+	require.NoError(t, err)
+
+	<-ready
+
+	err = proxy(proxyConn, "127.0.0.1:44444")
+	require.Error(t, err)
+}
+
 func createIngCtrlService(t *testing.T, wait chan struct{}, messages ...string) string {
 	t.Helper()
 
