@@ -1,4 +1,4 @@
-# Hub Agent for Kubernetes
+# Traefik Hub Agent for Kubernetes
 
 ## Usage
 
@@ -6,13 +6,10 @@
 
 ```
 NAME:
-   Hub agent for Kubernetes - Manages a Traefik Hub agent installation
+   Traefik Hub agent for Kubernetes - Manages a Traefik Hub agent installation
 
 USAGE:
    hub-agent-kubernetes [global options] command [command options] [arguments...]
-
-VERSION:
-   cf774bb, build cf774bb on 2022-03-14_11:15:42AM
 
 COMMANDS:
    controller      Runs the Hub agent controller

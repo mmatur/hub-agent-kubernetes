@@ -26,7 +26,7 @@ func main() {
 
 func run() error {
 	app := &cli.App{
-		Name:    "Hub agent for Kubernetes",
+		Name:    "Traefik Hub agent for Kubernetes",
 		Usage:   "Manages a Traefik Hub agent installation",
 		Version: version.String(),
 		Commands: []*cli.Command{
