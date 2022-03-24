@@ -326,19 +326,75 @@ func Test_parseDomains(t *testing.T) {
 		want []string
 	}{
 		{
-			desc: "Host rule",
-			rule: "Host(`foo.localhost`)",
-			want: []string{"foo.localhost"},
+			desc: "Empty rule",
 		},
 		{
-			desc: "Host rule with multiple domains",
-			rule: "Host(`foo.localhost`, `bar.localhost`)",
-			want: []string{"foo.localhost", "bar.localhost"},
+			desc: "No Host rule",
+			rule: "Headers(`X-Forwarded-Host`, `example.com`)",
 		},
 		{
-			desc: "Multiple Host rules",
-			rule: "Host(`foo.localhost`) || Host(`bar.localhost`) || Host(`baz.localhost`)",
-			want: []string{"foo.localhost", "bar.localhost", "baz.localhost"},
+			desc: "Single Host rule with a single domain",
+			rule: "Host(`example.com`)",
+			want: []string{"example.com"},
+		},
+		{
+			desc: "Single Host rule with a single domain: with other rule before",
+			rule: "Headers(`X-Key`, `value`) && Host(`example.com`)",
+			want: []string{"example.com"},
+		},
+		{
+			desc: "Single Host rule with a single domain: with other rule after",
+			rule: "Host(`example.com`) && Headers(`X-Key`, `value`)",
+			want: []string{"example.com"},
+		},
+		{
+			desc: "Multiple Host rules with a single domain",
+			rule: "Host(`1.example.com`) || Host(`2.example.com`)",
+			want: []string{"1.example.com", "2.example.com"},
+		},
+		{
+			desc: "Multiple Host rules with a single domain: with other rule in between",
+			rule: "Host(`1.example.com`) || Headers(`X-Key`, `value`) || Host(`2.example.com`)",
+			want: []string{"1.example.com", "2.example.com"},
+		},
+		{
+			desc: "Single Host rules with many domains",
+			rule: "Host(`1.example.com`, `2.example.com`)",
+			want: []string{"1.example.com", "2.example.com"},
+		},
+		{
+			desc: "Multiple Host rules with many domains",
+			rule: "Host(`1.example.com`, `2.example.com`) || Host(`3.example.com`)",
+			want: []string{"1.example.com", "2.example.com", "3.example.com"},
+		},
+		{
+			desc: "Host rule with double quotes",
+			rule: `Host("example.com")`,
+			want: []string{"example.com"},
+		},
+		{
+			desc: "Invalid rule: Host with no quotes",
+			rule: "Host(example.com)",
+		},
+		{
+			desc: "Invalid rule: Host with missing starting backtick",
+			rule: "Host(example.com`)",
+		},
+		{
+			desc: "Invalid rule: Host with missing ending backtick",
+			rule: "Host(`example.com)",
+		},
+		{
+			desc: "Invalid rule: Host with missing starting double quote",
+			rule: `Host(example.com")`,
+		},
+		{
+			desc: "Invalid rule: Host with missing ending double quote",
+			rule: `Host("example.com)`,
+		},
+		{
+			desc: "Invalid rule: Host with mixed double quote and backtick",
+			rule: "Host(" + `"example.com` + "`)",
 		},
 	}
 
@@ -348,8 +404,8 @@ func Test_parseDomains(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			domains := parseDomains(test.rule)
-			assert.Equal(t, test.want, domains)
+			got := parseDomains(test.rule)
+			assert.Equal(t, test.want, got)
 		})
 	}
 }

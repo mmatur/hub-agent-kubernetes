@@ -10,8 +10,6 @@ import (
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 )
 
-var hostRuleRegexp = regexp.MustCompile(`Host\(([^)]+)\)`)
-
 func (c *Controller) ingressRouteCreated(obj interface{}) {
 	ingRoute, ok := obj.(*traefikv1alpha1.IngressRoute)
 	if !ok {
@@ -116,13 +114,27 @@ func (c *Controller) syncIngressRoute(ingRoute *traefikv1alpha1.IngressRoute) {
 	})
 }
 
+var hostRuleRegexp = regexp.MustCompile(`Host\(([^)]+)\)`)
+
 func parseDomains(rule string) []string {
 	var domains []string
-	for _, matches := range hostRuleRegexp.FindAllStringSubmatch(rule, -1) {
-		for _, match := range matches[1:] {
-			sanitizedDomains := strings.NewReplacer("`", "", " ", "").Replace(match)
 
-			domains = append(domains, strings.Split(sanitizedDomains, ",")...)
+	for _, matches := range hostRuleRegexp.FindAllStringSubmatch(rule, -1) {
+		if len(matches[1:]) == 0 {
+			continue
+		}
+		rawDomains := strings.Split(matches[1], ",")
+		for _, domain := range rawDomains {
+			domain = strings.TrimSpace(domain)
+
+			doubleQuotaDelimiter := domain[0] == '"' && domain[len(domain)-1] == '"'
+			backtickDelimiter := domain[0] == '`' && domain[len(domain)-1] == '`'
+
+			if !doubleQuotaDelimiter && !backtickDelimiter {
+				return nil
+			}
+
+			domains = append(domains, domain[1:len(domain)-1])
 		}
 	}
 
