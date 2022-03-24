@@ -64,9 +64,10 @@ func (f *Fetcher) getAccessControlPolicies(clusterID string) (map[string]*Access
 	return result, nil
 }
 
-func removePassword(rawUsers string) string {
+func removePassword(rawUsers []string) string {
 	var users []string
-	for _, u := range strings.Split(rawUsers, ",") {
+
+	for _, u := range rawUsers {
 		parts := strings.Split(u, ":")
 
 		// Digest format: user:realm:secret

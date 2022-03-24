@@ -104,7 +104,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 					},
 					Spec: hubv1alpha1.AccessControlPolicySpec{
 						BasicAuth: &hubv1alpha1.AccessControlPolicyBasicAuth{
-							Users:                    "toto:secret,titi:secret",
+							Users:                    []string{"toto:secret", "titi:secret"},
 							Realm:                    "realm",
 							StripAuthorizationHeader: true,
 						},
@@ -135,7 +135,7 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 					},
 					Spec: hubv1alpha1.AccessControlPolicySpec{
 						DigestAuth: &hubv1alpha1.AccessControlPolicyDigestAuth{
-							Users:                    "toto:realm:secret,titi:realm:secret",
+							Users:                    []string{"toto:realm:secret", "titi:realm:secret"},
 							Realm:                    "myrealm",
 							StripAuthorizationHeader: true,
 						},

@@ -36,18 +36,18 @@ type AccessControlPolicyJWT struct {
 
 // AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
 type AccessControlPolicyBasicAuth struct {
-	Users                    string `json:"users,omitempty"`
-	Realm                    string `json:"realm,omitempty"`
-	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader"`
-	ForwardUsernameHeader    string `json:"forwardUsernameHeader"`
+	Users                    []string `json:"users,omitempty"`
+	Realm                    string   `json:"realm,omitempty"`
+	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader"`
+	ForwardUsernameHeader    string   `json:"forwardUsernameHeader"`
 }
 
 // AccessControlPolicyDigestAuth holds the HTTP digest authentication configuration.
 type AccessControlPolicyDigestAuth struct {
-	Users                    string `json:"users,omitempty"`
-	Realm                    string `json:"realm,omitempty"`
-	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader"`
-	ForwardUsernameHeader    string `json:"forwardUsernameHeader"`
+	Users                    []string `json:"users,omitempty"`
+	Realm                    string   `json:"realm,omitempty"`
+	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader"`
+	ForwardUsernameHeader    string   `json:"forwardUsernameHeader"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

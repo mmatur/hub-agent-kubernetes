@@ -44,7 +44,7 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 
 		return &Config{
 			BasicAuth: &basicauth.Config{
-				Users:                    strings.Split(basicCfg.Users, ","),
+				Users:                    basicCfg.Users,
 				Realm:                    basicCfg.Realm,
 				StripAuthorizationHeader: basicCfg.StripAuthorizationHeader,
 				ForwardUsernameHeader:    basicCfg.ForwardUsernameHeader,
@@ -56,7 +56,7 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 
 		return &Config{
 			DigestAuth: &digestauth.Config{
-				Users:                    strings.Split(digestCfg.Users, ","),
+				Users:                    digestCfg.Users,
 				Realm:                    digestCfg.Realm,
 				StripAuthorizationHeader: digestCfg.StripAuthorizationHeader,
 				ForwardUsernameHeader:    digestCfg.ForwardUsernameHeader,
