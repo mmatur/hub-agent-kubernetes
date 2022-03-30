@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/abbot/go-http-auth v0.4.0
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/ettle/strcase v0.1.1
 	github.com/go-chi/chi/v5 v5.0.3
 	github.com/golang-jwt/jwt/v4 v4.2.0
