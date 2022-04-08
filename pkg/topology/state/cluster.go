@@ -59,6 +59,7 @@ type IngressController struct {
 	IngressClasses  []string `json:"ingressClasses,omitempty"`
 	MetricsURLs     []string `json:"metricsURLs,omitempty"`
 	PublicEndpoints []string `json:"publicEndpoints,omitempty"`
+	Endpoints       []string `json:"endpoints,omitempty"`
 }
 
 // Service describes a Service.

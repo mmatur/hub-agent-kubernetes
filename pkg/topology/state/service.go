@@ -26,6 +26,10 @@ func (f *Fetcher) getServices(clusterID string, apps map[string]*App) (map[strin
 			externalIPs   []string
 			externalPorts []int
 		)
+		// for BC reason we keep externalPorts.
+		for _, port := range service.Spec.Ports {
+			externalPorts = append(externalPorts, int(port.Port))
+		}
 		if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
 			for _, ingress := range service.Status.LoadBalancer.Ingress {
 				hostname := ingress.Hostname
@@ -33,9 +37,6 @@ func (f *Fetcher) getServices(clusterID string, apps map[string]*App) (map[strin
 					hostname = ingress.IP
 				}
 				externalIPs = append(externalIPs, hostname)
-			}
-			for _, port := range service.Spec.Ports {
-				externalPorts = append(externalPorts, int(port.Port))
 			}
 		}
 

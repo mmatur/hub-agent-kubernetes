@@ -45,6 +45,7 @@ func TestFetcher_GetServices(t *testing.T) {
 					},
 				},
 			},
+			ExternalPorts: []int{443},
 		},
 	}
 	wantNames := map[string]string{

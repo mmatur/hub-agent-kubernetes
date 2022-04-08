@@ -76,6 +76,7 @@ func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[s
 
 				// TODO What should we do if an IngressController does not have a service, log, status field?
 				PublicEndpoints: findPublicEndpoints(services, pod),
+				Endpoints:       findEndpoints(services, pod),
 			}
 
 			result[key] = ic
@@ -332,6 +333,35 @@ func findApp(apps map[string]*App, pod *corev1.Pod) App {
 	})
 
 	return result[0]
+}
+
+func findEndpoints(svcs map[string]*Service, pod *corev1.Pod) []string {
+	var endpoints []string
+	for _, service := range svcs {
+		if service.Namespace != pod.Namespace {
+			continue
+		}
+
+		var match bool
+		for sKey, sVal := range service.Selector {
+			if pod.Labels[sKey] != sVal {
+				match = false
+				break
+			}
+			match = true
+		}
+
+		if !match {
+			continue
+		}
+		for _, port := range service.ExternalPorts {
+			endpoints = append(endpoints, fmt.Sprintf("%s.%s.svc.cluster.local:%d", service.Name, service.Namespace, port))
+		}
+	}
+
+	sort.Strings(endpoints)
+
+	return endpoints
 }
 
 func findPublicEndpoints(svcs map[string]*Service, pod *corev1.Pod) []string {
