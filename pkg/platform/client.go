@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 )
 
@@ -142,6 +143,38 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// GetACPs returns the ACPs related to the agent.
+func (c *Client) GetACPs(ctx context.Context) ([]acp.ACP, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/acps", http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("failed with code %d: decode response: %w", resp.StatusCode, err)
+		}
+
+		return nil, apiErr
+	}
+
+	var acps []acp.ACP
+	if err = json.NewDecoder(resp.Body).Decode(&acps); err != nil {
+		return nil, fmt.Errorf("decode config: %w", err)
+	}
+
+	return acps, nil
 }
 
 // Ping sends a ping to the platform to inform that the agent is alive.

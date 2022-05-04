@@ -203,3 +203,6 @@ issues:
     - path: pkg/acp/admission/webhook.go
       linters:
         - errname
+    - path: pkg/acp/watcher.go
+      linters:
+        - gocognit

@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
@@ -69,7 +70,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	h, err := setupAdmissionHandler(ctx, authServerAddr)
+	h, err := setupAdmissionHandler(ctx, platformClient, authServerAddr)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -121,7 +122,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Handler, error) {
+func setupAdmissionHandler(ctx context.Context, platformClient *platform.Client, authServerAddr string) (http.Handler, error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -162,6 +163,11 @@ func setupAdmissionHandler(ctx context.Context, authServerAddr string) (http.Han
 	if err != nil {
 		return nil, fmt.Errorf("start Hub informer: %w", err)
 	}
+
+	w := acp.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
+	go func() {
+		w.Run(ctx)
+	}()
 
 	traefikClientSet, err := traefikclientset.NewForConfig(config)
 	if err != nil {
