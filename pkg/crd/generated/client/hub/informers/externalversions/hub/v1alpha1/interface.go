@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// AccessControlPolicies returns a AccessControlPolicyInformer.
 	AccessControlPolicies() AccessControlPolicyInformer
+	// EdgeIngresses returns a EdgeIngressInformer.
+	EdgeIngresses() EdgeIngressInformer
 	// IngressClasses returns a IngressClassInformer.
 	IngressClasses() IngressClassInformer
 }
@@ -44,6 +46,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // AccessControlPolicies returns a AccessControlPolicyInformer.
 func (v *version) AccessControlPolicies() AccessControlPolicyInformer {
 	return &accessControlPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// EdgeIngresses returns a EdgeIngressInformer.
+func (v *version) EdgeIngresses() EdgeIngressInformer {
+	return &edgeIngressInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // IngressClasses returns a IngressClassInformer.

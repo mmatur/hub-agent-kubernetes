@@ -31,6 +31,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&IngressClassList{},
 		&AccessControlPolicy{},
 		&AccessControlPolicyList{},
+		&EdgeIngress{},
+		&EdgeIngressList{},
 	)
 
 	metav1.AddToGroupVersion(

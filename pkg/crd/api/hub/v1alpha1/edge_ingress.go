@@ -1,0 +1,81 @@
+package v1alpha1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EdgeIngress defines an edge ingress.
+// +kubebuilder:printcolumn:name="Service",type=string,JSONPath=`.spec.service.name`
+// +kubebuilder:printcolumn:name="Port",type=string,JSONPath=`.spec.service.port`
+// +kubebuilder:printcolumn:name="ACP",type=string,JSONPath=`.spec.acp.name`,priority=1
+// +kubebuilder:printcolumn:name="ACP Namespace",type=string,JSONPath=`.spec.acp.namespace`,priority=1
+// +kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.url`
+// +kubebuilder:printcolumn:name="Connection",type=string,JSONPath=`.status.connection`
+type EdgeIngress struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// The desired behavior of this edge ingress.
+	Spec EdgeIngressSpec `json:"spec,omitempty"`
+
+	// The current status of this edge ingress.
+	// +optional
+	Status EdgeIngressStatus `json:"status,omitempty"`
+}
+
+// EdgeIngressSpec configures an access control policy.
+type EdgeIngressSpec struct {
+	Service EdgeIngressService `json:"service"`
+	ACP     *EdgeIngressACP    `json:"acp,omitempty"`
+}
+
+// EdgeIngressService configures the service to exposed on the edge.
+type EdgeIngressService struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+}
+
+// EdgeIngressACP configures the ACP to use on the Ingress.
+type EdgeIngressACP struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// EdgeIngressConnectionStatus is the status of the underlying connection to the edge.
+type EdgeIngressConnectionStatus string
+
+// Connection statuses.
+const (
+	EdgeIngressConnectionDown EdgeIngressConnectionStatus = "DOWN"
+	EdgeIngressConnectionUp   EdgeIngressConnectionStatus = "UP"
+)
+
+// EdgeIngressStatus is the status of the EdgeIngress.
+type EdgeIngressStatus struct {
+	Version  string      `json:"version,omitempty"`
+	SyncedAt metav1.Time `json:"syncedAt,omitempty"`
+
+	// Domain is the Domain for accessing the exposed service.
+	Domain string `json:"domain,omitempty"`
+
+	// URL is the URL for accessing the exposed service.
+	URL string `json:"url,omitempty"`
+
+	// Connection is the status of the underlying connection to the edge.
+	Connection EdgeIngressConnectionStatus `json:"connection,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EdgeIngressList defines a list of edge ingress.
+type EdgeIngressList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []EdgeIngress `json:"items"`
+}

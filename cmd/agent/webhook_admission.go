@@ -13,12 +13,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
+	acpadmission "github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	edgeadmission "github.com/traefik/hub-agent-kubernetes/pkg/edgeingress/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
@@ -70,7 +71,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	h, err := setupAdmissionHandler(ctx, platformClient, authServerAddr)
+	acpAdmission, edgeIngressAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -82,11 +83,12 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 
 	go domainCache.Run(ctx)
 
-	validationHandler := validationwebhook.NewHandler(domainCache)
+	acpValidation := validationwebhook.NewHandler(domainCache)
 
 	router := chi.NewRouter()
-	router.Handle("/", h)
-	router.Handle("/validation", validationHandler)
+	router.Handle("/edge-ingress", edgeIngressAdmission)
+	router.Handle("/ingress", acpAdmission)
+	router.Handle("/ingress/validation", acpValidation)
 
 	server := &http.Server{
 		Addr:     listenAddr,
@@ -122,46 +124,52 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandler(ctx context.Context, platformClient *platform.Client, authServerAddr string) (http.Handler, error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string) (acpHdl, edgeIngressHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
-		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
+		return nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
 	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("create Kubernetes client set: %w", err)
+		return nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
 	hubClientSet, err := hubclientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("create Hub client set: %w", err)
+		return nil, nil, fmt.Errorf("create Hub client set: %w", err)
 	}
 
 	kubeVers, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
-		return nil, fmt.Errorf("detect Kubernetes version: %w", err)
+		return nil, nil, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 
 	kubeInformer := informers.NewSharedInformerFactory(clientSet, 5*time.Minute)
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
-	updater := admission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
+	ingressUpdater := acpadmission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
 
-	go updater.Run(ctx)
+	go ingressUpdater.Run(ctx)
 
-	eventHandler := admission.NewEventHandler(updater)
-
+	acpEventHandler := acpadmission.NewEventHandler(ingressUpdater)
 	ingClassWatcher := ingclass.NewWatcher()
 
 	err = startKubeInformer(ctx, kubeVers.GitVersion, kubeInformer, ingClassWatcher)
 	if err != nil {
-		return nil, fmt.Errorf("start kube informer: %w", err)
+		return nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	err = startHubInformer(ctx, hubInformer, eventHandler, ingClassWatcher)
-	if err != nil {
-		return nil, fmt.Errorf("start Hub informer: %w", err)
+	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher)
+	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
+	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
+
+	hubInformer.Start(ctx.Done())
+
+	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return nil, nil, fmt.Errorf("wait for Hub informer cache sync: %s: %w", t, ctx.Err())
+		}
 	}
 
 	w := acp.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
@@ -171,21 +179,21 @@ func setupAdmissionHandler(ctx context.Context, platformClient *platform.Client,
 
 	traefikClientSet, err := traefikclientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("create Traefik client set: %w", err)
+		return nil, nil, fmt.Errorf("create Traefik client set: %w", err)
 	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
-	reviewers := []admission.Reviewer{
+	reviewers := []acpadmission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
 		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
 		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
 		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 
-	return admission.NewHandler(reviewers), nil
+	return acpadmission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
@@ -207,21 +215,6 @@ func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer inform
 	for t, ok := range kubeInformer.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return fmt.Errorf("wait for cache Kubernetes sync: %s: %w", t, ctx.Err())
-		}
-	}
-
-	return nil
-}
-
-func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, acpEventHandler, ingClassEventHandler cache.ResourceEventHandler) error {
-	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
-	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
-
-	hubInformer.Start(ctx.Done())
-
-	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
-		if !ok {
-			return fmt.Errorf("wait for Hub cache sync: %s: %w", t, ctx.Err())
 		}
 	}
 

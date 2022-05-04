@@ -13,6 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const testToken = "123"
@@ -287,5 +290,308 @@ func TestClient_ListVerifiedDomains(t *testing.T) {
 			require.Equal(t, 1, callCount)
 			assert.Equal(t, test.wantDomains, domains)
 		})
+	}
+}
+
+func TestClient_CreateEdgeIngress(t *testing.T) {
+	tests := []struct {
+		desc             string
+		createReq        *CreateEdgeIngressReq
+		edgeIngress      *edgeingress.EdgeIngress
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create edge ingress",
+			createReq: &CreateEdgeIngressReq{
+				Name:         "name",
+				Namespace:    "namespace",
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			edgeIngress: &edgeingress.EdgeIngress{
+				WorkspaceID:  "workspace-id",
+				ClusterID:    "cluster-id",
+				Namespace:    "namespace",
+				Name:         "name",
+				Domain:       "majestic-beaver-123.hub-traefik.io",
+				Version:      "version-1",
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+				CreatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc: "conflict",
+			createReq: &CreateEdgeIngressReq{
+				Name:         "name",
+				Namespace:    "namespace",
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/edge-ingresses", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.edgeIngress)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			createdEdgeIngress, err := c.CreateEdgeIngress(context.Background(), test.createReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.edgeIngress, createdEdgeIngress)
+		})
+	}
+}
+
+func TestClient_UpdateEdgeIngress(t *testing.T) {
+	edgeIngress := hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{Kind: "EdgeIngress"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: "service-name",
+				Port: 8080,
+			},
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name:      "acp-name",
+				Namespace: "acp-namespace",
+			},
+		},
+	}
+	edgeIngressWithStatus := edgeIngress
+	edgeIngressWithStatus.Status.Version = "version-2"
+	edgeIngressWithStatus.Status.Domain = "majestic-beaver-123.hub-traefik.io"
+
+	tests := []struct {
+		desc             string
+		name             string
+		namespace        string
+		version          string
+		updateReq        *UpdateEdgeIngressReq
+		edgeIngress      *edgeingress.EdgeIngress
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:      "update edge ingress",
+			name:      "name",
+			namespace: "namespace",
+			version:   "version-1",
+			updateReq: &UpdateEdgeIngressReq{
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			edgeIngress: &edgeingress.EdgeIngress{
+				WorkspaceID:  "workspace-id",
+				ClusterID:    "cluster-id",
+				Namespace:    "namespace",
+				Name:         "name",
+				Domain:       "majestic-beaver-123.hub-traefik.io",
+				Version:      "version-2",
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+				CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+				UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc:    "conflict",
+			version: "version-1",
+			updateReq: &UpdateEdgeIngressReq{
+				ServiceName:  "service-name",
+				ServicePort:  8080,
+				ACPName:      "acp-name",
+				ACPNamespace: "acp-namespace",
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			id := test.name + "@" + test.namespace
+			mux := http.NewServeMux()
+			mux.HandleFunc("/edge-ingresses/"+id, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.edgeIngress)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			updatedEdgeIngress, err := c.UpdateEdgeIngress(context.Background(), test.namespace, test.name, test.version, test.updateReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.edgeIngress, updatedEdgeIngress)
+		})
+	}
+}
+
+func TestClient_DeleteEdgeIngress(t *testing.T) {
+	tests := []struct {
+		desc             string
+		version          string
+		name             string
+		namespace        string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+		edgeIngress      *hubv1alpha1.EdgeIngress
+	}{
+		{
+			desc:             "delete edge ingress",
+			version:          "version-1",
+			name:             "name",
+			namespace:        "namespace",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "conflict",
+			version:          "version-1",
+			name:             "name",
+			namespace:        "namespace",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			id := test.name + "@" + test.namespace
+			mux := http.NewServeMux()
+			mux.HandleFunc("/edge-ingresses/"+id, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			err := c.DeleteEdgeIngress(context.Background(), test.version, test.namespace, test.name)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func assertErrorIs(wantErr error) assert.ErrorAssertionFunc {
+	return func(t assert.TestingT, err error, i ...interface{}) bool {
+		return assert.ErrorIs(t, err, wantErr, i...)
 	}
 }

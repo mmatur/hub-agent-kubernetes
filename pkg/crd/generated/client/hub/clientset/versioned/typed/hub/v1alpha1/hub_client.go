@@ -27,6 +27,7 @@ import (
 type HubV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	AccessControlPoliciesGetter
+	EdgeIngressesGetter
 	IngressClassesGetter
 }
 
@@ -37,6 +38,10 @@ type HubV1alpha1Client struct {
 
 func (c *HubV1alpha1Client) AccessControlPolicies(namespace string) AccessControlPolicyInterface {
 	return newAccessControlPolicies(c, namespace)
+}
+
+func (c *HubV1alpha1Client) EdgeIngresses(namespace string) EdgeIngressInterface {
+	return newEdgeIngresses(c, namespace)
 }
 
 func (c *HubV1alpha1Client) IngressClasses() IngressClassInterface {

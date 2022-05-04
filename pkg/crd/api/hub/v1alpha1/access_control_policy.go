@@ -16,38 +16,38 @@ type AccessControlPolicy struct {
 
 // AccessControlPolicySpec configures an access control policy.
 type AccessControlPolicySpec struct {
-	JWT        *AccessControlPolicyJWT        `json:"jwt"`
-	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth"`
-	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth"`
+	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
+	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
+	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth,omitempty"`
 }
 
 // AccessControlPolicyJWT configures a JWT access control policy.
 type AccessControlPolicyJWT struct {
-	SigningSecret              string            `json:"signingSecret"`
-	SigningSecretBase64Encoded bool              `json:"signingSecretBase64Encoded"`
-	PublicKey                  string            `json:"publicKey"`
-	JWKsFile                   string            `json:"jwksFile"`
-	JWKsURL                    string            `json:"jwksUrl"`
-	StripAuthorizationHeader   bool              `json:"stripAuthorizationHeader"`
-	ForwardHeaders             map[string]string `json:"forwardHeaders"`
-	TokenQueryKey              string            `json:"tokenQueryKey"`
-	Claims                     string            `json:"claims"`
+	SigningSecret              string            `json:"signingSecret,omitempty"`
+	SigningSecretBase64Encoded bool              `json:"signingSecretBase64Encoded,omitempty"`
+	PublicKey                  string            `json:"publicKey,omitempty"`
+	JWKsFile                   string            `json:"jwksFile,omitempty"`
+	JWKsURL                    string            `json:"jwksUrl,omitempty"`
+	StripAuthorizationHeader   bool              `json:"stripAuthorizationHeader,omitempty"`
+	ForwardHeaders             map[string]string `json:"forwardHeaders,omitempty"`
+	TokenQueryKey              string            `json:"tokenQueryKey,omitempty"`
+	Claims                     string            `json:"claims,omitempty"`
 }
 
 // AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
 type AccessControlPolicyBasicAuth struct {
 	Users                    []string `json:"users,omitempty"`
 	Realm                    string   `json:"realm,omitempty"`
-	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader"`
-	ForwardUsernameHeader    string   `json:"forwardUsernameHeader"`
+	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
 }
 
 // AccessControlPolicyDigestAuth holds the HTTP digest authentication configuration.
 type AccessControlPolicyDigestAuth struct {
 	Users                    []string `json:"users,omitempty"`
 	Realm                    string   `json:"realm,omitempty"`
-	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader"`
-	ForwardUsernameHeader    string   `json:"forwardUsernameHeader"`
+	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

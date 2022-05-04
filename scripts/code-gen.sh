@@ -27,3 +27,12 @@ docker run --rm \
            -v "$(pwd):/go/src/${PROJECT_MODULE}" \
            -w "/go/src/${PROJECT_MODULE}" \
            "${IMAGE_NAME}" $cmd
+
+
+cmd="controller-gen crd:crdVersions=v1 paths=./pkg/crd/api/hub/v1alpha1/... output:dir=."
+
+echo "Generating the CRD definitions ..."
+docker run --rm \
+           -v "$(pwd):/go/src/${PROJECT_MODULE}" \
+           -w "/go/src/${PROJECT_MODULE}" \
+           "${IMAGE_NAME}" $cmd

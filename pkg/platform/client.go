@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 )
 
@@ -228,4 +229,142 @@ func (c *Client) ListVerifiedDomains(ctx context.Context) ([]string, error) {
 	}
 
 	return domains, nil
+}
+
+// CreateEdgeIngressReq is the request for creating an edge ingress.
+type CreateEdgeIngressReq struct {
+	Name         string `json:"name"`
+	Namespace    string `json:"namespace"`
+	ServiceName  string `json:"serviceName"`
+	ServicePort  int    `json:"servicePort"`
+	ACPName      string `json:"acpName"`
+	ACPNamespace string `json:"acpNamespace"`
+}
+
+// ErrVersionConflict indicates a conflict error on the EdgeIngress resource being modified.
+var ErrVersionConflict = errors.New("version conflict")
+
+// CreateEdgeIngress creates an edge ingress.
+func (c *Client) CreateEdgeIngress(ctx context.Context, createReq *CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal edge ingress request: %w", err)
+	}
+
+	endpoint := c.baseURL + "/edge-ingresses"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusOK:
+		var edgeIng edgeingress.EdgeIngress
+
+		if err = json.NewDecoder(resp.Body).Decode(&edgeIng); err != nil {
+			return nil, fmt.Errorf("failed to decode edge ingress: %w", err)
+		}
+		return &edgeIng, nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
+}
+
+// UpdateEdgeIngressReq is a request for updating an edge ingress.
+type UpdateEdgeIngressReq struct {
+	ServiceName  string `json:"serviceName"`
+	ServicePort  int    `json:"servicePort"`
+	ACPName      string `json:"acpName"`
+	ACPNamespace string `json:"acpNamespace"`
+}
+
+// UpdateEdgeIngress updated an edge ingress.
+func (c *Client) UpdateEdgeIngress(ctx context.Context, namespace, name, lastKnownVersion string, updateReq *UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal edge ingress request: %w", err)
+	}
+
+	id := name + "@" + namespace
+	endpoint := c.baseURL + "/edge-ingresses/" + id
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusOK:
+		var edgeIng edgeingress.EdgeIngress
+
+		if err = json.NewDecoder(resp.Body).Decode(&edgeIng); err != nil {
+			return nil, fmt.Errorf("failed to decode edge ingress: %w", err)
+		}
+		return &edgeIng, nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
+}
+
+// DeleteEdgeIngress deletes an edge ingress.
+func (c *Client) DeleteEdgeIngress(ctx context.Context, lastKnownVersion, namespace, name string) error {
+	id := name + "@" + namespace
+	endpoint := c.baseURL + "/edge-ingresses/" + id
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return ErrVersionConflict
+	case http.StatusNoContent:
+		return nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
 }

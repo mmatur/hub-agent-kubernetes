@@ -1,4 +1,5 @@
 .idea/
 dist/
 hub-agent-kubernetes
+hub.traefik.io_*.yaml
 /agent

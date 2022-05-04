@@ -26,6 +26,14 @@ type AccessControlPolicyListerExpansion interface{}
 // AccessControlPolicyNamespaceLister.
 type AccessControlPolicyNamespaceListerExpansion interface{}
 
+// EdgeIngressListerExpansion allows custom methods to be added to
+// EdgeIngressLister.
+type EdgeIngressListerExpansion interface{}
+
+// EdgeIngressNamespaceListerExpansion allows custom methods to be added to
+// EdgeIngressNamespaceLister.
+type EdgeIngressNamespaceListerExpansion interface{}
+
 // IngressClassListerExpansion allows custom methods to be added to
 // IngressClassLister.
 type IngressClassListerExpansion interface{}
