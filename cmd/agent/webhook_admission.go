@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
-	acpadmission "github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
@@ -86,10 +86,13 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 
 	acpValidation := validationwebhook.NewHandler(domainCache)
 
+	webAdmissionACP := admission.NewACPHandler(platformClient)
+
 	router := chi.NewRouter()
 	router.Handle("/edge-ingress", edgeIngressAdmission)
 	router.Handle("/ingress", acpAdmission)
 	router.Handle("/ingress/validation", acpValidation)
+	router.Handle("/acp", webAdmissionACP)
 
 	server := &http.Server{
 		Addr:     listenAddr,
@@ -149,11 +152,11 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	kubeInformer := informers.NewSharedInformerFactory(clientSet, 5*time.Minute)
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
-	ingressUpdater := acpadmission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
+	ingressUpdater := admission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
 
 	go ingressUpdater.Run(ctx)
 
-	acpEventHandler := acpadmission.NewEventHandler(ingressUpdater)
+	acpEventHandler := admission.NewEventHandler(ingressUpdater)
 	ingClassWatcher := ingclass.NewWatcher()
 
 	err = startKubeInformer(ctx, kubeVers.GitVersion, kubeInformer, ingClassWatcher)
@@ -192,14 +195,14 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
-	reviewers := []acpadmission.Reviewer{
+	reviewers := []admission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
 		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
 		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
 		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 
-	return acpadmission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil
+	return admission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {

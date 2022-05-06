@@ -1,6 +1,13 @@
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -12,6 +19,10 @@ type AccessControlPolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec AccessControlPolicySpec `json:"spec,omitempty"`
+
+	// The current status of this access control policy.
+	// +optional
+	Status AccessControlPolicyStatus `json:"status,omitempty"`
 }
 
 // AccessControlPolicySpec configures an access control policy.
@@ -19,6 +30,19 @@ type AccessControlPolicySpec struct {
 	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
 	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
 	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth,omitempty"`
+}
+
+// Hash return AccessControlPolicySpec hash.
+func (a AccessControlPolicySpec) Hash() (string, error) {
+	b, err := json.Marshal(a)
+	if err != nil {
+		return "", fmt.Errorf("encode ACP spec: %w", err)
+	}
+
+	hash := sha1.New()
+	hash.Write(b)
+
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
 }
 
 // AccessControlPolicyJWT configures a JWT access control policy.
@@ -48,6 +72,13 @@ type AccessControlPolicyDigestAuth struct {
 	Realm                    string   `json:"realm,omitempty"`
 	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`
 	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
+}
+
+// AccessControlPolicyStatus is the status of the access control policy.
+type AccessControlPolicyStatus struct {
+	Version  string      `json:"version,omitempty"`
+	SyncedAt metav1.Time `json:"syncedAt,omitempty"`
+	SpecHash string      `json:"specHash,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

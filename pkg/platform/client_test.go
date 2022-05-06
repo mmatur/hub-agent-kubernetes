@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -583,6 +585,293 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 			c.httpClient = srv.Client()
 
 			err := c.DeleteEdgeIngress(context.Background(), test.version, test.namespace, test.name)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func TestClient_CreateACP(t *testing.T) {
+	tests := []struct {
+		desc             string
+		policy           *hubv1alpha1.AccessControlPolicy
+		acp              *acp.ACP
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create access control policy",
+			policy: &hubv1alpha1.AccessControlPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: hubv1alpha1.AccessControlPolicySpec{
+					JWT: &hubv1alpha1.AccessControlPolicyJWT{
+						PublicKey: "key",
+					},
+				},
+			},
+			returnStatusCode: http.StatusCreated,
+			wantErr:          assert.NoError,
+			acp: &acp.ACP{
+				Namespace: "namespace",
+				Name:      "name",
+				Version:   "version-1",
+				Config: acp.Config{
+					JWT: &jwt.Config{
+						PublicKey: "key",
+					},
+				},
+			},
+		},
+		{
+			desc: "conflict",
+			policy: &hubv1alpha1.AccessControlPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: hubv1alpha1.AccessControlPolicySpec{
+					JWT: &hubv1alpha1.AccessControlPolicyJWT{
+						PublicKey: "key",
+					},
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  acp.ACP
+			)
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/acps", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				callWith.Version = "version-1"
+				assert.Equal(t, test.acp, &callWith)
+
+				err = json.NewEncoder(rw).Encode(callWith)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			createdACP, err := c.CreateACP(context.Background(), test.policy)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.acp, createdACP)
+		})
+	}
+}
+
+func TestClient_UpdateACP(t *testing.T) {
+	tests := []struct {
+		desc             string
+		policy           *hubv1alpha1.AccessControlPolicy
+		acp              *acp.ACP
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "update access control policy",
+			policy: &hubv1alpha1.AccessControlPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: hubv1alpha1.AccessControlPolicySpec{
+					JWT: &hubv1alpha1.AccessControlPolicyJWT{
+						PublicKey: "key",
+					},
+				},
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			acp: &acp.ACP{
+				Namespace: "namespace",
+				Name:      "name",
+				Version:   "version-1",
+				Config: acp.Config{
+					JWT: &jwt.Config{
+						PublicKey: "key",
+					},
+				},
+			},
+		},
+		{
+			desc: "conflict",
+			policy: &hubv1alpha1.AccessControlPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "name",
+					Namespace: "namespace",
+				},
+				Spec: hubv1alpha1.AccessControlPolicySpec{
+					JWT: &hubv1alpha1.AccessControlPolicyJWT{
+						PublicKey: "key",
+					},
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  acp.ACP
+			)
+
+			id := test.policy.Name + "@" + test.policy.Namespace
+			mux := http.NewServeMux()
+			mux.HandleFunc("/acps/"+id, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				if req.Header.Get("Last-Known-Version") != "oldVersion" {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				callWith.Version = "version-1"
+				assert.Equal(t, test.acp, &callWith)
+
+				err = json.NewEncoder(rw).Encode(callWith)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			updatedACP, err := c.UpdateACP(context.Background(), "oldVersion", test.policy)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.acp, updatedACP)
+		})
+	}
+}
+
+func TestClient_DeleteACP(t *testing.T) {
+	tests := []struct {
+		desc             string
+		name             string
+		namespace        string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "update access control policy",
+			name:             "name",
+			namespace:        "namespace",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "conflict",
+			name:             "name",
+			namespace:        "namespace",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+			id := test.name + "@" + test.namespace
+			mux := http.NewServeMux()
+			mux.HandleFunc("/acps/"+id, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != "oldVersion" {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c := NewClient(srv.URL, testToken)
+			c.httpClient = srv.Client()
+
+			err := c.DeleteACP(context.Background(), "oldVersion", test.name, test.namespace)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)

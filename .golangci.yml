@@ -203,6 +203,9 @@ issues:
     - path: pkg/acp/admission/webhook.go
       linters:
         - errname
+    - path: pkg/crd/api/hub/v1alpha1/access_control_policy.go
+      linters:
+        - gosec # sha1 is not used to encrypt data, no security issue
     - path: pkg/acp/watcher.go
       linters:
         - gocognit

@@ -70,7 +70,7 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var warn *reviewerWarning
 		if errors.As(err, &warn) {
 			log.Ctx(ctx).Debug().Err(warn).Msg("Reviewer warning")
-			setReviewWarningResponse(&ar, warn.err)
+			setReviewWarningResponse(&ar, warn)
 		} else {
 			log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
 			setReviewErrorResponse(&ar, err)
@@ -226,10 +226,8 @@ func setReviewResponse(ar *admv1.AdmissionReview, patch []byte) {
 		UID:     ar.Request.UID,
 	}
 	if patch != nil {
-		ar.Response.PatchType = func() *admv1.PatchType {
-			t := admv1.PatchTypeJSONPatch
-			return &t
-		}()
+		t := admv1.PatchTypeJSONPatch
+		ar.Response.PatchType = &t
 		ar.Response.Patch = patch
 	}
 }

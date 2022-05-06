@@ -227,10 +227,8 @@ func setReviewResponse(ar *admv1.AdmissionReview, patch []byte) {
 		UID:     ar.Request.UID,
 	}
 	if patch != nil {
-		ar.Response.PatchType = func() *admv1.PatchType {
-			t := admv1.PatchTypeJSONPatch
-			return &t
-		}()
+		t := admv1.PatchTypeJSONPatch
+		ar.Response.PatchType = &t
 		ar.Response.Patch = patch
 	}
 }

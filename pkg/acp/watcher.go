@@ -95,6 +95,14 @@ func (w *Watcher) Run(ctx context.Context) {
 				}
 
 				policy.Spec = buildAccessControlPolicySpec(a)
+				policy.Status.Version = a.Version
+
+				var err error
+				policy.Status.SpecHash, err = policy.Spec.Hash()
+				if err != nil {
+					log.Error().Err(err).Str("name", policy.Name).Str("namespace", policy.Namespace).Msg("Build spec hash")
+					continue
+				}
 				if err := w.updatePolicy(ctx, policy); err != nil {
 					log.Error().Err(err).Str("name", policy.Name).Str("namespace", policy.Namespace).Msg("Upsert ACP")
 				}
@@ -111,8 +119,17 @@ func (w *Watcher) createPolicy(ctx context.Context, acp ACP) error {
 			Name:      acp.Name,
 			Namespace: acp.Namespace,
 		},
+		Status: hubv1alpha1.AccessControlPolicyStatus{
+			Version: acp.Version,
+		},
 	}
 	policy.Spec = buildAccessControlPolicySpec(acp)
+
+	var err error
+	policy.Status.SpecHash, err = policy.Spec.Hash()
+	if err != nil {
+		return fmt.Errorf("build spec hash: %w ", err)
+	}
 
 	ctxCreate, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

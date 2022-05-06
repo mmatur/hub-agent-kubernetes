@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 )
@@ -347,6 +348,133 @@ func (c *Client) DeleteEdgeIngress(ctx context.Context, lastKnownVersion, namesp
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", lastKnownVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return ErrVersionConflict
+	case http.StatusNoContent:
+		return nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
+}
+
+// CreateACP creates an AccessControlPolicy.
+func (c *Client) CreateACP(ctx context.Context, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
+	acpReq := acp.ACP{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		Config:    *acp.ConfigFromPolicy(policy),
+	}
+	body, err := json.Marshal(acpReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ACP request: %w", err)
+	}
+
+	endpoint := c.baseURL + "/acps"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusCreated:
+		var a acp.ACP
+		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
+			return nil, fmt.Errorf("failed to decode ACP: %w", err)
+		}
+
+		return &a, nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
+}
+
+// UpdateACP updates an AccessControlPolicy.
+func (c *Client) UpdateACP(ctx context.Context, oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
+	acpReq := acp.ACP{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		Config:    *acp.ConfigFromPolicy(policy),
+	}
+	body, err := json.Marshal(acpReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ACP request: %w", err)
+	}
+
+	id := policy.Name + "@" + policy.Namespace
+	endpoint := c.baseURL + "/acps/" + id
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", oldVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusOK:
+		var a acp.ACP
+		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
+			return nil, fmt.Errorf("failed to decode ACP: %w", err)
+		}
+
+		return &a, nil
+	default:
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, fmt.Errorf("%q failed with code %d: decode response: %w", endpoint, resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("%q failed with code %d: %s", endpoint, resp.StatusCode, apiErr.Message)
+	}
+}
+
+// DeleteACP deletes an AccessControlPolicy.
+func (c *Client) DeleteACP(ctx context.Context, oldVersion, name, namespace string) error {
+	id := name + "@" + namespace
+	endpoint := c.baseURL + "/acps/" + id
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", endpoint, err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", oldVersion)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
