@@ -24,6 +24,27 @@ import (
 func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 	now := metav1.Now()
 
+	edgeIngress := hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "EdgeIngress",
+			APIVersion: "hub.traefik.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "edge-ingress",
+			Namespace: "default",
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: "whoami",
+				Port: 8081,
+			},
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name:      "acp",
+				Namespace: "default",
+			},
+		},
+		Status: hubv1alpha1.EdgeIngressStatus{},
+	}
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
@@ -36,27 +57,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 			Namespace: "default",
 			Operation: admv1.Create,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.EdgeIngress{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "EdgeIngress",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "edge-ingress",
-						Namespace: "default",
-					},
-					Spec: hubv1alpha1.EdgeIngressSpec{
-						Service: hubv1alpha1.EdgeIngressService{
-							Name: "whoami",
-							Port: 8081,
-						},
-						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
-						},
-					},
-					Status: hubv1alpha1.EdgeIngressStatus{},
-				}),
+				Raw: mustMarshal(t, edgeIngress),
 			},
 		},
 		Response: &admv1.AdmissionResponse{},
@@ -119,6 +120,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				SyncedAt:   now,
 				Domain:     "majestic-beaver-123.hub-traefik.io",
 				URL:        "https://majestic-beaver-123.hub-traefik.io",
+				SpecHash:   "3pbFKX/wXPiRs+f+J4ERDJMRT58=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
 		}),
@@ -205,6 +207,53 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		version          = "version-3"
 	)
 
+	newEdgeIng := hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "EdgeIngress",
+			APIVersion: "hub.traefik.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      edgeIngName,
+			Namespace: edgeIngNamespace,
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: "whoami",
+				Port: 8082,
+			},
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name:      "acp",
+				Namespace: "default",
+			},
+		},
+		Status: hubv1alpha1.EdgeIngressStatus{},
+	}
+	oldEdgeIng := hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "EdgeIngress",
+			APIVersion: "hub.traefik.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "edge-ingress",
+			Namespace: "default",
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: "whoami",
+				Port: 8081,
+			},
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name:      "acp",
+				Namespace: "default",
+			},
+		},
+		Status: hubv1alpha1.EdgeIngressStatus{
+			Version:    version,
+			SyncedAt:   metav1.NewTime(now.Time.Add(-time.Hour)),
+			Domain:     "majestic-beaver-567889.hub.traefik.io",
+			Connection: hubv1alpha1.EdgeIngressConnectionUp,
+		},
+	}
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
@@ -217,55 +266,10 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 			Namespace: edgeIngNamespace,
 			Operation: admv1.Update,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.EdgeIngress{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "EdgeIngress",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      edgeIngName,
-						Namespace: edgeIngNamespace,
-					},
-					Spec: hubv1alpha1.EdgeIngressSpec{
-						Service: hubv1alpha1.EdgeIngressService{
-							Name: "whoami",
-							Port: 8082,
-						},
-						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
-						},
-					},
-					Status: hubv1alpha1.EdgeIngressStatus{},
-				}),
+				Raw: mustMarshal(t, newEdgeIng),
 			},
 			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.EdgeIngress{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "EdgeIngress",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "edge-ingress",
-						Namespace: "default",
-					},
-					Spec: hubv1alpha1.EdgeIngressSpec{
-						Service: hubv1alpha1.EdgeIngressService{
-							Name: "whoami",
-							Port: 8081,
-						},
-						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
-						},
-					},
-					Status: hubv1alpha1.EdgeIngressStatus{
-						Version:    version,
-						SyncedAt:   metav1.NewTime(now.Time.Add(-time.Hour)),
-						Domain:     "majestic-beaver-567889.hub.traefik.io",
-						Connection: hubv1alpha1.EdgeIngressConnectionUp,
-					},
-				}),
+				Raw: mustMarshal(t, oldEdgeIng),
 			},
 		},
 		Response: &admv1.AdmissionResponse{},
@@ -332,6 +336,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Domain:     "majestic-beaver-123.hub-traefik.io",
 				URL:        "https://majestic-beaver-123.hub-traefik.io",
 				SyncedAt:   now,
+				SpecHash:   "+cX+zj06A2+tSgPO9/qWr0XEuq0=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
 		}),

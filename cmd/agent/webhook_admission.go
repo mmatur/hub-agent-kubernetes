@@ -19,6 +19,7 @@ import (
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	edgeadmission "github.com/traefik/hub-agent-kubernetes/pkg/edgeingress/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
@@ -172,9 +173,14 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		}
 	}
 
-	w := acp.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
+	acpWatcher := acp.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
 	go func() {
-		w.Run(ctx)
+		acpWatcher.Run(ctx)
+	}()
+
+	edgeIngressWatcher := edgeingress.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
+	go func() {
+		edgeIngressWatcher.Run(ctx)
 	}()
 
 	traefikClientSet, err := traefikclientset.NewForConfig(config)

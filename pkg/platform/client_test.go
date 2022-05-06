@@ -311,7 +311,7 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 				ACPName:      "acp-name",
 				ACPNamespace: "acp-namespace",
 			},
-			returnStatusCode: http.StatusOK,
+			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
 			edgeIngress: &edgeingress.EdgeIngress{
 				WorkspaceID:  "workspace-id",
@@ -588,6 +588,59 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 			require.Equal(t, 1, callCount)
 		})
 	}
+}
+
+func TestClient_GetEdgeIngress(t *testing.T) {
+	wantEdgeIngresses := []edgeingress.EdgeIngress{
+		{
+			WorkspaceID:  "workspace-id",
+			ClusterID:    "cluster-id",
+			Namespace:    "namespace",
+			Name:         "name",
+			Domain:       "https://majestic-beaver-123.traefik-hub.io",
+			Version:      "version",
+			ServiceName:  "service-name",
+			ServicePort:  8080,
+			ACPName:      "acp-name",
+			ACPNamespace: "acp-namespace",
+			CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+			UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+		},
+	}
+
+	var callCount int
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/edge-ingresses", func(rw http.ResponseWriter, req *http.Request) {
+		callCount++
+
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantEdgeIngresses)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c := NewClient(srv.URL, testToken)
+	c.httpClient = srv.Client()
+
+	gotEdgeIngresses, err := c.GetEdgeIngresses(context.Background())
+	require.NoError(t, err)
+
+	require.Equal(t, 1, callCount)
+	assert.Equal(t, wantEdgeIngresses, gotEdgeIngresses)
 }
 
 func assertErrorIs(wantErr error) assert.ErrorAssertionFunc {

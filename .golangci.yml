@@ -206,3 +206,6 @@ issues:
     - path: pkg/acp/watcher.go
       linters:
         - gocognit
+    - path: pkg/crd/api/hub/v1alpha1/edge_ingress.go
+      linters:
+        - gosec # sha1 is not used to encrypt data, no security issue

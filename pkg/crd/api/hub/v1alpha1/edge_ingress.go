@@ -1,6 +1,11 @@
 package v1alpha1
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,6 +36,19 @@ type EdgeIngress struct {
 type EdgeIngressSpec struct {
 	Service EdgeIngressService `json:"service"`
 	ACP     *EdgeIngressACP    `json:"acp,omitempty"`
+}
+
+// Hash generates the hash of the spec.
+func (in EdgeIngressSpec) Hash() (string, error) {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return "", fmt.Errorf("encode ACP: %w", err)
+	}
+
+	hash := sha1.New()
+	hash.Write(b)
+
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
 }
 
 // EdgeIngressService configures the service to exposed on the edge.
@@ -67,6 +85,9 @@ type EdgeIngressStatus struct {
 
 	// Connection is the status of the underlying connection to the edge.
 	Connection EdgeIngressConnectionStatus `json:"connection,omitempty"`
+
+	// SpecHash is a hash representing the the EdgeIngressSpec
+	SpecHash string `json:"specHash,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

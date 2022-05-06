@@ -88,6 +88,7 @@ func (h Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byt
 	}
 
 	logger.Info().Msg("Reviewing EdgeIngress resource")
+	ctx = logger.WithContext(ctx)
 
 	// TODO: Handle DryRun flag.
 	if req.DryRun != nil && *req.DryRun {
@@ -99,57 +100,80 @@ func (h Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byt
 		return nil, fmt.Errorf("parse raw objects: %w", err)
 	}
 
+	// Skip the review if the EdgeIngress hasn't changed since the last platform sync.
+	if newEdgeIng != nil && newEdgeIng.Status.SpecHash != "" {
+		var specHash string
+		specHash, err = newEdgeIng.Spec.Hash()
+		if err != nil {
+			return nil, fmt.Errorf("compute spec hash: %w", err)
+		}
+
+		if newEdgeIng.Status.SpecHash == specHash {
+			return nil, nil
+		}
+	}
+
 	switch req.Operation {
 	case admv1.Create:
-		logger.Info().Msg("Creating EdgeIngress resource")
-
-		createReq := &platform.CreateEdgeIngressReq{
-			Name:        newEdgeIng.Name,
-			Namespace:   newEdgeIng.Namespace,
-			ServiceName: newEdgeIng.Spec.Service.Name,
-			ServicePort: newEdgeIng.Spec.Service.Port,
-		}
-		if newEdgeIng.Spec.ACP != nil {
-			createReq.ACPName = newEdgeIng.Spec.ACP.Name
-			createReq.ACPNamespace = newEdgeIng.Spec.ACP.Namespace
-		}
-
-		var edgeIng *edgeingress.EdgeIngress
-		edgeIng, err = h.backend.CreateEdgeIngress(ctx, createReq)
-		if err != nil {
-			return nil, fmt.Errorf("create edge ingress: %w", err)
-		}
-
-		return h.buildPatches(edgeIng)
+		return h.reviewCreateOperation(ctx, newEdgeIng)
 	case admv1.Update:
-		logger.Info().Msg("Updating EdgeIngress resource")
-
-		updateReq := &platform.UpdateEdgeIngressReq{
-			ServiceName: newEdgeIng.Spec.Service.Name,
-			ServicePort: newEdgeIng.Spec.Service.Port,
-		}
-		if newEdgeIng.Spec.ACP != nil {
-			updateReq.ACPName = newEdgeIng.Spec.ACP.Name
-			updateReq.ACPNamespace = newEdgeIng.Spec.ACP.Namespace
-		}
-
-		var edgeIng *edgeingress.EdgeIngress
-		edgeIng, err = h.backend.UpdateEdgeIngress(ctx, oldEdgeIng.Namespace, oldEdgeIng.Name, oldEdgeIng.Status.Version, updateReq)
-		if err != nil {
-			return nil, fmt.Errorf("update edge ingress: %w", err)
-		}
-
-		return h.buildPatches(edgeIng)
+		return h.reviewUpdateOperation(ctx, oldEdgeIng, newEdgeIng)
 	case admv1.Delete:
-		logger.Info().Msg("Deleting EdgeIngress resource")
-
-		if err = h.backend.DeleteEdgeIngress(ctx, oldEdgeIng.Status.Version, oldEdgeIng.Namespace, oldEdgeIng.Name); err != nil {
-			return nil, fmt.Errorf("delete edge ingress: %w", err)
-		}
-		return nil, nil
+		return h.reviewDeleteOperation(ctx, oldEdgeIng)
 	default:
 		return nil, fmt.Errorf("unsupported operation %q", req.Operation)
 	}
+}
+
+func (h Handler) reviewCreateOperation(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) ([]byte, error) {
+	log.Ctx(ctx).Info().Msg("Creating EdgeIngress resource")
+
+	createReq := &platform.CreateEdgeIngressReq{
+		Name:        edgeIng.Name,
+		Namespace:   edgeIng.Namespace,
+		ServiceName: edgeIng.Spec.Service.Name,
+		ServicePort: edgeIng.Spec.Service.Port,
+	}
+	if edgeIng.Spec.ACP != nil {
+		createReq.ACPName = edgeIng.Spec.ACP.Name
+		createReq.ACPNamespace = edgeIng.Spec.ACP.Namespace
+	}
+
+	createdEdgeIng, err := h.backend.CreateEdgeIngress(ctx, createReq)
+	if err != nil {
+		return nil, fmt.Errorf("create edge ingress: %w", err)
+	}
+
+	return h.buildPatches(createdEdgeIng)
+}
+
+func (h Handler) reviewUpdateOperation(ctx context.Context, oldEdgeIng, newEdgeIng *hubv1alpha1.EdgeIngress) ([]byte, error) {
+	log.Ctx(ctx).Info().Msg("Updating EdgeIngress resource")
+
+	updateReq := &platform.UpdateEdgeIngressReq{
+		ServiceName: newEdgeIng.Spec.Service.Name,
+		ServicePort: newEdgeIng.Spec.Service.Port,
+	}
+	if newEdgeIng.Spec.ACP != nil {
+		updateReq.ACPName = newEdgeIng.Spec.ACP.Name
+		updateReq.ACPNamespace = newEdgeIng.Spec.ACP.Namespace
+	}
+
+	updatedEdgeIng, err := h.backend.UpdateEdgeIngress(ctx, oldEdgeIng.Namespace, oldEdgeIng.Name, oldEdgeIng.Status.Version, updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("update edge ingress: %w", err)
+	}
+
+	return h.buildPatches(updatedEdgeIng)
+}
+
+func (h Handler) reviewDeleteOperation(ctx context.Context, oldEdgeIng *hubv1alpha1.EdgeIngress) ([]byte, error) {
+	log.Ctx(ctx).Info().Msg("Deleting EdgeIngress resource")
+
+	if err := h.backend.DeleteEdgeIngress(ctx, oldEdgeIng.Status.Version, oldEdgeIng.Namespace, oldEdgeIng.Name); err != nil {
+		return nil, fmt.Errorf("delete edge ingress: %w", err)
+	}
+	return nil, nil
 }
 
 type patch struct {
@@ -159,14 +183,13 @@ type patch struct {
 }
 
 func (h Handler) buildPatches(edgeIng *edgeingress.EdgeIngress) ([]byte, error) {
+	res, err := edgeIng.Resource()
+	if err != nil {
+		return nil, fmt.Errorf("build resource: %w", err)
+	}
+
 	return json.Marshal([]patch{
-		{Op: "replace", Path: "/status", Value: hubv1alpha1.EdgeIngressStatus{
-			Version:    edgeIng.Version,
-			SyncedAt:   metav1.NewTime(h.now()),
-			Domain:     edgeIng.Domain,
-			URL:        "https://" + edgeIng.Domain,
-			Connection: hubv1alpha1.EdgeIngressConnectionDown,
-		}},
+		{Op: "replace", Path: "/status", Value: res.Status},
 	})
 }
 
