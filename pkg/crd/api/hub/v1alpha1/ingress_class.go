@@ -7,6 +7,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // IngressClass defines an ingress class.
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Controller",type=string,JSONPath=`.spec.controller`
+// +kubebuilder:printcolumn:name="Is Default",type=string,JSONPath=`.metadata.annotations.ingressclass\.kubernetes\.io/is-default-class`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type IngressClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

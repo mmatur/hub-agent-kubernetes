@@ -40,6 +40,7 @@ type AccessControlPoliciesGetter interface {
 type AccessControlPolicyInterface interface {
 	Create(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.CreateOptions) (*v1alpha1.AccessControlPolicy, error)
 	Update(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.UpdateOptions) (*v1alpha1.AccessControlPolicy, error)
+	UpdateStatus(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.UpdateOptions) (*v1alpha1.AccessControlPolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.AccessControlPolicy, error)
@@ -128,6 +129,22 @@ func (c *accessControlPolicies) Update(ctx context.Context, accessControlPolicy 
 		Namespace(c.ns).
 		Resource("accesscontrolpolicies").
 		Name(accessControlPolicy.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(accessControlPolicy).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *accessControlPolicies) UpdateStatus(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.UpdateOptions) (result *v1alpha1.AccessControlPolicy, err error) {
+	result = &v1alpha1.AccessControlPolicy{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("accesscontrolpolicies").
+		Name(accessControlPolicy.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(accessControlPolicy).
 		Do(ctx).
