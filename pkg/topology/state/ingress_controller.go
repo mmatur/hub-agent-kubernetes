@@ -21,16 +21,12 @@ const AnnotationHubIngressController = "hub.traefik.io/ingress-controller"
 const (
 	IngressControllerTypeNone             = "none"
 	IngressControllerTypeTraefik          = "traefik"
-	IngressControllerTypeNginxOfficial    = "nginx"
-	IngressControllerTypeNginxCommunity   = "nginx-community"
 	IngressControllerTypeHAProxyCommunity = "haproxy-community"
 )
 
 // Supported Ingress Controllers.
 // TODO: unify constants with ACP.
 const (
-	ControllerTypeNginxOfficial    = "nginx.org/ingress-controller"
-	ControllerTypeNginxCommunity   = "k8s.io/ingress-nginx"
 	ControllerTypeHAProxyCommunity = "haproxy-ingress.github.io/controller"
 	ControllerTypeTraefik          = "traefik.io/ingress-controller"
 )
@@ -153,14 +149,6 @@ func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
 			return IngressControllerTypeTraefik, nil
 		}
 
-		if strings.Contains(parts[0], "nginx/nginx-ingress") {
-			return IngressControllerTypeNginxOfficial, nil
-		}
-
-		if strings.Contains(parts[0], "ingress-nginx/controller") {
-			return IngressControllerTypeNginxCommunity, nil
-		}
-
 		if strings.Contains(parts[0], "jcmoraisjr/haproxy-ingress") {
 			return IngressControllerTypeHAProxyCommunity, nil
 		}
@@ -229,14 +217,7 @@ func setIngressClasses(controllers map[string]*IngressController, ingressClasses
 	// TODO: Detect which ingress class is selected by which controller.
 	for _, ingressClass := range ingressClasses {
 		var ctrlType string
-
 		switch ingressClass.Spec.Controller {
-		case ControllerTypeNginxCommunity:
-			ctrlType = IngressControllerTypeNginxCommunity
-
-		case ControllerTypeNginxOfficial:
-			ctrlType = IngressControllerTypeNginxOfficial
-
 		case ControllerTypeTraefik:
 			ctrlType = IngressControllerTypeTraefik
 
@@ -259,17 +240,10 @@ func setIngressClasses(controllers map[string]*IngressController, ingressClasses
 // For instance, this will not work if someone use a specific configuration to expose the prometheus metrics endpoint.
 // TODO we can try to use the IngressController configuration to be more accurate.
 func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
-	// Metrics are not supported for Nginx official.
-	if ctrl == IngressControllerTypeNginxOfficial {
-		return ""
-	}
-
 	var port string
 	switch ctrl {
 	case IngressControllerTypeTraefik:
 		port = "8080"
-	case IngressControllerTypeNginxCommunity:
-		port = "10254"
 	case IngressControllerTypeHAProxyCommunity:
 		port = "9101"
 	}
@@ -289,8 +263,6 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 
 func isSupportedIngressControllerType(value string) bool {
 	switch value {
-	case IngressControllerTypeNginxOfficial:
-	case IngressControllerTypeNginxCommunity:
 	case IngressControllerTypeHAProxyCommunity:
 	case IngressControllerTypeTraefik:
 	case IngressControllerTypeNone:

@@ -61,7 +61,7 @@ func TestWatcher_GetController(t *testing.T) {
 	legacyIng := netv1beta1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{UID: "2", Name: "ing-class-2"},
 		Spec: netv1beta1.IngressClassSpec{
-			Controller: ControllerTypeNginxOfficial,
+			Controller: ControllerTypeTraefik,
 		},
 	}
 	customIng := hubv1alpha1.IngressClass{
@@ -85,7 +85,7 @@ func TestWatcher_GetController(t *testing.T) {
 	assert.Equal(t, ControllerTypeTraefik, ctrlr)
 	ctrlr, err = watcher.GetController("ing-class-2")
 	assert.NoError(t, err)
-	assert.Equal(t, ControllerTypeNginxOfficial, ctrlr)
+	assert.Equal(t, ControllerTypeTraefik, ctrlr)
 	ctrlr, err = watcher.GetController("ing-class-3")
 	assert.NoError(t, err)
 	assert.Equal(t, ControllerTypeTraefik, ctrlr)

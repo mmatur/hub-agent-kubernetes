@@ -181,12 +181,6 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:         "can't review if using another annotation",
-			annotation:   "nginx",
-			canReview:    false,
-			canReviewErr: assert.NoError,
-		},
-		{
 			desc:         "can review if using a custom ingress class (spec)",
 			spec:         "custom-traefik-ingress-class",
 			canReview:    true,
@@ -194,13 +188,13 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 		},
 		{
 			desc:         "can't review if using another controller",
-			spec:         "nginx",
+			spec:         "powpow",
 			canReview:    false,
 			canReviewErr: assert.Error,
 		},
 		{
 			desc:         "spec takes priority over annotation#1",
-			annotation:   "nginx",
+			annotation:   "powpow",
 			spec:         "custom-traefik-ingress-class",
 			canReview:    true,
 			canReviewErr: assert.NoError,
@@ -208,7 +202,7 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 		{
 			desc:         "spec takes priority over annotation#2",
 			annotation:   "traefik",
-			spec:         "nginx",
+			spec:         "powpow",
 			canReview:    false,
 			canReviewErr: assert.Error,
 		},

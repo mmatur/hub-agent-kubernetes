@@ -124,12 +124,6 @@ func getControllerType(ingress *netv1.Ingress, ingressClasses []*netv1.IngressCl
 	}
 
 	switch ingressClass.Spec.Controller {
-	case ControllerTypeNginxCommunity:
-		return IngressControllerTypeNginxCommunity
-
-	case ControllerTypeNginxOfficial:
-		return IngressControllerTypeNginxOfficial
-
 	case ControllerTypeTraefik:
 		return IngressControllerTypeTraefik
 

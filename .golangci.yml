@@ -169,11 +169,6 @@ issues:
       text: "cyclomatic complexity 19 of func `watchAll` is high"
       linters:
         - gocyclo
-    # False positive.
-    - path: pkg/acp/admission/reviewer/nginx_ingress_snippet.go
-      text: "G101: Potential hardcoded credentials"
-      linters:
-        - gosec
     - path: pkg/metrics/protocol/protocol.go
       text: '[[:alpha:]]+V\dSchema is a global variable'
     # Digest auth uses md5 in tests.
@@ -193,12 +188,6 @@ issues:
     - path: pkg/acp/admission/reviewer/traefik_ingress.go
       linters:
         - gocyclo
-    - path: pkg/acp/admission/reviewer/nginx_ingress.go
-      linters:
-        - gocyclo
-    - path: pkg/acp/admission/reviewer/nginx_ingress.go
-      linters:
-        - nestif
     - path: pkg/version/version.go
       linters:
         - gochecknoglobals

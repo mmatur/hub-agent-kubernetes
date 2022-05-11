@@ -517,8 +517,8 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					},
 					Images: []string{"traefik:latest"},
 				},
-				"Deployment/nginx@myns": {
-					Name:          "nginx",
+				"Deployment/traefik-2@myns": {
+					Name:          "traefik-2",
 					Namespace:     "myns",
 					Kind:          "Deployment",
 					Replicas:      3,
@@ -526,7 +526,7 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 					podLabels: map[string]string{
 						"my.label": "bar",
 					},
-					Images: []string{"nginx/nginx-ingress:latest"},
+					Images: []string{"traefik:latest"},
 				},
 			},
 			want: map[string]*IngressController{
@@ -543,127 +543,25 @@ func TestFetcher_GetIngressControllers(t *testing.T) {
 						},
 					},
 					Type:            IngressControllerTypeTraefik,
-					IngressClasses:  []string{"fooIngressClass"},
+					IngressClasses:  []string{"barIngressClass", "fooIngressClass"},
 					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
 					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
 				},
-				"nginx@myns": {
+				"traefik-2@myns": {
 					App: App{
-						Name:          "nginx",
+						Name:          "traefik-2",
 						Namespace:     "myns",
 						Kind:          "Deployment",
 						Replicas:      3,
 						ReadyReplicas: 2,
-						Images:        []string{"nginx/nginx-ingress:latest"},
+						Images:        []string{"traefik:latest"},
 						podLabels: map[string]string{
 							"my.label": "bar",
 						},
 					},
-					Type:            IngressControllerTypeNginxOfficial,
-					IngressClasses:  []string{"barIngressClass"},
-					PublicEndpoints: []string{"11.12.13.14", "7.8.9.10"},
-				},
-			},
-		},
-		{
-			desc:    "Two nginx ingress controllers",
-			fixture: "two-nginx-ingress-controllers.yml",
-			services: map[string]*Service{
-				"fooService@myns": {
-					Name:      "fooService",
-					Namespace: "myns",
-					Selector: map[string]string{
-						"my.label": "foo",
-					},
-					status: corev1.ServiceStatus{
-						LoadBalancer: corev1.LoadBalancerStatus{
-							Ingress: []corev1.LoadBalancerIngress{
-								{
-									IP: "1.2.3.4",
-								},
-								{
-									IP: "4.5.6.7",
-								},
-							},
-						},
-					},
-				},
-				"barService@myns": {
-					Name:      "barService",
-					Namespace: "myns",
-					Selector: map[string]string{
-						"my.label": "bar",
-					},
-					status: corev1.ServiceStatus{
-						LoadBalancer: corev1.LoadBalancerStatus{
-							Ingress: []corev1.LoadBalancerIngress{
-								{
-									IP: "7.8.9.10",
-								},
-								{
-									IP: "11.12.13.14",
-								},
-							},
-						},
-					},
-				},
-			},
-			apps: map[string]*App{
-				"Deployment/nginx-community@myns": {
-					Name:          "nginx-community",
-					Namespace:     "myns",
-					Kind:          "Deployment",
-					Replicas:      3,
-					ReadyReplicas: 2,
-					podLabels: map[string]string{
-						"my.label": "foo",
-					},
-					Images: []string{"ingress-nginx/controller:latest"},
-				},
-				"Deployment/nginx@myns": {
-					Name:          "nginx",
-					Namespace:     "myns",
-					Kind:          "Deployment",
-					Replicas:      3,
-					ReadyReplicas: 2,
-					podLabels: map[string]string{
-						"my.label": "bar",
-					},
-					Images: []string{"nginx/nginx-ingress:latest"},
-				},
-			},
-			want: map[string]*IngressController{
-				"nginx-community@myns": {
-					App: App{
-						Name:          "nginx-community",
-						Namespace:     "myns",
-						Kind:          "Deployment",
-						Replicas:      3,
-						ReadyReplicas: 2,
-						Images:        []string{"ingress-nginx/controller:latest"},
-						podLabels: map[string]string{
-							"my.label": "foo",
-						},
-					},
-					Type:            IngressControllerTypeNginxCommunity,
-					IngressClasses:  []string{"fooIngressClass"},
+					Type:            IngressControllerTypeTraefik,
+					IngressClasses:  []string{"barIngressClass", "fooIngressClass"},
 					MetricsURLs:     []string{"http://1.2.3.4:9090/custom"},
-					PublicEndpoints: []string{"1.2.3.4", "4.5.6.7"},
-				},
-				"nginx@myns": {
-					App: App{
-						Name:          "nginx",
-						Namespace:     "myns",
-						Kind:          "Deployment",
-						Replicas:      3,
-						ReadyReplicas: 2,
-						Images:        []string{"nginx/nginx-ingress:latest"},
-						podLabels: map[string]string{
-							"my.label": "bar",
-						},
-					},
-					Type:            IngressControllerTypeNginxOfficial,
-					IngressClasses:  []string{"barIngressClass"},
 					PublicEndpoints: []string{"11.12.13.14", "7.8.9.10"},
 				},
 			},
@@ -797,57 +695,6 @@ func TestFetcher_GetIngressControllerType(t *testing.T) {
 				},
 			},
 			wantType: IngressControllerTypeNone,
-		},
-		{
-			desc: "Valid nginx official controller image",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "nginx/nginx-ingress:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			wantType: IngressControllerTypeNginxOfficial,
-		},
-		{
-			desc: "Valid nginx community controller image",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "k8s.gcr.io/ingress-nginx/controller:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			wantType: IngressControllerTypeNginxCommunity,
-		},
-		{
-			desc: "Another valid nginx community controller image",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "docker.io/ingress-nginx/controller:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			wantType: IngressControllerTypeNginxCommunity,
 		},
 		{
 			desc: "Valid haproxy community controller image",
@@ -1059,16 +906,6 @@ func TestGuessMetricsURL(t *testing.T) {
 			wantURL: "http://1.2.3.4:8080/metrics",
 		},
 		{
-			desc: "Pod with nginx community controller defaults",
-			ctrl: IngressControllerTypeNginxCommunity,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:10254/metrics",
-		},
-		{
 			desc: "Pod with haproxy community controller defaults",
 			ctrl: IngressControllerTypeHAProxyCommunity,
 			pod: &corev1.Pod{
@@ -1077,15 +914,6 @@ func TestGuessMetricsURL(t *testing.T) {
 				},
 			},
 			wantURL: "http://1.2.3.4:9101/metrics",
-		},
-		{
-			desc: "Pod with nginx official controller",
-			ctrl: IngressControllerTypeNginxOfficial,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
 		},
 		{
 			desc: "Pod with annotations",
@@ -1321,14 +1149,6 @@ func TestIsSupportedIngressControllerType(t *testing.T) {
 		},
 		{
 			value: IngressControllerTypeHAProxyCommunity,
-			want:  true,
-		},
-		{
-			value: IngressControllerTypeNginxCommunity,
-			want:  true,
-		},
-		{
-			value: IngressControllerTypeNginxOfficial,
 			want:  true,
 		},
 		{

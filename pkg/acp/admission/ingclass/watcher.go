@@ -25,8 +25,6 @@ const annotationDefaultIngressClass = "ingressclass.kubernetes.io/is-default-cla
 // Supported ingress controller types.
 const (
 	ControllerTypeHAProxyCommunity = "haproxy-ingress.github.io/controller"
-	ControllerTypeNginxOfficial    = "nginx.org/ingress-controller"
-	ControllerTypeNginxCommunity   = "k8s.io/ingress-nginx"
 	ControllerTypeTraefik          = "traefik.io/ingress-controller"
 )
 

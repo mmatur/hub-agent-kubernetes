@@ -15,7 +15,6 @@ import (
 // Parser names.
 // This should match the topology types.
 const (
-	ParserNginx   = "nginx-community"
 	ParserTraefik = "traefik"
 	ParserHAProxy = "haproxy-community"
 )
@@ -114,7 +113,6 @@ type Parser interface {
 type Scraper struct {
 	client *http.Client
 
-	nginxParser   NginxParser
 	traefikParser TraefikParser
 	haproxyParser HAProxyParser
 }
@@ -137,8 +135,6 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, s
 
 	var p Parser
 	switch parser {
-	case ParserNginx:
-		p = s.nginxParser
 	case ParserTraefik:
 		p = s.traefikParser
 	case ParserHAProxy:

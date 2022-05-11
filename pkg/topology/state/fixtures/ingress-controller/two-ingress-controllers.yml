@@ -14,7 +14,7 @@ metadata:
   name: barIngressClass
 
 spec:
-  controller: nginx.org/ingress-controller
+  controller: traefik.io/ingress-controller
 
 ---
 apiVersion: apps/v1
@@ -83,8 +83,8 @@ metadata:
 
 spec:
   containers:
-    - image: nginx/nginx-ingress:latest
-      name: nginx
+    - image: traefik:latest
+      name: traefik-2
 
 status:
   podIP: 1.2.3.4

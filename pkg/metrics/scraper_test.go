@@ -14,30 +14,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/metrics"
 )
 
-func TestScraper_ScrapeNginx(t *testing.T) {
-	srvURL := startServer(t, "testdata/nginx-metrics.txt")
-
-	s := metrics.NewScraper(http.DefaultClient)
-
-	got, err := s.Scrape(context.Background(), metrics.ParserNginx, []string{srvURL}, metrics.ScrapeState{})
-	require.NoError(t, err)
-
-	require.Len(t, got, 6)
-
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "whoami@default.ingress.networking.k8s.io", Service: "whoami@default", Value: 20})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "whoami@default.ingress.networking.k8s.io", Service: "whoami@default", Value: 19})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestClientErrors, Ingress: "whoami@default.ingress.networking.k8s.io", Service: "whoami@default", Value: 19})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "whoami@default.ingress.networking.k8s.io", Service: "whoami2@default", Value: 18})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Ingress: "whoami@default.ingress.networking.k8s.io", Service: "whoami2@default", Value: 18})
-	assert.Contains(t, got, &metrics.Histogram{
-		Name:    metrics.MetricRequestDuration,
-		Ingress: "whoami@default.ingress.networking.k8s.io",
-		Service: "whoami@default",
-		Sum:     0.030000000000000006,
-		Count:   20,
-	})
-}
-
 func TestScraper_ScrapeTraefik(t *testing.T) {
 	srvURL := startServer(t, "testdata/traefik-metrics.txt")
 
