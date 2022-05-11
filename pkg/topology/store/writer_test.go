@@ -314,7 +314,6 @@ func TestWrite_Overview(t *testing.T) {
 		IngressCount: 2,
 		ServiceCount: 1,
 		IngressControllerTypes: []string{
-			state.IngressControllerTypeHAProxyCommunity,
 			state.IngressControllerTypeTraefik,
 		},
 	}

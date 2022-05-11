@@ -108,7 +108,7 @@ func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, 
 			return nil, nil
 		}
 		return nil, fmt.Errorf("unsupported or ambiguous Ingress Controller for resource %q of kind %q in namespace %q. "+
-			"Supported Ingress Controllers are: Traefik and HAProxy; "+
+			"Supported Ingress Controller is Traefik; "+
 			`consider explicitly setting the "ingressClassName" property in your resource `+
 			`or the "kubernetes.io/ingress.class" annotation (deprecated) `+
 			"or setting a default Ingress Controller if none is set",

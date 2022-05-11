@@ -127,9 +127,6 @@ func getControllerType(ingress *netv1.Ingress, ingressClasses []*netv1.IngressCl
 	case ControllerTypeTraefik:
 		return IngressControllerTypeTraefik
 
-	case ControllerTypeHAProxyCommunity:
-		return IngressControllerTypeHAProxyCommunity
-
 	default:
 		return ingressClass.Spec.Controller
 	}

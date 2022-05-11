@@ -200,7 +200,6 @@ func Test_getOverview(t *testing.T) {
 		IngressControllers: map[string]*IngressController{
 			"name@namespace":  {Type: IngressControllerTypeTraefik},
 			"name2@namespace": {Type: IngressControllerTypeTraefik},
-			"name3@namespace": {Type: IngressControllerTypeHAProxyCommunity},
 		},
 	}
 
@@ -209,7 +208,7 @@ func Test_getOverview(t *testing.T) {
 	want := Overview{
 		IngressCount:           2,
 		ServiceCount:           1,
-		IngressControllerTypes: []string{IngressControllerTypeHAProxyCommunity, IngressControllerTypeTraefik},
+		IngressControllerTypes: []string{IngressControllerTypeTraefik},
 	}
 
 	assert.Equal(t, want, overview)

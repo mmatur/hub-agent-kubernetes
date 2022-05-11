@@ -697,40 +697,6 @@ func TestFetcher_GetIngressControllerType(t *testing.T) {
 			wantType: IngressControllerTypeNone,
 		},
 		{
-			desc: "Valid haproxy community controller image",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "quay.io/jcmoraisjr/haproxy-ingress:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			wantType: IngressControllerTypeHAProxyCommunity,
-		},
-		{
-			desc: "Another valid haproxy community controller image",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-				},
-			},
-			wantType: IngressControllerTypeHAProxyCommunity,
-		},
-		{
 			desc: "Ingress controller type defined by annotation",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -741,7 +707,7 @@ func TestFetcher_GetIngressControllerType(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
+							Image: "docker.io/powpow/ingress:latest",
 						},
 					},
 				},
@@ -762,7 +728,7 @@ func TestFetcher_GetIngressControllerType(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: "docker.io/jcmoraisjr/haproxy-ingress:latest",
+							Image: "docker.io/powpow/ingress:latest",
 						},
 					},
 				},
@@ -904,16 +870,6 @@ func TestGuessMetricsURL(t *testing.T) {
 				},
 			},
 			wantURL: "http://1.2.3.4:8080/metrics",
-		},
-		{
-			desc: "Pod with haproxy community controller defaults",
-			ctrl: IngressControllerTypeHAProxyCommunity,
-			pod: &corev1.Pod{
-				Status: corev1.PodStatus{
-					PodIP: "1.2.3.4",
-				},
-			},
-			wantURL: "http://1.2.3.4:9101/metrics",
 		},
 		{
 			desc: "Pod with annotations",
@@ -1145,10 +1101,6 @@ func TestIsSupportedIngressControllerType(t *testing.T) {
 	}{
 		{
 			value: IngressControllerTypeTraefik,
-			want:  true,
-		},
-		{
-			value: IngressControllerTypeHAProxyCommunity,
 			want:  true,
 		},
 		{

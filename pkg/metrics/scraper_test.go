@@ -55,27 +55,6 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 	require.Len(t, got, 14)
 }
 
-func TestScraper_ScrapeHAProxy(t *testing.T) {
-	srvURL := startServer(t, "testdata/haproxy-metrics.txt")
-
-	s := metrics.NewScraper(http.DefaultClient)
-
-	got, err := s.Scrape(context.Background(), metrics.ParserHAProxy, []string{srvURL}, metrics.ScrapeState{
-		ServiceIngresses:    map[string][]string{"whoami@default": {"myIngress@default.ingress.networking.k8s.io"}, "whoami2@default": {"myIngress@default.ingress.networking.k8s.io"}},
-		TraefikServiceNames: nil,
-	})
-	require.NoError(t, err)
-
-	require.Len(t, got, 6)
-
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami@default", Value: 12})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami@default", Value: 14})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestClientErrors, Service: "whoami@default", Value: 14})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami2@default", Value: 16})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Service: "whoami2@default", Value: 16})
-	assert.Contains(t, got, &metrics.Histogram{Name: metrics.MetricRequestDuration, Relative: true, Service: "whoami@default", Sum: 1.263616, Count: 1024})
-}
-
 func startServer(t *testing.T, file string) string {
 	t.Helper()
 

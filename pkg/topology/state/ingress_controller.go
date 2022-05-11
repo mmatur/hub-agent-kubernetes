@@ -19,16 +19,15 @@ const AnnotationHubIngressController = "hub.traefik.io/ingress-controller"
 
 // Supported Ingress controller types.
 const (
-	IngressControllerTypeNone             = "none"
-	IngressControllerTypeTraefik          = "traefik"
-	IngressControllerTypeHAProxyCommunity = "haproxy-community"
+	IngressControllerTypeNone    = "none"
+	IngressControllerTypeTraefik = "traefik"
 )
 
 // Supported Ingress Controllers.
 // TODO: unify constants with ACP.
 const (
-	ControllerTypeHAProxyCommunity = "haproxy-ingress.github.io/controller"
-	ControllerTypeTraefik          = "traefik.io/ingress-controller"
+	// ControllerTypeTraefik Traefik Ingress Controllers type.
+	ControllerTypeTraefik = "traefik.io/ingress-controller"
 )
 
 func (f *Fetcher) getIngressControllers(services map[string]*Service, apps map[string]*App) (map[string]*IngressController, error) {
@@ -148,10 +147,6 @@ func (f *Fetcher) getIngressControllerType(pod *corev1.Pod) (string, error) {
 		if strings.HasSuffix(parts[0], "traefikee") && contains(container.Command, "proxy") {
 			return IngressControllerTypeTraefik, nil
 		}
-
-		if strings.Contains(parts[0], "jcmoraisjr/haproxy-ingress") {
-			return IngressControllerTypeHAProxyCommunity, nil
-		}
 	}
 
 	return IngressControllerTypeNone, nil
@@ -220,10 +215,6 @@ func setIngressClasses(controllers map[string]*IngressController, ingressClasses
 		switch ingressClass.Spec.Controller {
 		case ControllerTypeTraefik:
 			ctrlType = IngressControllerTypeTraefik
-
-		case ControllerTypeHAProxyCommunity:
-			ctrlType = IngressControllerTypeHAProxyCommunity
-
 		default:
 			continue
 		}
@@ -241,11 +232,8 @@ func setIngressClasses(controllers map[string]*IngressController, ingressClasses
 // TODO we can try to use the IngressController configuration to be more accurate.
 func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 	var port string
-	switch ctrl {
-	case IngressControllerTypeTraefik:
+	if ctrl == IngressControllerTypeTraefik {
 		port = "8080"
-	case IngressControllerTypeHAProxyCommunity:
-		port = "9101"
 	}
 
 	if pod.Annotations["prometheus.io/port"] != "" {
@@ -263,7 +251,6 @@ func guessMetricsURL(ctrl string, pod *corev1.Pod) string {
 
 func isSupportedIngressControllerType(value string) bool {
 	switch value {
-	case IngressControllerTypeHAProxyCommunity:
 	case IngressControllerTypeTraefik:
 	case IngressControllerTypeNone:
 	default:

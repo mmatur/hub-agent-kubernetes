@@ -198,7 +198,6 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	reviewers := []admission.Reviewer{
 		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
 		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
-		reviewer.NewHAProxyIngress(authServerAddr, ingClassWatcher, polGetter),
 	}
 
 	return admission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil

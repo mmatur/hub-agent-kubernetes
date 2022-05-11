@@ -200,7 +200,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 				Result: &metav1.Status{
 					Status: "Failure",
 					Message: `unsupported or ambiguous Ingress Controller for resource "my-ingress" of kind "networking.k8s.io/v1, Kind=Ingress" in namespace "". ` +
-						`Supported Ingress Controllers are: Traefik and HAProxy; ` +
+						`Supported Ingress Controller is Traefik; ` +
 						`consider explicitly setting the "ingressClassName" property in your resource ` +
 						`or the "kubernetes.io/ingress.class" annotation (deprecated) or setting a default Ingress Controller if none is set`,
 				},

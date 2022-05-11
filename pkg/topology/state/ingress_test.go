@@ -195,25 +195,6 @@ func Test_GetControllerType(t *testing.T) {
 			wantType: IngressControllerTypeTraefik,
 		},
 		{
-			desc: "IngressClassName matching haproxy community controller",
-			ingress: &netv1.Ingress{
-				Spec: netv1.IngressSpec{
-					IngressClassName: stringPtr("foo"),
-				},
-			},
-			ingressClasses: []*netv1.IngressClass{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
-					},
-					Spec: netv1.IngressClassSpec{
-						Controller: ControllerTypeHAProxyCommunity,
-					},
-				},
-			},
-			wantType: IngressControllerTypeHAProxyCommunity,
-		},
-		{
 			desc: "IngressClassName matching unknown controller",
 			ingress: &netv1.Ingress{
 				Spec: netv1.IngressSpec{

@@ -16,7 +16,6 @@ import (
 // This should match the topology types.
 const (
 	ParserTraefik = "traefik"
-	ParserHAProxy = "haproxy-community"
 )
 
 // Metric names.
@@ -114,7 +113,6 @@ type Scraper struct {
 	client *http.Client
 
 	traefikParser TraefikParser
-	haproxyParser HAProxyParser
 }
 
 // NewScraper returns a scraper instance with parser p.
@@ -122,7 +120,6 @@ func NewScraper(c *http.Client) *Scraper {
 	return &Scraper{
 		client:        c,
 		traefikParser: NewTraefikParser(),
-		haproxyParser: NewHAProxyParser(),
 	}
 }
 
@@ -137,8 +134,6 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, s
 	switch parser {
 	case ParserTraefik:
 		p = s.traefikParser
-	case ParserHAProxy:
-		p = s.haproxyParser
 	default:
 		return nil, fmt.Errorf("invalid parser %q", parser)
 	}
