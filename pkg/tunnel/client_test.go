@@ -14,14 +14,12 @@ import (
 func TestClient_ListClusterTunnelEndpoints(t *testing.T) {
 	wantEndpoints := []Endpoint{
 		{
-			TunnelID:        "id",
-			BrokerEndpoint:  "endpoint",
-			ClusterEndpoint: ":443",
+			TunnelID:       "id",
+			BrokerEndpoint: "endpoint",
 		},
 		{
-			TunnelID:        "id2",
-			BrokerEndpoint:  "endpoint2",
-			ClusterEndpoint: ":4443",
+			TunnelID:       "id2",
+			BrokerEndpoint: "endpoint2",
 		},
 	}
 

@@ -11,7 +11,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/topology"
 )
 
-func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform.MetricsConfig, cfgWatcher *platform.ConfigWatcher) (*metrics.Manager, *metrics.Store, error) {
+func newMetrics(watch *topology.Watcher, token, platformURL, traefikURL string, cfg platform.MetricsConfig, cfgWatcher *platform.ConfigWatcher) (*metrics.Manager, *metrics.Store, error) {
 	rc := retryablehttp.NewClient()
 	rc.RetryWaitMin = time.Second
 	rc.RetryWaitMax = 10 * time.Second
@@ -29,7 +29,7 @@ func newMetrics(watch *topology.Watcher, token, platformURL string, cfg platform
 
 	scraper := metrics.NewScraper(httpClient)
 
-	mgr := metrics.NewManager(client, store, scraper)
+	mgr := metrics.NewManager(client, traefikURL, store, scraper)
 
 	mgr.SetConfig(cfg.Interval, cfg.Tables)
 

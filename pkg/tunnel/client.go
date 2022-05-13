@@ -53,9 +53,8 @@ func (a APIError) Error() string {
 
 // Endpoint represents a tunnel endpoint.
 type Endpoint struct {
-	TunnelID        string `json:"tunnelId"`
-	BrokerEndpoint  string `json:"brokerEndpoint"`
-	ClusterEndpoint string `json:"clusterEndpoint"`
+	TunnelID       string `json:"tunnelId"`
+	BrokerEndpoint string `json:"brokerEndpoint"`
 }
 
 // ListClusterTunnelEndpoints lists all tunnels the agent needs to open.

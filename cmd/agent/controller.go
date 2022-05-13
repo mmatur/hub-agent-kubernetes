@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ettle/strcase"
 	"github.com/traefik/hub-agent-kubernetes/pkg/heartbeat"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
@@ -20,7 +21,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-const pidFilePath = "/var/run/hub-agent-kubernetes.pid"
+const (
+	pidFilePath           = "/var/run/hub-agent-kubernetes.pid"
+	flagPlatformURL       = "platform-url"
+	flagToken             = "token"
+	flagTraefikMetricsURL = "traefik.metrics-url"
+)
 
 type controllerCmd struct {
 	flags []cli.Flag
@@ -29,16 +35,22 @@ type controllerCmd struct {
 func newControllerCmd() controllerCmd {
 	flgs := []cli.Flag{
 		&cli.StringFlag{
-			Name:    "platform-url",
+			Name:    flagPlatformURL,
 			Usage:   "The URL at which to reach the Hub platform API",
 			Value:   "https://platform.hub.traefik.io/agent",
-			EnvVars: []string{"PLATFORM_URL"},
+			EnvVars: []string{strcase.ToSNAKE(flagPlatformURL)},
 			Hidden:  true,
 		},
 		&cli.StringFlag{
-			Name:     "token",
+			Name:     flagToken,
 			Usage:    "The token to use for Hub platform API calls",
-			EnvVars:  []string{"TOKEN"},
+			EnvVars:  []string{strcase.ToSNAKE(flagToken)},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     flagTraefikMetricsURL,
+			Usage:    "The url used by Traefik to expose metrics",
+			EnvVars:  []string{strcase.ToSNAKE(flagTraefikMetricsURL)},
 			Required: true,
 		},
 	}
@@ -69,7 +81,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("write pid: %w", err)
 	}
 
-	platformURL, token := cliCtx.String("platform-url"), cliCtx.String("token")
+	platformURL, token := cliCtx.String(flagPlatformURL), cliCtx.String(flagToken)
 
 	kubeCfg, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
@@ -94,7 +106,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	storeCfg := store.Config{
 		TopologyConfig: agentCfg.Topology,
-		Token:          cliCtx.String("token"),
+		Token:          token,
 	}
 	topoFetcher, err := state.NewFetcher(cliCtx.Context, hubClusterID)
 	if err != nil {
@@ -105,11 +117,10 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return err
 	}
 
-	mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, agentCfg.Metrics, configWatcher)
+	mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, cliCtx.String(flagTraefikMetricsURL), agentCfg.Metrics, configWatcher)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = mtrcsMgr.Close() }()
 
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 

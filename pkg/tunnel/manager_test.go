@@ -40,34 +40,31 @@ func TestManager_updateTunnels(t *testing.T) {
 		listClusterTunnelEndpoints: func() ([]Endpoint, error) {
 			return []Endpoint{
 				{
-					TunnelID:        "current-tunnel",
-					BrokerEndpoint:  "ws://" + currentBrokerURL.Host,
-					ClusterEndpoint: ingCtrlServiceURL,
+					TunnelID:       "current-tunnel",
+					BrokerEndpoint: "ws://" + currentBrokerURL.Host,
 				},
 				{
-					TunnelID:        "new-tunnel",
-					BrokerEndpoint:  "ws://" + newBrokerURL.Host,
-					ClusterEndpoint: ingCtrlServiceURL,
+					TunnelID:       "new-tunnel",
+					BrokerEndpoint: "ws://" + newBrokerURL.Host,
 				},
 				{
-					TunnelID:        "stable-tunnel",
-					BrokerEndpoint:  "ws://" + stableBrokerURL.Host,
-					ClusterEndpoint: ingCtrlServiceURL,
+					TunnelID:       "stable-tunnel",
+					BrokerEndpoint: "ws://" + stableBrokerURL.Host,
 				},
 			}, nil
 		},
 	}
 
 	c := fakeClient(t)
-	manager := NewManager(client, "token")
+	manager := NewManager(client, ingCtrlServiceURL, "token")
 	manager.tunnels["current-tunnel-new-broker"] = &tunnel{
 		BrokerEndpoint:  "old-endpoint",
-		ClusterEndpoint: "old-endpoint",
+		ClusterEndpoint: ingCtrlServiceURL,
 		Client:          &closeAwareListener{Listener: c},
 	}
 	manager.tunnels["unused-tunnel"] = &tunnel{
 		BrokerEndpoint:  "old-endpoint",
-		ClusterEndpoint: "old-endpoint",
+		ClusterEndpoint: ingCtrlServiceURL,
 		Client:          &closeAwareListener{Listener: c},
 	}
 

@@ -9,7 +9,6 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"github.com/rs/zerolog/log"
 )
 
 // Parser names.
@@ -124,7 +123,7 @@ func NewScraper(c *http.Client) *Scraper {
 }
 
 // Scrape returns metrics scraped from all targets.
-func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, state ScrapeState) ([]Metric, error) {
+func (s *Scraper) Scrape(ctx context.Context, parser, target string, state ScrapeState) ([]Metric, error) {
 	// This is a naive approach and should be dealt with
 	// as an iterator later to control the amount of RAM
 	// used while scraping many targets with many services.
@@ -138,18 +137,14 @@ func (s *Scraper) Scrape(ctx context.Context, parser string, targets []string, s
 		return nil, fmt.Errorf("invalid parser %q", parser)
 	}
 
+	raw, err := s.scrapeMetrics(ctx, target)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get metrics from target %s", target)
+	}
+
 	var m []Metric
-
-	for _, u := range targets {
-		raw, err := s.scrapeMetrics(ctx, u)
-		if err != nil {
-			log.Error().Err(err).Str("target", u).Msg("Unable to get metrics from target")
-			continue
-		}
-
-		for _, v := range raw {
-			m = append(m, p.Parse(v, state)...)
-		}
+	for _, v := range raw {
+		m = append(m, p.Parse(v, state)...)
 	}
 
 	return m, nil

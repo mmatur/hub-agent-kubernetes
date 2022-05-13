@@ -15,29 +15,31 @@ const scrapeInterval = time.Minute
 
 // Manager orchestrates metrics scraping and sending.
 type Manager struct {
-	store   *Store
-	client  *Client
-	scraper *Scraper
+	store      *Store
+	client     *Client
+	traefikURL string
+	scraper    *Scraper
 
 	sendMu     sync.Mutex
 	sendIntvl  time.Duration
 	sendTables []string
 
-	scraperMu sync.Mutex
-	scrapers  map[string]chan struct{}
-	stopped   bool
-	state     atomic.Value
+	state atomic.Value
 }
 
 // NewManager returns a manager.
-func NewManager(client *Client, store *Store, scraper *Scraper) *Manager {
+func NewManager(client *Client, traefikURL string, store *Store, scraper *Scraper) *Manager {
+	var st atomic.Value
+	st.Store(&state.Cluster{})
+
 	return &Manager{
 		store:      store,
 		client:     client,
+		traefikURL: traefikURL,
 		scraper:    scraper,
 		sendIntvl:  time.Minute,
 		sendTables: []string{"1m", "10m", "1h", "1d"},
-		scrapers:   map[string]chan struct{}{},
+		state:      st,
 	}
 }
 
@@ -51,36 +53,12 @@ func (m *Manager) SetConfig(sendInterval time.Duration, sendTables []string) {
 }
 
 // TopologyStateChanged is called every time the topology state changes.
-func (m *Manager) TopologyStateChanged(ctx context.Context, cluster *state.Cluster) {
-	m.scraperMu.Lock()
-	defer m.scraperMu.Unlock()
-
-	if m.stopped || cluster == nil {
+func (m *Manager) TopologyStateChanged(_ context.Context, cluster *state.Cluster) {
+	if cluster == nil {
 		return
 	}
 
 	m.state.Store(cluster)
-
-	// Start new scrapers.
-	for name, ic := range cluster.IngressControllers {
-		if _, ok := m.scrapers[name]; ok {
-			continue
-		}
-
-		doneCh := make(chan struct{})
-		m.scrapers[name] = doneCh
-		go m.startScraper(ctx, ic.Type, name, doneCh)
-	}
-
-	// Remove scrapers that no longer exist.
-	for name, doneCh := range m.scrapers {
-		if _, ok := cluster.IngressControllers[name]; ok {
-			continue
-		}
-
-		close(doneCh)
-		delete(m.scrapers, name)
-	}
 }
 
 // Run runs the metrics manager. This is a blocking method.
@@ -96,7 +74,10 @@ func (m *Manager) Run(ctx context.Context) error {
 		}
 	}
 
-	m.runSender(ctx)
+	go m.startScraper(ctx)
+	go m.runSender(ctx)
+
+	<-ctx.Done()
 
 	return nil
 }
@@ -162,8 +143,8 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	return nil
 }
 
-func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-chan struct{}) {
-	mtrcs, err := m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+func (m *Manager) startScraper(ctx context.Context) {
+	mtrcs, err := m.scraper.Scrape(ctx, ParserTraefik, m.traefikURL, ScrapeState{
 		Ingresses:           m.getIngresses(),
 		IngressRoutes:       m.getIngressRoutes(),
 		ServiceIngresses:    m.getSvcIngresses(),
@@ -182,11 +163,11 @@ func (m *Manager) startScraper(ctx context.Context, kind, name string, doneCh <-
 	scrapeSec := int64(scrapeInterval.Seconds())
 	for {
 		select {
-		case <-doneCh:
+		case <-ctx.Done():
 			return
 
 		case <-tick.C:
-			mtrcs, err = m.scraper.Scrape(ctx, kind, m.getIngressURLs(name), ScrapeState{
+			mtrcs, err = m.scraper.Scrape(ctx, ParserTraefik, m.traefikURL, ScrapeState{
 				Ingresses:           m.getIngresses(),
 				IngressRoutes:       m.getIngressRoutes(),
 				ServiceIngresses:    m.getSvcIngresses(),
@@ -260,29 +241,4 @@ func (m *Manager) getIngressRoutes() map[string]struct{} {
 	}
 
 	return ingRoutes
-}
-
-func (m *Manager) getIngressURLs(name string) []string {
-	cluster := m.state.Load().(*state.Cluster)
-
-	ctl, ok := cluster.IngressControllers[name]
-	if !ok {
-		return nil
-	}
-
-	return ctl.MetricsURLs
-}
-
-// Close stops of all the scrapers.
-func (m *Manager) Close() error {
-	m.scraperMu.Lock()
-	defer m.scraperMu.Unlock()
-
-	for _, doneCh := range m.scrapers {
-		close(doneCh)
-	}
-
-	m.stopped = true
-
-	return nil
 }

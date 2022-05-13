@@ -24,8 +24,9 @@ type Backend interface {
 
 // Manager manages tunnels.
 type Manager struct {
-	client Backend
-	token  string
+	client            Backend
+	token             string
+	traefikTunnelAddr string
 
 	tunnelsMu sync.Mutex
 	tunnels   map[string]*tunnel
@@ -46,11 +47,12 @@ func (t *tunnel) Close() error {
 }
 
 // NewManager returns a new manager instance.
-func NewManager(tunnels Backend, token string) Manager {
+func NewManager(tunnels Backend, traefikTunnelAddr, token string) Manager {
 	return Manager{
-		client:  tunnels,
-		token:   token,
-		tunnels: make(map[string]*tunnel),
+		client:            tunnels,
+		traefikTunnelAddr: traefikTunnelAddr,
+		token:             token,
+		tunnels:           make(map[string]*tunnel),
 	}
 }
 
@@ -107,7 +109,6 @@ func (m *Manager) updateTunnels(ctx context.Context) error {
 	for _, endpoint := range endpoints {
 		logger := log.With().
 			Str("broker_endpoint", endpoint.BrokerEndpoint).
-			Str("cluster_endpoint", endpoint.ClusterEndpoint).
 			Str("tunnel_id", endpoint.TunnelID).
 			Logger()
 		currentTunnels[endpoint.TunnelID] = struct{}{}
@@ -119,7 +120,7 @@ func (m *Manager) updateTunnels(ctx context.Context) error {
 			continue
 		}
 
-		if tun.BrokerEndpoint != endpoint.BrokerEndpoint || tun.ClusterEndpoint != endpoint.ClusterEndpoint {
+		if tun.BrokerEndpoint != endpoint.BrokerEndpoint {
 			if err = tun.Close(); err != nil {
 				logger.Error().Err(err).Msg("Unable to close tunnel")
 			}
@@ -142,7 +143,7 @@ func (m *Manager) updateTunnels(ctx context.Context) error {
 }
 
 func (m *Manager) launchTunnel(endpoint Endpoint) {
-	t := &tunnel{BrokerEndpoint: endpoint.BrokerEndpoint, ClusterEndpoint: endpoint.ClusterEndpoint}
+	t := &tunnel{BrokerEndpoint: endpoint.BrokerEndpoint, ClusterEndpoint: m.traefikTunnelAddr}
 	m.tunnels[endpoint.TunnelID] = t
 
 	go func(t *tunnel, tunnelID string) {
