@@ -48,7 +48,8 @@ func NewClient(baseURL, token string) *Client {
 }
 
 type linkClusterReq struct {
-	KubeID string `json:"kubeId"`
+	KubeID   string `json:"kubeId"`
+	Platform string `json:"platform"`
 }
 
 type linkClusterResp struct {
@@ -57,7 +58,7 @@ type linkClusterResp struct {
 
 // Link links the agent to the given Kubernetes ID.
 func (c *Client) Link(ctx context.Context, kubeID string) (string, error) {
-	body, err := json.Marshal(linkClusterReq{KubeID: kubeID})
+	body, err := json.Marshal(linkClusterReq{KubeID: kubeID, Platform: "kubernetes"})
 	if err != nil {
 		return "", fmt.Errorf("marshal link agent request: %w", err)
 	}
