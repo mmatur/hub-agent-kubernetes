@@ -29,6 +29,12 @@ func InClusterConfigWithRetrier(maxRetries int) (*rest.Config, error) {
 	rc.HTTPClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
 	rc.Logger = logger.NewWrappedLogger(log.Logger.With().Str("component", "kubernetes_client").Logger())
 
+	// By default, retryablehttp client returns an error when it reaches the maxRetry even if the doErr is nil.
+	// This error prevents kubernetes library from making a clean log. This errorHandler avoids this mechanism.
+	rc.ErrorHandler = func(resp *http.Response, err error, numTries int) (*http.Response, error) {
+		return resp, err
+	}
+
 	rrt := &retryablehttp.RoundTripper{Client: rc}
 
 	wt := cfg.WrapTransport
