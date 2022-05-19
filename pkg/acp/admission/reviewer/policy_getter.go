@@ -2,7 +2,6 @@ package reviewer
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
@@ -25,12 +24,7 @@ func NewPolGetter(informer hubinformer.SharedInformerFactory) *PolGetter {
 
 // GetConfig gets ACP configuration.
 func (p PolGetter) GetConfig(canonicalName string) (*acp.Config, error) {
-	parts := strings.Split(canonicalName, "@")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid canonical name %q", canonicalName)
-	}
-
-	policy, err := p.informer.Hub().V1alpha1().AccessControlPolicies().Lister().AccessControlPolicies(parts[1]).Get(parts[0])
+	policy, err := p.informer.Hub().V1alpha1().AccessControlPolicies().Lister().Get(canonicalName)
 	if err != nil {
 		return nil, fmt.Errorf("get ACP: %w", err)
 	}

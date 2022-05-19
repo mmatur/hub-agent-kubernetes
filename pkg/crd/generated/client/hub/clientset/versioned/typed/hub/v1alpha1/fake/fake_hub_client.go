@@ -28,8 +28,8 @@ type FakeHubV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeHubV1alpha1) AccessControlPolicies(namespace string) v1alpha1.AccessControlPolicyInterface {
-	return &FakeAccessControlPolicies{c, namespace}
+func (c *FakeHubV1alpha1) AccessControlPolicies() v1alpha1.AccessControlPolicyInterface {
+	return &FakeAccessControlPolicies{c}
 }
 
 func (c *FakeHubV1alpha1) EdgeIngresses(namespace string) v1alpha1.EdgeIngressInterface {

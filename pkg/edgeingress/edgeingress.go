@@ -8,6 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Certificate represents the certificate returned by the platform.
+type Certificate struct {
+	Certificate []byte `json:"certificate"`
+	PrivateKey  []byte `json:"privateKey"`
+}
+
 // EdgeIngress is an ingress exposed on the edge.
 type EdgeIngress struct {
 	WorkspaceID string `json:"workspaceId"`
@@ -17,29 +23,37 @@ type EdgeIngress struct {
 
 	Domain string `json:"domain"`
 
-	Version      string `json:"version"`
-	ServiceName  string `json:"serviceName"`
-	ServicePort  int    `json:"servicePort"`
-	ACPName      string `json:"acpName"`
-	ACPNamespace string `json:"acpNamespace"`
+	Version string  `json:"version"`
+	Service Service `json:"service"`
+	ACP     *ACP    `json:"acp,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// Service is a service used by the edge ingress.
+type Service struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+}
+
+// ACP is an ACP used by the edge ingress.
+type ACP struct {
+	Name string `json:"name"`
 }
 
 // Resource builds the v1alpha1 EdgeIngress resource.
 func (e *EdgeIngress) Resource() (*hubv1alpha1.EdgeIngress, error) {
 	spec := hubv1alpha1.EdgeIngressSpec{
 		Service: hubv1alpha1.EdgeIngressService{
-			Name: e.ServiceName,
-			Port: e.ServicePort,
+			Name: e.Service.Name,
+			Port: e.Service.Port,
 		},
 	}
 
-	if e.ACPName != "" {
+	if e.ACP != nil {
 		spec.ACP = &hubv1alpha1.EdgeIngressACP{
-			Name:      e.ACPName,
-			Namespace: e.ACPNamespace,
+			Name: e.ACP.Name,
 		}
 	}
 

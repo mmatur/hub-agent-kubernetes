@@ -259,15 +259,14 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 	testCases := []struct {
 		desc          string
-		deleteACPFunc func(oldVersion, namespace, name string) error
+		deleteACPFunc func(oldVersion, name string) error
 		response      *admv1.AdmissionResponse
 	}{
 		{
 			desc: "authorize ACP deletion",
-			deleteACPFunc: func(oldVersion, name, namespace string) error {
+			deleteACPFunc: func(oldVersion, name string) error {
 				assert.Equal(t, "oldVersion", oldVersion)
 				assert.Equal(t, "acp", name)
-				assert.Equal(t, "default", namespace)
 
 				return nil
 			},
@@ -278,7 +277,7 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 		},
 		{
 			desc: "conflict version scenario",
-			deleteACPFunc: func(oldVersion, namespace, name string) error {
+			deleteACPFunc: func(oldVersion, name string) error {
 				return platform.ErrVersionConflict
 			},
 			response: &admv1.AdmissionResponse{
@@ -332,9 +331,9 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 
 			var callCount int
 			client := &backendMock{
-				deleteACPFunc: func(oldVersion, namespace, name string) error {
+				deleteACPFunc: func(oldVersion, name string) error {
 					callCount++
-					return test.deleteACPFunc(oldVersion, namespace, name)
+					return test.deleteACPFunc(oldVersion, name)
 				},
 			}
 
@@ -534,7 +533,7 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 type backendMock struct {
 	createACPFunc func(policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
 	updateACPFunc func(oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
-	deleteACPFunc func(oldVersion, namespace, name string) error
+	deleteACPFunc func(oldVersion, name string) error
 }
 
 func (m *backendMock) CreateACP(_ context.Context, createReq *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
@@ -545,8 +544,8 @@ func (m *backendMock) UpdateACP(_ context.Context, oldVersion string, policy *hu
 	return m.updateACPFunc(oldVersion, policy)
 }
 
-func (m *backendMock) DeleteACP(_ context.Context, oldVersion, name, namespace string) error {
-	return m.deleteACPFunc(oldVersion, name, namespace)
+func (m *backendMock) DeleteACP(_ context.Context, oldVersion, name string) error {
+	return m.deleteACPFunc(oldVersion, name)
 }
 
 func mustMarshal(t *testing.T, obj interface{}) []byte {

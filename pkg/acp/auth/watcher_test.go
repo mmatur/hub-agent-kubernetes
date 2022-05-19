@@ -46,22 +46,22 @@ func TestWatcher_OnAdd(t *testing.T) {
 	}{
 		{
 			desc:     "my-policy-1",
-			path:     "/my-policy-1@test",
+			path:     "/my-policy-1",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "my-policy-2",
-			path:     "/my-policy-2@test",
+			path:     "/my-policy-2",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "my-policy-3",
-			path:     "/my-policy-3@foo",
+			path:     "/my-policy-3",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "unknown resource",
-			path:     "/my-policy@test",
+			path:     "/my-policy",
 			expected: http.StatusNotFound,
 		},
 	}
@@ -107,22 +107,22 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}{
 		{
 			desc:     "my-policy-1",
-			path:     "/my-policy-1@test",
+			path:     "/my-policy-1",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "my-policy-2",
-			path:     "/my-policy-2@test",
+			path:     "/my-policy-2",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "my-policy-3",
-			path:     "/my-policy-3@foo",
+			path:     "/my-policy-3",
 			expected: http.StatusUnauthorized,
 		},
 		{
 			desc:     "unknown resource",
-			path:     "/my-policy@test",
+			path:     "/my-policy",
 			expected: http.StatusNotFound,
 		},
 	}
@@ -168,12 +168,12 @@ func TestWatcher_OnDelete(t *testing.T) {
 	}{
 		{
 			desc:     "my-policy-1",
-			path:     "/my-policy-1@test",
+			path:     "/my-policy-1",
 			expected: http.StatusNotFound,
 		},
 		{
 			desc:     "my-policy-2",
-			path:     "/my-policy-2@test",
+			path:     "/my-policy-2",
 			expected: http.StatusNotFound,
 		},
 		{
@@ -183,7 +183,7 @@ func TestWatcher_OnDelete(t *testing.T) {
 		},
 		{
 			desc:     "unknown resource",
-			path:     "/my-policy@test",
+			path:     "/my-policy",
 			expected: http.StatusNotFound,
 		},
 	}

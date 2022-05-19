@@ -21,16 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestTraefikIngress_HandleACPName(t *testing.T) {
-	factory := func(policies PolicyGetter) reviewer {
-		fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikkubemock.NewSimpleClientset().TraefikV1alpha1())
-
-		return NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
-	}
-
-	ingressHandleACPName(t, factory)
-}
-
 func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 	i := ingressClassesMock{
 		getDefaultControllerFunc: func() (string, error) {

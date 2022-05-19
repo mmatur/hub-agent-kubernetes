@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/ettle/strcase"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -24,74 +25,86 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
-	"github.com/traefik/hub-agent-kubernetes/pkg/validationwebhook"
 	"github.com/urfave/cli/v2"
+	netv1 "k8s.io/api/networking/v1"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	flagACPServerListenAddr     = "acp-server.listen-addr"
+	flagACPServerCertificate    = "acp-server.cert"
+	flagACPServerKey            = "acp-server.key"
+	flagACPServerAuthServerAddr = "acp-server.auth-server-addr"
+	flagIngressClassName        = "ingress-class-name"
+	flagTraefikEntryPoint       = "traefik.entryPoint"
+)
+
 func acpFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:    "acp-server.listen-addr",
+			Name:    flagACPServerListenAddr,
 			Usage:   "Address on which the access control policy server listens for admission requests",
-			EnvVars: []string{"ACP_SERVER_LISTEN_ADDR"},
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerListenAddr)},
 			Value:   "0.0.0.0:443",
 		},
 		&cli.StringFlag{
-			Name:    "acp-server.cert",
+			Name:    flagACPServerCertificate,
 			Usage:   "Certificate used for TLS by the ACP server",
-			EnvVars: []string{"ACP_SERVER_CERT"},
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerCertificate)},
 			Value:   "/var/run/hub-agent-kubernetes/cert.pem",
 		},
 		&cli.StringFlag{
-			Name:    "acp-server.key",
+			Name:    flagACPServerKey,
 			Usage:   "Key used for TLS by the ACP server",
-			EnvVars: []string{"ACP_SERVER_KEY"},
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerKey)},
 			Value:   "/var/run/hub-agent-kubernetes/key.pem",
 		},
 		&cli.StringFlag{
-			Name:    "acp-server.auth-server-addr",
+			Name:    flagACPServerAuthServerAddr,
 			Usage:   "Address the ACP server can reach the auth server on",
-			EnvVars: []string{"ACP_SERVER_AUTH_SERVER_ADDR"},
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerAuthServerAddr)},
 			Value:   "http://hub-agent-auth-server.hub.svc.cluster.local",
+		},
+		&cli.StringFlag{
+			Name:    flagIngressClassName,
+			Usage:   "The ingress class name used for ingresses managed by Hub",
+			EnvVars: []string{strcase.ToSNAKE(flagIngressClassName)},
+		},
+		&cli.StringFlag{
+			Name:    flagTraefikEntryPoint,
+			Usage:   "The entry point used by Traefik to expose tunnels",
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikEntryPoint)},
+			Value:   "traefikhub-tunl",
 		},
 	}
 }
 
 func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client) error {
 	var (
-		listenAddr     = cliCtx.String("acp-server.listen-addr")
-		certFile       = cliCtx.String("acp-server.cert")
-		keyFile        = cliCtx.String("acp-server.key")
-		authServerAddr = cliCtx.String("acp-server.auth-server-addr")
+		listenAddr     = cliCtx.String(flagACPServerListenAddr)
+		certFile       = cliCtx.String(flagACPServerCertificate)
+		keyFile        = cliCtx.String(flagACPServerKey)
+		authServerAddr = cliCtx.String(flagACPServerAuthServerAddr)
 	)
 
 	if _, err := url.Parse(authServerAddr); err != nil {
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	acpAdmission, edgeIngressAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr)
+	acpAdmission, edgeIngressAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, cliCtx.String(flagIngressClassName), cliCtx.String(flagTraefikEntryPoint))
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
-
-	domainCache := platform.NewDomainCache(platformClient, 30*time.Second)
-	if err = domainCache.WarmUp(ctx); err != nil {
-		return fmt.Errorf("warming up domain cache: %w", err)
-	}
-
-	go domainCache.Run(ctx)
-
-	acpValidation := validationwebhook.NewHandler(domainCache)
 
 	webAdmissionACP := admission.NewACPHandler(platformClient)
 
 	router := chi.NewRouter()
 	router.Handle("/edge-ingress", edgeIngressAdmission)
 	router.Handle("/ingress", acpAdmission)
-	router.Handle("/ingress/validation", acpValidation)
 	router.Handle("/acp", webAdmissionACP)
 
 	server := &http.Server{
@@ -128,7 +141,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string) (acpHdl, edgeIngressHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr, ingressClassName, traefikEntryPoint string) (acpHdl, edgeIngressHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -137,6 +150,13 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
+	}
+
+	if ingressClassName == "" {
+		ingressClassName = "traefik-hub"
+		if err = initIngressClass(ctx, clientSet, ingressClassName); err != nil {
+			return nil, nil, fmt.Errorf("initatilize ingressClass: %w", err)
+		}
 	}
 
 	hubClientSet, err := hubclientset.NewForConfig(config)
@@ -176,12 +196,15 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		}
 	}
 
-	acpWatcher := acp.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
+	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
 	go func() {
 		acpWatcher.Run(ctx)
 	}()
 
-	edgeIngressWatcher := edgeingress.NewWatcher(10*time.Second, platformClient, hubClientSet, hubInformer)
+	edgeIngressWatcher, err := edgeingress.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer, clientSet, ingressClassName, traefikEntryPoint)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
+	}
 	go func() {
 		edgeIngressWatcher.Run(ctx)
 	}()
@@ -197,7 +220,6 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	reviewers := []admission.Reviewer{
 		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
-		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
 	}
 
 	return admission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil
@@ -222,6 +244,24 @@ func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer inform
 	for t, ok := range kubeInformer.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return fmt.Errorf("wait for cache Kubernetes sync: %s: %w", t, ctx.Err())
+		}
+	}
+
+	return nil
+}
+
+func initIngressClass(ctx context.Context, clientSet clientset.Interface, ingressClassName string) error {
+	ic := &netv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ingressClassName,
+		},
+		Spec: netv1.IngressClassSpec{
+			Controller: "traefik.io/ingress-controller",
+		},
+	}
+	if _, err := clientSet.NetworkingV1().IngressClasses().Create(ctx, ic, metav1.CreateOptions{}); err != nil {
+		if !kerror.IsAlreadyExists(err) {
+			return err
 		}
 	}
 

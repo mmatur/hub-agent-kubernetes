@@ -36,24 +36,18 @@ func NewFwdAuthMiddlewares(agentAddr string, policies PolicyGetter, traefikClien
 func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string) (string, error) {
 	logger := log.Ctx(ctx).With().
 		Str("acp_name", polName).
-		Str("namespace", namespace).
 		Logger()
 	ctx = logger.WithContext(ctx)
 
 	logger.Debug().Msg("Setting up ForwardAuth middleware")
 
-	canonicalPolName, err := acp.CanonicalName(polName, namespace)
+	acpCfg, err := m.policies.GetConfig(polName)
 	if err != nil {
 		return "", err
 	}
 
-	acpCfg, err := m.policies.GetConfig(canonicalPolName)
-	if err != nil {
-		return "", err
-	}
-
-	name := middlewareName(canonicalPolName)
-	if err = m.setupMiddleware(ctx, name, namespace, canonicalPolName, acpCfg); err != nil {
+	name := middlewareName(polName)
+	if err = m.setupMiddleware(ctx, name, namespace, polName, acpCfg); err != nil {
 		return "", fmt.Errorf("setup ForwardAuth middleware: %w", err)
 	}
 

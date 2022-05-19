@@ -45,7 +45,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 
 // AccessControlPolicies returns a AccessControlPolicyInformer.
 func (v *version) AccessControlPolicies() AccessControlPolicyInformer {
-	return &accessControlPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &accessControlPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // EdgeIngresses returns a EdgeIngressInformer.

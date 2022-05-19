@@ -17,9 +17,9 @@ func (f *fakeUpdater) Update(polName string) {
 	f.policies = append(f.policies, polName)
 }
 
-func createPolicy(uid, name, ns string, sah bool) *hubv1alpha1.AccessControlPolicy {
+func createPolicy(uid, name string, sah bool) *hubv1alpha1.AccessControlPolicy {
 	return &hubv1alpha1.AccessControlPolicy{
-		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name, Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
 		Spec: hubv1alpha1.AccessControlPolicySpec{
 			JWT: &hubv1alpha1.AccessControlPolicyJWT{
 				SigningSecret:            "secret",
@@ -34,10 +34,10 @@ func TestEventHandler_OnAdd(t *testing.T) {
 
 	handler := NewEventHandler(&updater)
 
-	handler.OnAdd(createPolicy("1", "my-policy-1", "foo", false))
-	handler.OnAdd(createPolicy("2", "my-policy-2", "bar", false))
+	handler.OnAdd(createPolicy("1", "my-policy-1", false))
+	handler.OnAdd(createPolicy("2", "my-policy-2", false))
 
-	expected := []string{"my-policy-1@foo", "my-policy-2@bar"}
+	expected := []string{"my-policy-1", "my-policy-2"}
 
 	assert.Equal(t, expected, updater.policies)
 }
@@ -47,10 +47,10 @@ func TestEventHandler_OnDelete(t *testing.T) {
 
 	handler := NewEventHandler(&updater)
 
-	handler.OnDelete(createPolicy("1", "my-policy-1", "foo", false))
-	handler.OnDelete(createPolicy("2", "my-policy-2", "bar", false))
+	handler.OnDelete(createPolicy("1", "my-policy-1", false))
+	handler.OnDelete(createPolicy("2", "my-policy-2", false))
 
-	expected := []string{"my-policy-1@foo", "my-policy-2@bar"}
+	expected := []string{"my-policy-1", "my-policy-2"}
 
 	assert.Equal(t, expected, updater.policies)
 }
@@ -61,16 +61,16 @@ func TestEventHandler_OnUpdate(t *testing.T) {
 	handler := NewEventHandler(&updater)
 
 	handler.OnUpdate(
-		createPolicy("1", "my-policy-1", "foo", false),
-		createPolicy("1", "my-policy-1", "foo", true),
+		createPolicy("1", "my-policy-1", false),
+		createPolicy("1", "my-policy-1", true),
 	)
 
 	handler.OnUpdate(
-		createPolicy("2", "my-policy-2", "bar", false),
-		createPolicy("2", "my-policy-2", "bar", false),
+		createPolicy("2", "my-policy-2", false),
+		createPolicy("2", "my-policy-2", false),
 	)
 
-	expected := []string{"my-policy-1@foo"}
+	expected := []string{"my-policy-1"}
 
 	assert.Equal(t, expected, updater.policies)
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NOTE: if we use the same watcher for all resources, then we need to restart it when new CRDs are
@@ -93,7 +92,7 @@ func (w *Watcher) OnAdd(obj interface{}) {
 	}
 
 	w.configsMu.Lock()
-	w.configs[canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)] = acp.ConfigFromPolicy(v)
+	w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
 	w.configsMu.Unlock()
 
 	select {
@@ -113,11 +112,10 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 		return
 	}
 
-	polName := canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)
 	cfg := acp.ConfigFromPolicy(v)
 
 	w.configsMu.Lock()
-	w.configs[polName] = cfg
+	w.configs[v.ObjectMeta.Name] = cfg
 	w.configsMu.Unlock()
 
 	select {
@@ -138,21 +136,13 @@ func (w *Watcher) OnDelete(obj interface{}) {
 	}
 
 	w.configsMu.Lock()
-	delete(w.configs, canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace))
+	delete(w.configs, v.ObjectMeta.Name)
 	w.configsMu.Unlock()
 
 	select {
 	case w.refresh <- struct{}{}:
 	default:
 	}
-}
-
-func canonicalName(name, ns string) string {
-	if ns == "" {
-		ns = metav1.NamespaceDefault
-	}
-
-	return name + "@" + ns
 }
 
 func buildRoutes(cfgs map[string]*acp.Config) (http.Handler, error) {

@@ -10,9 +10,11 @@ import (
 )
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AccessControlPolicy defines an access control policy.
+// +kubebuilder:resource:scope=Cluster
 type AccessControlPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

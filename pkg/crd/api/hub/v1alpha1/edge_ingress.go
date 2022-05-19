@@ -59,8 +59,7 @@ type EdgeIngressService struct {
 
 // EdgeIngressACP configures the ACP to use on the Ingress.
 type EdgeIngressACP struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace,omitempty"`
+	Name string `json:"name"`
 }
 
 // EdgeIngressConnectionStatus is the status of the underlying connection to the edge.

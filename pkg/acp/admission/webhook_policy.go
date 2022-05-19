@@ -26,7 +26,7 @@ type patch struct {
 type Backend interface {
 	CreateACP(ctx context.Context, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
 	UpdateACP(ctx context.Context, oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
-	DeleteACP(ctx context.Context, oldVersion, name, namespace string) error
+	DeleteACP(ctx context.Context, oldVersion, name string) error
 }
 
 // ACPHandler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
@@ -145,7 +145,7 @@ func (h ACPHandler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]
 	case admv1.Delete:
 		logger.Info().Msg("Deleting AccessControlPolicy resource")
 
-		if err = h.backend.DeleteACP(ctx, oldACP.Status.Version, oldACP.Name, oldACP.Namespace); err != nil {
+		if err = h.backend.DeleteACP(ctx, oldACP.Status.Version, oldACP.Name); err != nil {
 			return nil, fmt.Errorf("delete: %w", err)
 		}
 		return nil, nil

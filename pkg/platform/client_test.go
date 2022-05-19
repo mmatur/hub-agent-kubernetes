@@ -83,7 +83,8 @@ func TestClient_Link(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			hubClusterID, err := c.Link(context.Background(), "1")
@@ -156,7 +157,8 @@ func TestClient_GetConfig(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			agentCfg, err := c.GetConfig(context.Background())
@@ -220,10 +222,11 @@ func TestClient_Ping(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			err := c.Ping(context.Background())
+			err = c.Ping(context.Background())
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
@@ -283,7 +286,8 @@ func TestClient_ListVerifiedDomains(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			domains, err := c.ListVerifiedDomains(context.Background())
@@ -306,39 +310,43 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 		{
 			desc: "create edge ingress",
 			createReq: &CreateEdgeIngressReq{
-				Name:         "name",
-				Namespace:    "namespace",
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
+				Name:      "name",
+				Namespace: "namespace",
+				Service: Service{
+					Name: "service-name",
+					Port: 8080,
+				},
+				ACP: &ACP{
+					Name: "acp-name",
+				},
 			},
 			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
 			edgeIngress: &edgeingress.EdgeIngress{
-				WorkspaceID:  "workspace-id",
-				ClusterID:    "cluster-id",
-				Namespace:    "namespace",
-				Name:         "name",
-				Domain:       "majestic-beaver-123.hub-traefik.io",
-				Version:      "version-1",
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
-				CreatedAt:    time.Now().UTC().Truncate(time.Millisecond),
-				UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+				WorkspaceID: "workspace-id",
+				ClusterID:   "cluster-id",
+				Namespace:   "namespace",
+				Name:        "name",
+				Domain:      "majestic-beaver-123.hub-traefik.io",
+				Version:     "version-1",
+				Service:     edgeingress.Service{Name: "service-name", Port: 8080},
+				ACP:         &edgeingress.ACP{Name: "acp-name"},
+				CreatedAt:   time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 			},
 		},
 		{
 			desc: "conflict",
 			createReq: &CreateEdgeIngressReq{
-				Name:         "name",
-				Namespace:    "namespace",
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
+				Name:      "name",
+				Namespace: "namespace",
+				Service: Service{
+					Name: "service-name",
+					Port: 8080,
+				},
+				ACP: &ACP{
+					Name: "acp-name",
+				},
 			},
 			returnStatusCode: http.StatusConflict,
 			wantErr:          assertErrorIs(ErrVersionConflict),
@@ -381,7 +389,8 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			createdEdgeIngress, err := c.CreateEdgeIngress(context.Background(), test.createReq)
@@ -406,8 +415,7 @@ func TestClient_UpdateEdgeIngress(t *testing.T) {
 				Port: 8080,
 			},
 			ACP: &hubv1alpha1.EdgeIngressACP{
-				Name:      "acp-name",
-				Namespace: "acp-namespace",
+				Name: "acp-name",
 			},
 		},
 	}
@@ -431,36 +439,30 @@ func TestClient_UpdateEdgeIngress(t *testing.T) {
 			namespace: "namespace",
 			version:   "version-1",
 			updateReq: &UpdateEdgeIngressReq{
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
+				Service: Service{Name: "service-name", Port: 8080},
+				ACP:     &ACP{Name: "acp-name"},
 			},
 			returnStatusCode: http.StatusOK,
 			wantErr:          assert.NoError,
 			edgeIngress: &edgeingress.EdgeIngress{
-				WorkspaceID:  "workspace-id",
-				ClusterID:    "cluster-id",
-				Namespace:    "namespace",
-				Name:         "name",
-				Domain:       "majestic-beaver-123.hub-traefik.io",
-				Version:      "version-2",
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
-				CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-				UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+				WorkspaceID: "workspace-id",
+				ClusterID:   "cluster-id",
+				Namespace:   "namespace",
+				Name:        "name",
+				Domain:      "majestic-beaver-123.hub-traefik.io",
+				Version:     "version-2",
+				Service:     edgeingress.Service{Name: "service-name", Port: 8080},
+				ACP:         &edgeingress.ACP{Name: "acp-name"},
+				CreatedAt:   time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+				UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 			},
 		},
 		{
 			desc:    "conflict",
 			version: "version-1",
 			updateReq: &UpdateEdgeIngressReq{
-				ServiceName:  "service-name",
-				ServicePort:  8080,
-				ACPName:      "acp-name",
-				ACPNamespace: "acp-namespace",
+				Service: Service{Name: "service-name", Port: 8080},
+				ACP:     &ACP{Name: "acp-name"},
 			},
 			returnStatusCode: http.StatusConflict,
 			wantErr:          assertErrorIs(ErrVersionConflict),
@@ -508,7 +510,8 @@ func TestClient_UpdateEdgeIngress(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			updatedEdgeIngress, err := c.UpdateEdgeIngress(context.Background(), test.namespace, test.name, test.version, test.updateReq)
@@ -581,10 +584,11 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			err := c.DeleteEdgeIngress(context.Background(), test.version, test.namespace, test.name)
+			err = c.DeleteEdgeIngress(context.Background(), test.version, test.namespace, test.name)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
@@ -616,9 +620,8 @@ func TestClient_CreateACP(t *testing.T) {
 			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
 			acp: &acp.ACP{
-				Namespace: "namespace",
-				Name:      "name",
-				Version:   "version-1",
+				Name:    "name",
+				Version: "version-1",
 				Config: acp.Config{
 					JWT: &jwt.Config{
 						PublicKey: "key",
@@ -687,7 +690,8 @@ func TestClient_CreateACP(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			createdACP, err := c.CreateACP(context.Background(), test.policy)
@@ -711,8 +715,7 @@ func TestClient_UpdateACP(t *testing.T) {
 			desc: "update access control policy",
 			policy: &hubv1alpha1.AccessControlPolicy{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "name",
-					Namespace: "namespace",
+					Name: "name",
 				},
 				Spec: hubv1alpha1.AccessControlPolicySpec{
 					JWT: &hubv1alpha1.AccessControlPolicyJWT{
@@ -723,9 +726,8 @@ func TestClient_UpdateACP(t *testing.T) {
 			returnStatusCode: http.StatusOK,
 			wantErr:          assert.NoError,
 			acp: &acp.ACP{
-				Namespace: "namespace",
-				Name:      "name",
-				Version:   "version-1",
+				Name:    "name",
+				Version: "version-1",
 				Config: acp.Config{
 					JWT: &jwt.Config{
 						PublicKey: "key",
@@ -761,9 +763,8 @@ func TestClient_UpdateACP(t *testing.T) {
 				callWith  acp.ACP
 			)
 
-			id := test.policy.Name + "@" + test.policy.Namespace
 			mux := http.NewServeMux()
-			mux.HandleFunc("/acps/"+id, func(rw http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/acps/"+test.policy.Name, func(rw http.ResponseWriter, req *http.Request) {
 				callCount++
 
 				if req.Method != http.MethodPut {
@@ -800,7 +801,8 @@ func TestClient_UpdateACP(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
 			updatedACP, err := c.UpdateACP(context.Background(), "oldVersion", test.policy)
@@ -842,9 +844,8 @@ func TestClient_DeleteACP(t *testing.T) {
 			t.Parallel()
 
 			var callCount int
-			id := test.name + "@" + test.namespace
 			mux := http.NewServeMux()
-			mux.HandleFunc("/acps/"+id, func(rw http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/acps/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
 				callCount++
 
 				if req.Method != http.MethodDelete {
@@ -868,10 +869,11 @@ func TestClient_DeleteACP(t *testing.T) {
 
 			t.Cleanup(srv.Close)
 
-			c := NewClient(srv.URL, testToken)
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			err := c.DeleteACP(context.Background(), "oldVersion", test.name, test.namespace)
+			err = c.DeleteACP(context.Background(), "oldVersion", test.name)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
@@ -882,18 +884,16 @@ func TestClient_DeleteACP(t *testing.T) {
 func TestClient_GetEdgeIngress(t *testing.T) {
 	wantEdgeIngresses := []edgeingress.EdgeIngress{
 		{
-			WorkspaceID:  "workspace-id",
-			ClusterID:    "cluster-id",
-			Namespace:    "namespace",
-			Name:         "name",
-			Domain:       "https://majestic-beaver-123.traefik-hub.io",
-			Version:      "version",
-			ServiceName:  "service-name",
-			ServicePort:  8080,
-			ACPName:      "acp-name",
-			ACPNamespace: "acp-namespace",
-			CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-			UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+			WorkspaceID: "workspace-id",
+			ClusterID:   "cluster-id",
+			Namespace:   "namespace",
+			Name:        "name",
+			Domain:      "https://majestic-beaver-123.traefik-hub.io",
+			Version:     "version",
+			Service:     edgeingress.Service{Name: "service-name", Port: 8080},
+			ACP:         &edgeingress.ACP{Name: "acp-name"},
+			CreatedAt:   time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+			UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 		},
 	}
 
@@ -922,7 +922,8 @@ func TestClient_GetEdgeIngress(t *testing.T) {
 
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, testToken)
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
 	c.httpClient = srv.Client()
 
 	gotEdgeIngresses, err := c.GetEdgeIngresses(context.Background())
@@ -935,5 +936,85 @@ func TestClient_GetEdgeIngress(t *testing.T) {
 func assertErrorIs(wantErr error) assert.ErrorAssertionFunc {
 	return func(t assert.TestingT, err error, i ...interface{}) bool {
 		return assert.ErrorIs(t, err, wantErr, i...)
+	}
+}
+
+func Test_GetCertificate(t *testing.T) {
+	tests := []struct {
+		desc       string
+		statusCode int
+		wantCert   edgeingress.Certificate
+		wantErr    error
+	}{
+		{
+			desc:       "get certificate succeed",
+			statusCode: http.StatusOK,
+			wantCert: edgeingress.Certificate{
+				Certificate: []byte("cert"),
+				PrivateKey:  []byte("key"),
+			},
+		},
+		{
+			desc:       "get certificate unexpected error",
+			statusCode: http.StatusTeapot,
+			wantCert:   edgeingress.Certificate{},
+			wantErr: &APIError{
+				StatusCode: http.StatusTeapot,
+				Message:    "error",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/wildcard-certificate", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodGet {
+					http.Error(rw, fmt.Sprintf("unsupported method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer 123" {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				rw.WriteHeader(test.statusCode)
+
+				switch test.statusCode {
+				case http.StatusAccepted:
+				case http.StatusOK:
+					_ = json.NewEncoder(rw).Encode(test.wantCert)
+
+				default:
+					_ = json.NewEncoder(rw).Encode(APIError{Message: "error"})
+				}
+			})
+
+			srv := httptest.NewServer(mux)
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, "123")
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			gotCert, err := c.GetCertificate(context.Background())
+			if test.wantErr != nil {
+				require.ErrorAs(t, err, test.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, 1, callCount)
+			assert.Equal(t, test.wantCert, gotCert)
+		})
 	}
 }

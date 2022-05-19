@@ -93,7 +93,10 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
-	platformClient := platform.NewClient(platformURL, token)
+	platformClient, err := platform.NewClient(platformURL, token)
+	if err != nil {
+		return fmt.Errorf("build platform client: %w", err)
+	}
 
 	configWatcher := platform.NewConfigWatcher(15*time.Minute, platformClient)
 

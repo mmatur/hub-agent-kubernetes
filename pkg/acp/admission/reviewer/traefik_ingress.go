@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 )
@@ -109,10 +108,7 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 	routerMiddlewares := ing.Metadata.Annotations[annotationTraefikMiddlewares]
 
 	if prevPolName != "" {
-		routerMiddlewares, err = r.clearPreviousFwdAuthMiddleware(ctx, prevPolName, ing.Metadata.Namespace, routerMiddlewares)
-		if err != nil {
-			return nil, err
-		}
+		routerMiddlewares = r.clearPreviousFwdAuthMiddleware(ctx, prevPolName, ing.Metadata.Namespace, routerMiddlewares)
 	}
 
 	if polName != "" {
@@ -148,18 +144,13 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 	}, nil
 }
 
-func (r TraefikIngress) clearPreviousFwdAuthMiddleware(ctx context.Context, polName, namespace, routerMiddlewares string) (string, error) {
+func (r TraefikIngress) clearPreviousFwdAuthMiddleware(ctx context.Context, polName, namespace, routerMiddlewares string) string {
 	log.Ctx(ctx).Debug().Str("prev_acp_name", polName).Msg("Clearing previous ACP settings")
 
-	canonicalOldPolName, err := acp.CanonicalName(polName, namespace)
-	if err != nil {
-		return "", err
-	}
-
-	middlewareName := middlewareName(canonicalOldPolName)
+	middlewareName := middlewareName(polName)
 	oldCanonicalMiddlewareName := fmt.Sprintf("%s-%s@kubernetescrd", namespace, middlewareName)
 
-	return removeMiddleware(routerMiddlewares, oldCanonicalMiddlewareName), nil
+	return removeMiddleware(routerMiddlewares, oldCanonicalMiddlewareName)
 }
 
 // appendMiddleware appends newMiddleware to the comma-separated list of middlewareList.

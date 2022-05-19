@@ -36,8 +36,8 @@ type HubV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *HubV1alpha1Client) AccessControlPolicies(namespace string) AccessControlPolicyInterface {
-	return newAccessControlPolicies(c, namespace)
+func (c *HubV1alpha1Client) AccessControlPolicies() AccessControlPolicyInterface {
+	return newAccessControlPolicies(c)
 }
 
 func (c *HubV1alpha1Client) EdgeIngresses(namespace string) EdgeIngressInterface {

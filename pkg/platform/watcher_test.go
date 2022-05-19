@@ -118,7 +118,8 @@ func setupClient(t *testing.T, cfg Config) *Client {
 
 	t.Cleanup(srv.Close)
 
-	client := NewClient(srv.URL, "123")
+	client, err := NewClient(srv.URL, "123")
+	require.NoError(t, err)
 	client.httpClient = srv.Client()
 
 	return client

@@ -22,10 +22,6 @@ package v1alpha1
 // AccessControlPolicyLister.
 type AccessControlPolicyListerExpansion interface{}
 
-// AccessControlPolicyNamespaceListerExpansion allows custom methods to be added to
-// AccessControlPolicyNamespaceLister.
-type AccessControlPolicyNamespaceListerExpansion interface{}
-
 // EdgeIngressListerExpansion allows custom methods to be added to
 // EdgeIngressLister.
 type EdgeIngressListerExpansion interface{}

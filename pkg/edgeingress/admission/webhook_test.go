@@ -39,8 +39,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				Port: 8081,
 			},
 			ACP: &hubv1alpha1.EdgeIngressACP{
-				Name:      "acp",
-				Namespace: "default",
+				Name: "acp",
 			},
 		},
 		Status: hubv1alpha1.EdgeIngressStatus{},
@@ -63,26 +62,27 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 	wantCreateReq := &platform.CreateEdgeIngressReq{
-		Name:         "edge-ingress",
-		Namespace:    "default",
-		ServiceName:  "whoami",
-		ServicePort:  8081,
-		ACPName:      "acp",
-		ACPNamespace: "default",
+		Name:      "edge-ingress",
+		Namespace: "default",
+		Service: platform.Service{
+			Name: "whoami",
+			Port: 8081,
+		},
+		ACP: &platform.ACP{
+			Name: "acp",
+		},
 	}
 	createdEdgeIngress := &edgeingress.EdgeIngress{
-		WorkspaceID:  "workspace-id",
-		ClusterID:    "cluster-id",
-		Namespace:    "default",
-		Name:         "edge-ingress",
-		Domain:       "majestic-beaver-123.hub-traefik.io",
-		Version:      "version-1",
-		ServiceName:  "whoami",
-		ServicePort:  8081,
-		ACPName:      "acp",
-		ACPNamespace: "default",
-		CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+		WorkspaceID: "workspace-id",
+		ClusterID:   "cluster-id",
+		Namespace:   "default",
+		Name:        "edge-ingress",
+		Domain:      "majestic-beaver-123.hub-traefik.io",
+		Version:     "version-1",
+		Service:     edgeingress.Service{Name: "whoami", Port: 8081},
+		ACP:         &edgeingress.ACP{Name: "acp"},
+		CreatedAt:   time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := &backendMock{
@@ -120,7 +120,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				SyncedAt:   now,
 				Domain:     "majestic-beaver-123.hub-traefik.io",
 				URL:        "https://majestic-beaver-123.hub-traefik.io",
-				SpecHash:   "3pbFKX/wXPiRs+f+J4ERDJMRT58=",
+				SpecHash:   "NexiGZBcal8NDre24JKd5LKyxF4=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
 		}),
@@ -157,8 +157,7 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 							Port: 8081,
 						},
 						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
+							Name: "acp",
 						},
 					},
 					Status: hubv1alpha1.EdgeIngressStatus{},
@@ -222,8 +221,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Port: 8082,
 			},
 			ACP: &hubv1alpha1.EdgeIngressACP{
-				Name:      "acp",
-				Namespace: "default",
+				Name: "acp",
 			},
 		},
 		Status: hubv1alpha1.EdgeIngressStatus{},
@@ -243,8 +241,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Port: 8081,
 			},
 			ACP: &hubv1alpha1.EdgeIngressACP{
-				Name:      "acp",
-				Namespace: "default",
+				Name: "acp",
 			},
 		},
 		Status: hubv1alpha1.EdgeIngressStatus{
@@ -275,24 +272,20 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 	wantUpdateReq := &platform.UpdateEdgeIngressReq{
-		ServiceName:  "whoami",
-		ServicePort:  8082,
-		ACPName:      "acp",
-		ACPNamespace: "default",
+		Service: platform.Service{Name: "whoami", Port: 8082},
+		ACP:     &platform.ACP{Name: "acp"},
 	}
 	updatedEdgeIngress := &edgeingress.EdgeIngress{
-		WorkspaceID:  "workspace-id",
-		ClusterID:    "cluster-id",
-		Namespace:    "default",
-		Name:         "edge-ingress",
-		Domain:       "majestic-beaver-123.hub-traefik.io",
-		Version:      "version-4",
-		ServiceName:  "whoami",
-		ServicePort:  8082,
-		ACPName:      "acp",
-		ACPNamespace: "default",
-		CreatedAt:    time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+		WorkspaceID: "workspace-id",
+		ClusterID:   "cluster-id",
+		Namespace:   "default",
+		Name:        "edge-ingress",
+		Domain:      "majestic-beaver-123.hub-traefik.io",
+		Version:     "version-4",
+		Service:     edgeingress.Service{Name: "whoami", Port: 8082},
+		ACP:         &edgeingress.ACP{Name: "acp"},
+		CreatedAt:   time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := &backendMock{
@@ -336,7 +329,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Domain:     "majestic-beaver-123.hub-traefik.io",
 				URL:        "https://majestic-beaver-123.hub-traefik.io",
 				SyncedAt:   now,
-				SpecHash:   "+cX+zj06A2+tSgPO9/qWr0XEuq0=",
+				SpecHash:   "1AI6Wssn12E2icVo1NMreqOJSNU=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
 		}),
@@ -379,8 +372,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 							Port: 8082,
 						},
 						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
+							Name: "acp",
 						},
 					},
 					Status: hubv1alpha1.EdgeIngressStatus{},
@@ -402,8 +394,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 							Port: 8081,
 						},
 						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
+							Name: "acp",
 						},
 					},
 					Status: hubv1alpha1.EdgeIngressStatus{
@@ -482,8 +473,7 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 							Port: 8081,
 						},
 						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
+							Name: "acp",
 						},
 					},
 					Status: hubv1alpha1.EdgeIngressStatus{
@@ -565,8 +555,7 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 							Port: 8081,
 						},
 						ACP: &hubv1alpha1.EdgeIngressACP{
-							Name:      "acp",
-							Namespace: "default",
+							Name: "acp",
 						},
 					},
 					Status: hubv1alpha1.EdgeIngressStatus{

@@ -33,7 +33,6 @@ import (
 // FakeAccessControlPolicies implements AccessControlPolicyInterface
 type FakeAccessControlPolicies struct {
 	Fake *FakeHubV1alpha1
-	ns   string
 }
 
 var accesscontrolpoliciesResource = schema.GroupVersionResource{Group: "hub.traefik.io", Version: "v1alpha1", Resource: "accesscontrolpolicies"}
@@ -43,8 +42,7 @@ var accesscontrolpoliciesKind = schema.GroupVersionKind{Group: "hub.traefik.io",
 // Get takes name of the accessControlPolicy, and returns the corresponding accessControlPolicy object, and an error if there is any.
 func (c *FakeAccessControlPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AccessControlPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(accesscontrolpoliciesResource, c.ns, name), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootGetAction(accesscontrolpoliciesResource, name), &v1alpha1.AccessControlPolicy{})
 	if obj == nil {
 		return nil, err
 	}
@@ -54,8 +52,7 @@ func (c *FakeAccessControlPolicies) Get(ctx context.Context, name string, option
 // List takes label and field selectors, and returns the list of AccessControlPolicies that match those selectors.
 func (c *FakeAccessControlPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.AccessControlPolicyList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(accesscontrolpoliciesResource, accesscontrolpoliciesKind, c.ns, opts), &v1alpha1.AccessControlPolicyList{})
-
+		Invokes(testing.NewRootListAction(accesscontrolpoliciesResource, accesscontrolpoliciesKind, opts), &v1alpha1.AccessControlPolicyList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -76,15 +73,13 @@ func (c *FakeAccessControlPolicies) List(ctx context.Context, opts v1.ListOption
 // Watch returns a watch.Interface that watches the requested accessControlPolicies.
 func (c *FakeAccessControlPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(accesscontrolpoliciesResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(accesscontrolpoliciesResource, opts))
 }
 
 // Create takes the representation of a accessControlPolicy and creates it.  Returns the server's representation of the accessControlPolicy, and an error, if there is any.
 func (c *FakeAccessControlPolicies) Create(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.CreateOptions) (result *v1alpha1.AccessControlPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(accesscontrolpoliciesResource, c.ns, accessControlPolicy), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootCreateAction(accesscontrolpoliciesResource, accessControlPolicy), &v1alpha1.AccessControlPolicy{})
 	if obj == nil {
 		return nil, err
 	}
@@ -94,8 +89,7 @@ func (c *FakeAccessControlPolicies) Create(ctx context.Context, accessControlPol
 // Update takes the representation of a accessControlPolicy and updates it. Returns the server's representation of the accessControlPolicy, and an error, if there is any.
 func (c *FakeAccessControlPolicies) Update(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.UpdateOptions) (result *v1alpha1.AccessControlPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(accesscontrolpoliciesResource, c.ns, accessControlPolicy), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootUpdateAction(accesscontrolpoliciesResource, accessControlPolicy), &v1alpha1.AccessControlPolicy{})
 	if obj == nil {
 		return nil, err
 	}
@@ -106,8 +100,7 @@ func (c *FakeAccessControlPolicies) Update(ctx context.Context, accessControlPol
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeAccessControlPolicies) UpdateStatus(ctx context.Context, accessControlPolicy *v1alpha1.AccessControlPolicy, opts v1.UpdateOptions) (*v1alpha1.AccessControlPolicy, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(accesscontrolpoliciesResource, "status", c.ns, accessControlPolicy), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(accesscontrolpoliciesResource, "status", accessControlPolicy), &v1alpha1.AccessControlPolicy{})
 	if obj == nil {
 		return nil, err
 	}
@@ -117,14 +110,13 @@ func (c *FakeAccessControlPolicies) UpdateStatus(ctx context.Context, accessCont
 // Delete takes name of the accessControlPolicy and deletes it. Returns an error if one occurs.
 func (c *FakeAccessControlPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(accesscontrolpoliciesResource, c.ns, name), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootDeleteAction(accesscontrolpoliciesResource, name), &v1alpha1.AccessControlPolicy{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeAccessControlPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(accesscontrolpoliciesResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(accesscontrolpoliciesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.AccessControlPolicyList{})
 	return err
@@ -133,8 +125,7 @@ func (c *FakeAccessControlPolicies) DeleteCollection(ctx context.Context, opts v
 // Patch applies the patch and returns the patched accessControlPolicy.
 func (c *FakeAccessControlPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AccessControlPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accesscontrolpoliciesResource, c.ns, name, pt, data, subresources...), &v1alpha1.AccessControlPolicy{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(accesscontrolpoliciesResource, name, pt, data, subresources...), &v1alpha1.AccessControlPolicy{})
 	if obj == nil {
 		return nil, err
 	}

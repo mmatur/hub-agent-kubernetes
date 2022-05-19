@@ -18,8 +18,7 @@ import (
 
 var toUpdate = &hubv1alpha1.AccessControlPolicy{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "toUpdate",
-		Namespace: "ns",
+		Name: "toUpdate",
 	},
 	Spec: hubv1alpha1.AccessControlPolicySpec{
 		JWT: &hubv1alpha1.AccessControlPolicyJWT{
@@ -30,8 +29,7 @@ var toUpdate = &hubv1alpha1.AccessControlPolicy{
 
 var toDelete = &hubv1alpha1.AccessControlPolicy{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "toDelete",
-		Namespace: "ns",
+		Name: "toDelete",
 	},
 	Spec: hubv1alpha1.AccessControlPolicySpec{
 		JWT: &hubv1alpha1.AccessControlPolicyJWT{
@@ -61,8 +59,7 @@ func Test_WatcherRun(t *testing.T) {
 
 			return []ACP{
 				{
-					Name:      "toCreate",
-					Namespace: "ns",
+					Name: "toCreate",
 					Config: Config{
 						JWT: &jwt.Config{
 							PublicKey: "secret",
@@ -70,8 +67,7 @@ func Test_WatcherRun(t *testing.T) {
 					},
 				},
 				{
-					Name:      "toUpdate",
-					Namespace: "ns",
+					Name: "toUpdate",
 					Config: Config{
 						JWT: &jwt.Config{
 							PublicKey: "secretUpdated",
@@ -86,15 +82,15 @@ func Test_WatcherRun(t *testing.T) {
 
 	<-ctx.Done()
 
-	policy, err := clientSetHub.HubV1alpha1().AccessControlPolicies("ns").Get(ctx, "toCreate", metav1.GetOptions{})
+	policy, err := clientSetHub.HubV1alpha1().AccessControlPolicies().Get(ctx, "toCreate", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "secret", policy.Spec.JWT.PublicKey)
 
-	policy, err = clientSetHub.HubV1alpha1().AccessControlPolicies("ns").Get(ctx, "toUpdate", metav1.GetOptions{})
+	policy, err = clientSetHub.HubV1alpha1().AccessControlPolicies().Get(ctx, "toUpdate", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "secretUpdated", policy.Spec.JWT.PublicKey)
 
-	_, err = clientSetHub.HubV1alpha1().AccessControlPolicies("ns").Get(ctx, "toDelete", metav1.GetOptions{})
+	_, err = clientSetHub.HubV1alpha1().AccessControlPolicies().Get(ctx, "toDelete", metav1.GetOptions{})
 	require.Error(t, err)
 }
 

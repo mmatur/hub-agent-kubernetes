@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Updatable represents a object that is updatable.
@@ -37,8 +36,7 @@ func (w *EventHandler) OnAdd(obj interface{}) {
 		return
 	}
 
-	polName := canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)
-	w.listener.Update(polName)
+	w.listener.Update(v.ObjectMeta.Name)
 }
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
@@ -65,8 +63,7 @@ func (w *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	polName := canonicalName(newACP.ObjectMeta.Name, newACP.ObjectMeta.Namespace)
-	w.listener.Update(polName)
+	w.listener.Update(newACP.ObjectMeta.Name)
 }
 
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
@@ -80,16 +77,7 @@ func (w *EventHandler) OnDelete(obj interface{}) {
 		return
 	}
 
-	polName := canonicalName(v.ObjectMeta.Name, v.ObjectMeta.Namespace)
-	w.listener.Update(polName)
-}
-
-func canonicalName(name, ns string) string {
-	if ns == "" {
-		ns = metav1.NamespaceDefault
-	}
-
-	return name + "@" + ns
+	w.listener.Update(v.ObjectMeta.Name)
 }
 
 func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {

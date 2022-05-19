@@ -37,13 +37,14 @@ func TestDomainCache_WarmUp(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	client := NewClient(srv.URL, testToken)
+	client, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
 	client.httpClient = srv.Client()
 
 	ttl := time.Millisecond
 	domainCache := NewDomainCache(client, ttl)
 
-	err := domainCache.WarmUp(context.Background())
+	err = domainCache.WarmUp(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, callCount)
@@ -75,13 +76,14 @@ func TestDomainCache_WarmUp_unableToSetup(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	client := NewClient(srv.URL, testToken)
+	client, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
 	client.httpClient = srv.Client()
 
 	ttl := time.Millisecond
 	domainCache := NewDomainCache(client, ttl)
 
-	err := domainCache.WarmUp(context.Background())
+	err = domainCache.WarmUp(context.Background())
 	require.Error(t, err)
 	assert.Equal(t, 1, callCount)
 }
@@ -107,7 +109,8 @@ func TestDomainCache_Run(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	client := NewClient(srv.URL, testToken)
+	client, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
 	client.httpClient = srv.Client()
 
 	ttl := 5 * time.Millisecond

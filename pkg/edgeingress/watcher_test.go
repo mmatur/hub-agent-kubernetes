@@ -10,15 +10,22 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubemock "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 var toUpdate = hubv1alpha1.EdgeIngress{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "toUpdate",
 		Namespace: "default",
+		UID:       "uid",
+		Annotations: map[string]string{
+			"app.kubernetes.io/managed-by": "traefik-hub",
+		},
 	},
 	Spec: hubv1alpha1.EdgeIngressSpec{
 		Service: hubv1alpha1.EdgeIngressService{
@@ -39,6 +46,9 @@ var toDelete = hubv1alpha1.EdgeIngress{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "toDelete",
 		Namespace: "default",
+		Annotations: map[string]string{
+			"app.kubernetes.io/managed-by": "traefik-hub",
+		},
 	},
 	Spec: hubv1alpha1.EdgeIngressSpec{
 		Service: hubv1alpha1.EdgeIngressService{
@@ -57,6 +67,7 @@ var toDelete = hubv1alpha1.EdgeIngress{
 
 func Test_WatcherRun(t *testing.T) {
 	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{&toUpdate, &toDelete}...)
+	clientSet := kubemock.NewSimpleClientset()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
@@ -66,8 +77,38 @@ func Test_WatcherRun(t *testing.T) {
 	hubInformer.Start(ctx.Done())
 	cache.WaitForCacheSync(ctx.Done(), edgeIngressInformer.HasSynced)
 
+	edgeIngresses := []EdgeIngress{
+		{
+			Name:      "toCreate",
+			Namespace: "default",
+			Domain:    "majestic-beaver-123.hub-traefik.io",
+			Version:   "version-1",
+			Service:   Service{Name: "service-1", Port: 8080},
+			ACP:       &ACP{Name: "acp-name"},
+		},
+		{
+			Name:      "toUpdate",
+			Namespace: "default",
+			Domain:    "sad-bat-123.hub-traefik.io",
+			Version:   "version-2",
+			Service:   Service{Name: "service-2", Port: 8082},
+			ACP:       &ACP{Name: "acp-name"},
+		},
+	}
+
+	hashes := map[string]string{
+		"toCreate": "gFO9z9bw0btZf3+lNIiaXfA8z0g=",
+		"toUpdate": "4vJBrpeDJLuGzikpIg0ZJTca9FQ=",
+	}
+
 	var callCount int
 	client := clientMock{
+		getCertificateFunc: func() (Certificate, error) {
+			return Certificate{
+				Certificate: []byte("cert"),
+				PrivateKey:  []byte("private"),
+			}, nil
+		},
 		getEdgeIngressesFunc: func() ([]EdgeIngress, error) {
 			callCount++
 
@@ -75,101 +116,140 @@ func Test_WatcherRun(t *testing.T) {
 				cancel()
 			}
 
-			return []EdgeIngress{
-				{
-					Name:         "toCreate",
-					Namespace:    "default",
-					Domain:       "majestic-beaver-123.hub-traefik.io",
-					Version:      "version-1",
-					ServiceName:  "service-1",
-					ServicePort:  8080,
-					ACPName:      "acp",
-					ACPNamespace: "default",
-				},
-				{
-					Name:         "toUpdate",
-					Namespace:    "default",
-					Domain:       "sad-bat-123.hub-traefik.io",
-					Version:      "version-2",
-					ServiceName:  "service-2",
-					ServicePort:  8082,
-					ACPName:      "acp",
-					ACPNamespace: "default",
-				},
-			}, nil
+			return edgeIngresses, nil
 		},
 	}
-	w := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer)
+
+	_, err := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer, clientSet, "", "traefikhub-tunl")
+	require.Error(t, err)
+
+	w, err := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer, clientSet, "traefik-hub", "traefikhub-tunl")
+	require.NoError(t, err)
 	go w.Run(ctx)
 
 	<-ctx.Done()
-
-	// Make sure the EdgeIngress to create has been created.
-	edgeIng, err := clientSetHub.HubV1alpha1().
-		EdgeIngresses("default").
-		Get(ctx, "toCreate", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, hubv1alpha1.EdgeIngressSpec{
-		Service: hubv1alpha1.EdgeIngressService{
-			Name: "service-1",
-			Port: 8080,
-		},
-		ACP: &hubv1alpha1.EdgeIngressACP{
-			Name:      "acp",
-			Namespace: "default",
-		},
-	}, edgeIng.Spec)
-
-	assert.WithinDuration(t, time.Now(), edgeIng.Status.SyncedAt.Time, 100*time.Millisecond)
-	edgeIng.Status.SyncedAt = metav1.Time{}
-
-	assert.Equal(t, hubv1alpha1.EdgeIngressStatus{
-		Version:    "version-1",
-		SyncedAt:   metav1.Time{},
-		Domain:     "majestic-beaver-123.hub-traefik.io",
-		URL:        "https://majestic-beaver-123.hub-traefik.io",
-		SpecHash:   "gmFASysBkrYjEOkykBdT7mAXMl8=",
-		Connection: hubv1alpha1.EdgeIngressConnectionDown,
-	}, edgeIng.Status)
-
-	// Make sure the EdgeIngress to update has been updated.
-	edgeIng, err = clientSetHub.HubV1alpha1().
-		EdgeIngresses("default").
-		Get(ctx, "toUpdate", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, hubv1alpha1.EdgeIngressSpec{
-		Service: hubv1alpha1.EdgeIngressService{
-			Name: "service-2",
-			Port: 8082,
-		},
-		ACP: &hubv1alpha1.EdgeIngressACP{
-			Name:      "acp",
-			Namespace: "default",
-		},
-	}, edgeIng.Spec)
-
-	assert.WithinDuration(t, time.Now(), edgeIng.Status.SyncedAt.Time, 100*time.Millisecond)
-	edgeIng.Status.SyncedAt = metav1.Time{}
-
-	assert.Equal(t, hubv1alpha1.EdgeIngressStatus{
-		Version:    "version-2",
-		SyncedAt:   metav1.Time{},
-		Domain:     "sad-bat-123.hub-traefik.io",
-		URL:        "https://sad-bat-123.hub-traefik.io",
-		SpecHash:   "WXzOAUMsFW9vmfzKxCXI14wlJjE=",
-		Connection: hubv1alpha1.EdgeIngressConnectionDown,
-	}, edgeIng.Status)
 
 	_, err = clientSetHub.HubV1alpha1().
 		EdgeIngresses("default").
 		Get(ctx, "toDelete", metav1.GetOptions{})
 	require.Error(t, err)
+
+	for _, edgeIngress := range edgeIngresses {
+		edgeIng, errL := clientSetHub.HubV1alpha1().
+			EdgeIngresses(edgeIngress.Namespace).
+			Get(ctx, edgeIngress.Name, metav1.GetOptions{})
+		require.NoError(t, errL)
+
+		assert.Equal(t, hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: edgeIngress.Service.Name,
+				Port: edgeIngress.Service.Port,
+			},
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name: edgeIngress.ACP.Name,
+			},
+		}, edgeIng.Spec)
+
+		assert.WithinDuration(t, time.Now(), edgeIng.Status.SyncedAt.Time, 100*time.Millisecond)
+		edgeIng.Status.SyncedAt = metav1.Time{}
+
+		assert.Equal(t, hubv1alpha1.EdgeIngressStatus{
+			Version:    edgeIngress.Version,
+			SyncedAt:   metav1.Time{},
+			Domain:     edgeIngress.Domain,
+			URL:        "https://" + edgeIngress.Domain,
+			SpecHash:   hashes[edgeIngress.Name],
+			Connection: hubv1alpha1.EdgeIngressConnectionDown,
+		}, edgeIng.Status)
+
+		// Make sure the ingress related to the edgeIngress is created.
+		ctx = context.Background()
+		ing, errL := clientSet.NetworkingV1().Ingresses(edgeIngress.Namespace).Get(ctx, edgeIngress.Name, metav1.GetOptions{})
+		require.NoError(t, errL)
+
+		assert.Equal(t, map[string]string{
+			"app.kubernetes.io/managed-by": "traefik-hub",
+		}, ing.ObjectMeta.Labels)
+
+		assert.Equal(t, map[string]string{
+			"hub.traefik.io/access-control-policy":             "acp-name",
+			"traefik.ingress.kubernetes.io/router.tls":         "true",
+			"traefik.ingress.kubernetes.io/router.entrypoints": "traefikhub-tunl",
+		}, ing.ObjectMeta.Annotations)
+
+		assert.Equal(t, []metav1.OwnerReference{
+			{
+				APIVersion: "hub.traefik.io/v1alpha1",
+				Kind:       "EdgeIngress",
+				Name:       edgeIng.Name,
+				UID:        edgeIng.UID,
+			},
+		}, ing.ObjectMeta.OwnerReferences)
+
+		wantPathType := netv1.PathTypePrefix
+		assert.Equal(t, netv1.IngressSpec{
+			IngressClassName: pointer.StringPtr("traefik-hub"),
+			TLS: []netv1.IngressTLS{
+				{
+					Hosts:      []string{edgeIngress.Domain},
+					SecretName: edgeIngress.Name,
+				},
+			},
+			Rules: []netv1.IngressRule{
+				{
+					Host: edgeIngress.Domain,
+					IngressRuleValue: netv1.IngressRuleValue{
+						HTTP: &netv1.HTTPIngressRuleValue{
+							Paths: []netv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &wantPathType,
+									Backend: netv1.IngressBackend{
+										Service: &netv1.IngressServiceBackend{
+											Name: edgeIngress.Service.Name,
+											Port: netv1.ServiceBackendPort{
+												Number: int32(edgeIngress.Service.Port),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, ing.Spec)
+
+		// Make sure the secrets related to the edgeIngress is created.
+		ctx = context.Background()
+		secret, errL := clientSet.CoreV1().Secrets(edgeIngress.Namespace).Get(ctx, edgeIngress.Name, metav1.GetOptions{})
+		require.NoError(t, errL)
+
+		assert.Equal(t, []metav1.OwnerReference{
+			{
+				APIVersion: "hub.traefik.io/v1alpha1",
+				Kind:       "EdgeIngress",
+				Name:       edgeIng.Name,
+				UID:        edgeIng.UID,
+			},
+		}, secret.ObjectMeta.OwnerReferences)
+
+		assert.Equal(t, map[string][]byte{
+			"tls.crt": []byte("cert"),
+			"tls.key": []byte("private"),
+		}, secret.Data)
+	}
 }
 
 type clientMock struct {
 	getEdgeIngressesFunc func() ([]EdgeIngress, error)
+	getCertificateFunc   func() (Certificate, error)
 }
 
 func (c clientMock) GetEdgeIngresses(_ context.Context) ([]EdgeIngress, error) {
 	return c.getEdgeIngressesFunc()
+}
+
+func (c clientMock) GetCertificate(_ context.Context) (Certificate, error) {
+	return c.getCertificateFunc()
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,8 +93,7 @@ func (u *IngressUpdater) updateV1Ingresses(ctx context.Context, polName string) 
 		default:
 		}
 
-		var ok bool
-		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], ing.Namespace, polName)
+		ok := shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], polName)
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to determine if ingress should be updated")
 			continue
@@ -131,8 +129,7 @@ func (u *IngressUpdater) updateV1beta1Ingresses(ctx context.Context, polName str
 		default:
 		}
 
-		var ok bool
-		ok, err = shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], ing.Namespace, polName)
+		ok := shouldUpdate(ing.Annotations[reviewer.AnnotationHubAuth], polName)
 		if err != nil {
 			log.Error().Err(err).Str("ingress_name", ing.Name).Str("ingress_namespace", ing.Namespace).Msg("Unable to determine if legacy ingress should be updated")
 			continue
@@ -150,19 +147,14 @@ func (u *IngressUpdater) updateV1beta1Ingresses(ctx context.Context, polName str
 	return nil
 }
 
-func shouldUpdate(hubAuthAnno, ns, polName string) (bool, error) {
+func shouldUpdate(hubAuthAnno, polName string) bool {
 	if hubAuthAnno == "" {
-		return false, nil
+		return false
 	}
 
-	name, err := acp.CanonicalName(hubAuthAnno, ns)
-	if err != nil {
-		return false, err
+	if hubAuthAnno != polName {
+		return false
 	}
 
-	if name != polName {
-		return false, nil
-	}
-
-	return true, nil
+	return true
 }

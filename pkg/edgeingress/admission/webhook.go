@@ -129,14 +129,15 @@ func (h Handler) reviewCreateOperation(ctx context.Context, edgeIng *hubv1alpha1
 	log.Ctx(ctx).Info().Msg("Creating EdgeIngress resource")
 
 	createReq := &platform.CreateEdgeIngressReq{
-		Name:        edgeIng.Name,
-		Namespace:   edgeIng.Namespace,
-		ServiceName: edgeIng.Spec.Service.Name,
-		ServicePort: edgeIng.Spec.Service.Port,
+		Name:      edgeIng.Name,
+		Namespace: edgeIng.Namespace,
+		Service: platform.Service{
+			Name: edgeIng.Spec.Service.Name,
+			Port: edgeIng.Spec.Service.Port,
+		},
 	}
 	if edgeIng.Spec.ACP != nil {
-		createReq.ACPName = edgeIng.Spec.ACP.Name
-		createReq.ACPNamespace = edgeIng.Spec.ACP.Namespace
+		createReq.ACP = &platform.ACP{Name: edgeIng.Spec.ACP.Name}
 	}
 
 	createdEdgeIng, err := h.backend.CreateEdgeIngress(ctx, createReq)
@@ -151,12 +152,15 @@ func (h Handler) reviewUpdateOperation(ctx context.Context, oldEdgeIng, newEdgeI
 	log.Ctx(ctx).Info().Msg("Updating EdgeIngress resource")
 
 	updateReq := &platform.UpdateEdgeIngressReq{
-		ServiceName: newEdgeIng.Spec.Service.Name,
-		ServicePort: newEdgeIng.Spec.Service.Port,
+		Service: platform.Service{
+			Name: newEdgeIng.Spec.Service.Name,
+			Port: newEdgeIng.Spec.Service.Port,
+		},
 	}
 	if newEdgeIng.Spec.ACP != nil {
-		updateReq.ACPName = newEdgeIng.Spec.ACP.Name
-		updateReq.ACPNamespace = newEdgeIng.Spec.ACP.Namespace
+		updateReq.ACP = &platform.ACP{
+			Name: newEdgeIng.Spec.ACP.Name,
+		}
 	}
 
 	updatedEdgeIng, err := h.backend.UpdateEdgeIngress(ctx, oldEdgeIng.Namespace, oldEdgeIng.Name, oldEdgeIng.Status.Version, updateReq)

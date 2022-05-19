@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	admv1 "k8s.io/api/admission/v1"
 )
@@ -57,10 +56,7 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	var updated bool
 	if prevPolName != "" {
-		updated, err = r.clearPreviousFwdAuthMiddleware(ctx, &ingRoute.Spec, prevPolName, ingRoute.Namespace)
-		if err != nil {
-			return nil, err
-		}
+		updated = r.clearPreviousFwdAuthMiddleware(ctx, &ingRoute.Spec, prevPolName, ingRoute.Namespace)
 	}
 
 	var mdlwrName string
@@ -107,15 +103,10 @@ func updateIngressRoute(spec *traefikv1alpha1.IngressRouteSpec, name, namespace 
 	return updated
 }
 
-func (r TraefikIngressRoute) clearPreviousFwdAuthMiddleware(ctx context.Context, spec *traefikv1alpha1.IngressRouteSpec, oldPolName, namespace string) (updated bool, err error) {
+func (r TraefikIngressRoute) clearPreviousFwdAuthMiddleware(ctx context.Context, spec *traefikv1alpha1.IngressRouteSpec, oldPolName, namespace string) (updated bool) {
 	log.Ctx(ctx).Debug().Str("prev_acp_name", oldPolName).Msg("Clearing previous ACP settings")
 
-	canonicalOldPolName, err := acp.CanonicalName(oldPolName, namespace)
-	if err != nil {
-		return false, err
-	}
-
-	mdlwrName := middlewareName(canonicalOldPolName)
+	mdlwrName := middlewareName(oldPolName)
 
 	for i, route := range spec.Routes {
 		var refs []traefikv1alpha1.MiddlewareRef
@@ -130,7 +121,7 @@ func (r TraefikIngressRoute) clearPreviousFwdAuthMiddleware(ctx context.Context,
 		spec.Routes[i].Middlewares = refs
 	}
 
-	return updated, nil
+	return updated
 }
 
 // parseRawIngressRoutes parses raw ingressRoutes from admission requests.

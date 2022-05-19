@@ -40,7 +40,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 				Kind:    "Ingress",
 			},
 			Object: runtime.RawExtension{
-				Raw: []byte(`{"metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}}}`),
+				Raw: []byte(`{"metadata":{"annotations":{"hub.traefik.io/access-control-policy":"my-acp"}, "labels":{"app.kubernetes.io/managed-by":"traefik-hub"}}}`),
 			},
 		}
 
@@ -112,7 +112,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
 				Allowed: true,
-				Patch:   []byte(`[{"value":"add-acp"},{"op":"replace","path":"/metadata/annotations/hub.traefik.io~1access-control-policy","value":"my-acp@default"}]`),
+				Patch:   []byte(`[{"value":"add-acp"}]`),
 				PatchType: func() *admv1.PatchType {
 					typ := admv1.PatchTypeJSONPatch
 					return &typ
