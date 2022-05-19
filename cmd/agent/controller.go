@@ -48,10 +48,9 @@ func newControllerCmd() controllerCmd {
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     flagTraefikMetricsURL,
-			Usage:    "The url used by Traefik to expose metrics",
-			EnvVars:  []string{strcase.ToSNAKE(flagTraefikMetricsURL)},
-			Required: true,
+			Name:    flagTraefikMetricsURL,
+			Usage:   "The url used by Traefik to expose metrics",
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikMetricsURL)},
 		},
 	}
 
@@ -120,11 +119,6 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return err
 	}
 
-	mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, cliCtx.String(flagTraefikMetricsURL), agentCfg.Metrics, configWatcher)
-	if err != nil {
-		return err
-	}
-
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 
 	group.Go(func() error {
@@ -137,9 +131,18 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return nil
 	})
 
-	group.Go(func() error {
-		return mtrcsMgr.Run(ctx)
-	})
+	if cliCtx.String(flagTraefikMetricsURL) != "" {
+		mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, cliCtx.String(flagTraefikMetricsURL), agentCfg.Metrics, configWatcher)
+		if err != nil {
+			return err
+		}
+
+		group.Go(func() error {
+			return mtrcsMgr.Run(ctx)
+		})
+
+		group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
+	}
 
 	group.Go(func() error {
 		topoWatch.Start(ctx)
@@ -149,8 +152,6 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	group.Go(func() error {
 		return webhookAdmission(ctx, cliCtx, platformClient)
 	})
-
-	group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
 
 	return group.Wait()
 }
