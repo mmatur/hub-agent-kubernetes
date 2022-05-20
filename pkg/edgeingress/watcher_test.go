@@ -124,10 +124,16 @@ func Test_WatcherRun(t *testing.T) {
 	require.Error(t, err)
 
 	w, err := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer, clientSet, "traefik-hub", "traefikhub-tunl")
-	require.NoError(t, err)
-	go w.Run(ctx)
 
-	<-ctx.Done()
+	require.NoError(t, err)
+
+	stop := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(stop)
+	}()
+
+	<-stop
 
 	_, err = clientSetHub.HubV1alpha1().
 		EdgeIngresses("default").
@@ -159,7 +165,7 @@ func Test_WatcherRun(t *testing.T) {
 			Domain:     edgeIngress.Domain,
 			URL:        "https://" + edgeIngress.Domain,
 			SpecHash:   hashes[edgeIngress.Name],
-			Connection: hubv1alpha1.EdgeIngressConnectionDown,
+			Connection: hubv1alpha1.EdgeIngressConnectionUp,
 		}, edgeIng.Status)
 
 		// Make sure the ingress related to the edgeIngress is created.

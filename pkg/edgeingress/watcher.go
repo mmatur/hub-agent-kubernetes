@@ -67,16 +67,16 @@ func (w *Watcher) Run(ctx context.Context) {
 			log.Info().Msg("Stopping EdgeIngress watcher")
 			return
 		case <-t.C:
-			w.syncEdgeIngresses(ctx)
+			ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
+			w.syncEdgeIngresses(ctxSync)
+
+			cancel()
 		}
 	}
 }
 
 func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
-	ctxFetch, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	platformEdgeIngresses, err := w.client.GetEdgeIngresses(ctxFetch)
+	platformEdgeIngresses, err := w.client.GetEdgeIngresses(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("Fetching EdgeIngresses")
 		return
@@ -101,56 +101,51 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 		delete(clusterEdgeIngressByID, platformEdgeIng.Name+"@"+platformEdgeIng.Namespace)
 
 		if found && !needUpdate(buildResourceSpec(&platformEdgeIng), clusterEdgeIng.Spec) {
-			if err = w.syncChildResources(ctx, clusterEdgeIng); err != nil {
-				log.Error().Err(err).
-					Str("name", clusterEdgeIng.Name).
-					Str("namespace", clusterEdgeIng.Namespace).
-					Msg("Sync child resources")
-			}
+			w.syncChildAndUpdateConnectionStatus(ctx, clusterEdgeIng)
 
 			continue
 		}
 
 		if !found {
-			eIng, err := w.createEdgeIngress(ctx, &platformEdgeIng)
-			if err != nil {
+			if err := w.createEdgeIngress(ctx, &platformEdgeIng); err != nil {
 				log.Error().Err(err).
 					Str("name", platformEdgeIng.Name).
 					Str("namespace", platformEdgeIng.Namespace).
 					Msg("Creating EdgeIngress")
-				continue
 			}
-
-			if err = w.syncChildResources(ctx, eIng); err != nil {
-				log.Error().Err(err).
-					Str("name", eIng.Name).
-					Str("namespace", eIng.Namespace).
-					Msg("Sync child resources when creating EdgeIngress")
-			}
-
 			continue
 		}
 
 		clusterEdgeIng.Spec = buildResourceSpec(&platformEdgeIng)
-		eIng, err := w.updateEdgeIngress(ctx, clusterEdgeIng, &platformEdgeIng)
-		if err != nil {
+		if err := w.updateEdgeIngress(ctx, clusterEdgeIng, &platformEdgeIng); err != nil {
 			log.Error().Err(err).
 				Str("name", clusterEdgeIng.Name).
 				Str("namespace", clusterEdgeIng.Namespace).
 				Msg("Updating EdgeIngress")
-
-			continue
-		}
-
-		if err = w.syncChildResources(ctx, eIng); err != nil {
-			log.Error().Err(err).
-				Str("name", eIng.Name).
-				Str("namespace", eIng.Namespace).
-				Msg("Sync child resources when updating EdgeIngress")
 		}
 	}
 
 	w.cleanEdgeIngresses(ctx, clusterEdgeIngressByID)
+}
+
+func (w *Watcher) syncChildAndUpdateConnectionStatus(ctx context.Context, edgeIngress *hubv1alpha1.EdgeIngress) {
+	connectionStatus := hubv1alpha1.EdgeIngressConnectionUp
+
+	if err := w.syncChildResources(ctx, edgeIngress); err != nil {
+		connectionStatus = hubv1alpha1.EdgeIngressConnectionDown
+
+		log.Error().Err(err).
+			Str("name", edgeIngress.Name).
+			Str("namespace", edgeIngress.Namespace).
+			Msg("Sync child resources when updating EdgeIngress")
+	}
+
+	if err := w.updateEdgeIngressConnectionStatus(ctx, edgeIngress, connectionStatus); err != nil {
+		log.Error().Err(err).
+			Str("name", edgeIngress.Name).
+			Str("namespace", edgeIngress.Namespace).
+			Msg("Update edgeIngress status connection failed")
+	}
 }
 
 func (w *Watcher) syncChildResources(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) error {
@@ -245,18 +240,35 @@ func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIn
 	return nil
 }
 
-func (w *Watcher) createEdgeIngress(ctx context.Context, edgeIng *EdgeIngress) (*hubv1alpha1.EdgeIngress, error) {
-	obj, err := edgeIng.Resource()
-	if err != nil {
-		return nil, fmt.Errorf("build EdgeIngress resource: %w", err)
-	}
+func (w *Watcher) updateEdgeIngressConnectionStatus(ctx context.Context, edgeIngress *hubv1alpha1.EdgeIngress, connection hubv1alpha1.EdgeIngressConnectionStatus) error {
+	edgeIngress.Status.Connection = connection
 
-	ctxCreate, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxUpdate, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	obj, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(obj.Namespace).Create(ctxCreate, obj, metav1.CreateOptions{})
+	_, err := w.hubClientSet.HubV1alpha1().EdgeIngresses(edgeIngress.Namespace).Update(ctxUpdate, edgeIngress, metav1.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("creating EdgeIngress: %w", err)
+		return fmt.Errorf("updating EdgeIngress: %w", err)
+	}
+
+	log.Debug().
+		Str("name", edgeIngress.Name).
+		Str("namespace", edgeIngress.Namespace).
+		Str("connection_state", string(connection)).
+		Msg("EdgeIngress connection status updated")
+
+	return nil
+}
+
+func (w *Watcher) createEdgeIngress(ctx context.Context, edgeIng *EdgeIngress) error {
+	obj, err := edgeIng.Resource()
+	if err != nil {
+		return fmt.Errorf("build EdgeIngress resource: %w", err)
+	}
+
+	obj, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("creating EdgeIngress: %w", err)
 	}
 
 	log.Debug().
@@ -264,24 +276,25 @@ func (w *Watcher) createEdgeIngress(ctx context.Context, edgeIng *EdgeIngress) (
 		Str("namespace", obj.Namespace).
 		Msg("EdgeIngress created")
 
-	return obj, nil
+	if err = w.syncChildResources(ctx, obj); err != nil {
+		return fmt.Errorf("sync child resource: %w", err)
+	}
+
+	return w.updateEdgeIngressConnectionStatus(ctx, obj, hubv1alpha1.EdgeIngressConnectionUp)
 }
 
-func (w *Watcher) updateEdgeIngress(ctx context.Context, oldEdgeIng *hubv1alpha1.EdgeIngress, newEdgeIng *EdgeIngress) (*hubv1alpha1.EdgeIngress, error) {
-	ctxUpdate, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
+func (w *Watcher) updateEdgeIngress(ctx context.Context, oldEdgeIng *hubv1alpha1.EdgeIngress, newEdgeIng *EdgeIngress) error {
 	obj, err := newEdgeIng.Resource()
 	if err != nil {
-		return nil, fmt.Errorf("build EdgeIngress resource: %w", err)
+		return fmt.Errorf("build EdgeIngress resource: %w", err)
 	}
 
 	oldEdgeIng.Spec = obj.Spec
 	oldEdgeIng.Status = obj.Status
 
-	obj, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(obj.Namespace).Update(ctxUpdate, oldEdgeIng, metav1.UpdateOptions{})
+	obj, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(obj.Namespace).Update(ctx, oldEdgeIng, metav1.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("updating EdgeIngress: %w", err)
+		return fmt.Errorf("updating EdgeIngress: %w", err)
 	}
 
 	log.Debug().
@@ -289,28 +302,27 @@ func (w *Watcher) updateEdgeIngress(ctx context.Context, oldEdgeIng *hubv1alpha1
 		Str("namespace", obj.Namespace).
 		Msg("EdgeIngress updated")
 
-	return obj, nil
+	if err = w.syncChildResources(ctx, obj); err != nil {
+		return fmt.Errorf("sync child resource: %w", err)
+	}
+
+	return w.updateEdgeIngressConnectionStatus(ctx, obj, hubv1alpha1.EdgeIngressConnectionUp)
 }
 
 func (w *Watcher) cleanEdgeIngresses(ctx context.Context, edgeIngs map[string]*hubv1alpha1.EdgeIngress) {
 	for _, edgeIng := range edgeIngs {
-		ctxDelete, cancel := context.WithTimeout(ctx, 5*time.Second)
-
 		// Foreground propagation allow us to delete all ingresses owned by the edgeIngress.
 		policy := metav1.DeletePropagationForeground
 
 		opts := metav1.DeleteOptions{
 			PropagationPolicy: &policy,
 		}
-		err := w.hubClientSet.HubV1alpha1().EdgeIngresses(edgeIng.Namespace).Delete(ctxDelete, edgeIng.Name, opts)
+		err := w.hubClientSet.HubV1alpha1().EdgeIngresses(edgeIng.Namespace).Delete(ctx, edgeIng.Name, opts)
 		if err != nil {
 			log.Error().Err(err).Msg("Deleting EdgeIngress")
-			cancel()
 
 			continue
 		}
-
-		cancel()
 
 		log.Debug().
 			Str("name", edgeIng.Name).
