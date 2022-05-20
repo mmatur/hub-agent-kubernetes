@@ -25,14 +25,7 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 	}
 
 	var metrics []Metric
-
 	switch *m.Name {
-	case "traefik_service_request_duration_seconds":
-		metrics = append(metrics, p.parseServiceRequestDuration(m.Metric, state)...)
-
-	case "traefik_service_requests_total":
-		metrics = append(metrics, p.parseServiceRequestTotal(m.Metric, state)...)
-
 	case "traefik_router_request_duration_seconds":
 		metrics = append(metrics, p.parseRouterRequestDuration(m.Metric, state)...)
 
@@ -41,64 +34,6 @@ func (p TraefikParser) Parse(m *dto.MetricFamily, state ScrapeState) []Metric {
 	}
 
 	return metrics
-}
-
-func (p TraefikParser) parseServiceRequestDuration(metrics []*dto.Metric, state ScrapeState) []Metric {
-	var enrichedMetrics []Metric
-
-	for _, metric := range metrics {
-		hist := HistogramFromMetric(metric)
-		if hist == nil {
-			continue
-		}
-
-		// Service metrics doesn't hold information about the ingress it went through.
-		svc := p.guessService(metric.Label, state)
-		if svc == "" {
-			continue
-		}
-		hist.Name = MetricRequestDuration
-		hist.Service = svc
-
-		enrichedMetrics = append(enrichedMetrics, hist)
-	}
-
-	return enrichedMetrics
-}
-
-func (p TraefikParser) parseServiceRequestTotal(metrics []*dto.Metric, state ScrapeState) []Metric {
-	var enrichedMetrics []Metric
-
-	for _, metric := range metrics {
-		counter := CounterFromMetric(metric)
-		if counter == 0 {
-			continue
-		}
-
-		svc := p.guessService(metric.Label, state)
-		if svc == "" {
-			continue
-		}
-
-		// Service metrics doesn't hold information about the ingress it went through.
-		enrichedMetrics = append(enrichedMetrics, &Counter{
-			Name:    MetricRequests,
-			Service: svc,
-			Value:   counter,
-		})
-
-		metricErrorName := getMetricErrorName(metric.Label, "code")
-		if metricErrorName == "" {
-			continue
-		}
-		enrichedMetrics = append(enrichedMetrics, &Counter{
-			Name:    metricErrorName,
-			Service: svc,
-			Value:   counter,
-		})
-	}
-
-	return enrichedMetrics
 }
 
 func (p TraefikParser) parseRouterRequestDuration(metrics []*dto.Metric, state ScrapeState) []Metric {
@@ -160,25 +95,6 @@ func (p TraefikParser) parseRouterRequestTotal(metrics []*dto.Metric, state Scra
 	}
 
 	return enrichedMetrics
-}
-
-func (p TraefikParser) guessService(lbls []*dto.LabelPair, state ScrapeState) string {
-	name := getLabel(lbls, "service")
-
-	parts := strings.SplitN(name, "@", 2)
-	if len(parts) != 2 {
-		return ""
-	}
-
-	// In the case where an ingressRoute has a single route with a single service
-	// Traefik create a service with the name of the ingressRoute
-	for ingress, service := range state.TraefikServiceNames {
-		if strings.Contains(parts[0], ingress) {
-			return service
-		}
-	}
-
-	return ""
 }
 
 func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (ingress string) {

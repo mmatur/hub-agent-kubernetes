@@ -33,17 +33,6 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// service
-	assert.Contains(t, got, &metrics.Histogram{Name: metrics.MetricRequestDuration, Service: "whoami@default", Sum: 0.021072671000000005, Count: 12})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami@default", Value: 12})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami@default", Value: 14})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestClientErrors, Service: "whoami@default", Value: 14})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami2@default", Value: 16})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Service: "whoami2@default", Value: 16})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami3@default", Value: 15})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequestErrors, Service: "whoami3@default", Value: 15})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Service: "whoami@whoami", Value: 66})
-
 	// router
 	assert.Contains(t, got, &metrics.Histogram{Name: metrics.MetricRequestDuration, Ingress: "myIngress@default.ingress.networking.k8s.io", Sum: 0.0137623, Count: 1})
 	assert.Contains(t, got, &metrics.Histogram{Name: metrics.MetricRequestDuration, Ingress: "myIngressRoute@default.ingressroute.traefik.containo.us", Sum: 0.0216373, Count: 1})
@@ -52,7 +41,7 @@ func TestScraper_ScrapeTraefik(t *testing.T) {
 	// edge cases, TLS/middleware enable on entrypoint
 	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, Ingress: "app-obe@whoami.ingress.networking.k8s.io", Value: 38})
 
-	require.Len(t, got, 14)
+	require.Len(t, got, 5)
 }
 
 func startServer(t *testing.T, file string) string {
