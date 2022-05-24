@@ -15,8 +15,9 @@ type tableInfo struct {
 }
 
 type tableKey struct {
-	Ingress string
-	Service string
+	EdgeIngress string
+	Ingress     string
+	Service     string
 }
 
 func toTableKey(grp DataPointGroup) tableKey {

@@ -71,8 +71,9 @@ type DataPoint struct {
 
 // SetKey contains the primary key of a metric set.
 type SetKey struct {
-	Ingress string
-	Service string
+	EdgeIngress string
+	Ingress     string
+	Service     string
 }
 
 // MetricSet contains assembled metrics for an ingress or service.
@@ -137,7 +138,7 @@ func Aggregate(m []Metric) map[SetKey]MetricSet {
 	svcs := map[SetKey]MetricSet{}
 
 	for _, metric := range m {
-		key := SetKey{Ingress: metric.IngressName(), Service: metric.ServiceName()}
+		key := SetKey{Ingress: metric.IngressName(), Service: metric.ServiceName(), EdgeIngress: metric.EdgeIngressName()}
 		svc := svcs[key]
 
 		switch val := metric.(type) {

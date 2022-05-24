@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	dto "github.com/prometheus/client_model/go"
+	"github.com/rs/zerolog/log"
 )
 
 // TraefikParser parses Traefik metrics into a common form.
@@ -45,15 +46,15 @@ func (p TraefikParser) parseRouterRequestDuration(metrics []*dto.Metric, state S
 			continue
 		}
 
-		ingress := p.guessIngress(metric.Label, state)
-		if ingress == "" {
+		edgeIngress := p.guessEdgeIngress(metric.Label, state)
+		if edgeIngress == "" {
 			continue
 		}
 
 		// Service can't be accurately obtained on router metrics. The service label holds the service name to which the
 		// router will deliver the traffic, not the leaf node of the service tree (e.g. load-balancer, wrr).
 		hist.Name = MetricRequestDuration
-		hist.Ingress = ingress
+		hist.EdgeIngress = edgeIngress
 
 		enrichedMetrics = append(enrichedMetrics, hist)
 	}
@@ -70,17 +71,17 @@ func (p TraefikParser) parseRouterRequestTotal(metrics []*dto.Metric, state Scra
 			continue
 		}
 
-		ingress := p.guessIngress(metric.Label, state)
-		if ingress == "" {
+		edgeIngress := p.guessEdgeIngress(metric.Label, state)
+		if edgeIngress == "" {
 			continue
 		}
 
 		// Service can't be accurately obtained on router metrics. The service label holds the service name to which the
 		// router will deliver the traffic, not the leaf node of the service tree (e.g. load-balancer, wrr).
 		enrichedMetrics = append(enrichedMetrics, &Counter{
-			Name:    MetricRequests,
-			Ingress: ingress,
-			Value:   counter,
+			Name:        MetricRequests,
+			EdgeIngress: edgeIngress,
+			Value:       counter,
 		})
 
 		metricErrorName := getMetricErrorName(metric.Label, "code")
@@ -88,17 +89,19 @@ func (p TraefikParser) parseRouterRequestTotal(metrics []*dto.Metric, state Scra
 			continue
 		}
 		enrichedMetrics = append(enrichedMetrics, &Counter{
-			Name:    metricErrorName,
-			Ingress: ingress,
-			Value:   counter,
+			Name:        metricErrorName,
+			EdgeIngress: edgeIngress,
+			Value:       counter,
 		})
 	}
 
 	return enrichedMetrics
 }
 
-func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (ingress string) {
+func (p TraefikParser) guessEdgeIngress(lbls []*dto.LabelPair, state ScrapeState) string {
 	name := getLabel(lbls, "router")
+
+	log.Debug().Str("metrics_name", name).Msg("Parse metrics")
 
 	parts := strings.SplitN(name, "@", 2)
 	if len(parts) != 2 {
@@ -106,34 +109,21 @@ func (p TraefikParser) guessIngress(lbls []*dto.LabelPair, state ScrapeState) (i
 	}
 	name, typ := parts[0], parts[1]
 
-	if typ == "kubernetes" {
-		for ingressName := range state.Ingresses {
-			guess := strings.ReplaceAll(ingressName, "@", "-")
-			// Remove the `.kind.group` from the namespace.
-			guess = strings.SplitN(guess, ".", 2)[0]
-			// The name of ingresses follow this rule:
-			//     [entrypointName-]ingressName-ingressNamespace-ingressHost-ingressPath[-hash]@kubernetes
-			// If the ingress uses an entry point that has TLS or middlewares enabled, its name is prefixed by the entry point name
-			// An optional hash is added in case of a name conflict
-			// Since an entry point name can contain "-", checking if ingressName-ingressNamespace is contained in `name` should be fine.
-			if strings.Contains(name, guess) {
-				return ingressName
-			}
-		}
+	if typ != "kubernetes" {
 		return ""
 	}
-
-	for irName := range state.IngressRoutes {
-		// for ingress routes resource names are prefixed with their namespace so we need to
-		// flip those around
-		parts := strings.SplitN(irName, "@", 2)
-
+	for ingressName := range state.Ingresses {
+		guess := strings.ReplaceAll(ingressName, "@", "-")
 		// Remove the `.kind.group` from the namespace.
-		parts[1] = strings.SplitN(parts[1], ".", 2)[0]
-		guess := parts[1] + "-" + parts[0]
-
-		if strings.HasPrefix(name, guess) {
-			return irName
+		guess = strings.SplitN(guess, ".", 2)[0]
+		// The name of ingresses follow this rule:
+		//     [entrypointName-]ingressName-ingressNamespace-ingressHost-ingressPath[-hash]@kubernetes
+		// If the ingress uses an entry point that has TLS or middlewares enabled, its name is prefixed by the entry point name
+		// An optional hash is added in case of a name conflict
+		// Since an entry point name can contain "-", checking if ingressName-ingressNamespace is contained in `name` should be fine.
+		if strings.Contains(name, guess) {
+			// The edge ingress name doesn't contain the ".kind.group"
+			return strings.SplitN(ingressName, ".", 2)[0]
 		}
 	}
 	return ""

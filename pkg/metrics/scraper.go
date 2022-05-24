@@ -27,16 +27,18 @@ const (
 
 // Metric represents a metric object.
 type Metric interface {
+	EdgeIngressName() string
 	IngressName() string
 	ServiceName() string
 }
 
 // Counter represents a counter metric.
 type Counter struct {
-	Name    string
-	Ingress string
-	Service string
-	Value   uint64
+	Name        string
+	EdgeIngress string
+	Ingress     string
+	Service     string
+	Value       uint64
 }
 
 // CounterFromMetric returns a counter metric from a prometheus
@@ -48,6 +50,11 @@ func CounterFromMetric(m *dto.Metric) uint64 {
 	}
 
 	return uint64(c.GetValue())
+}
+
+// EdgeIngressName returns the metric edge ingress name.
+func (c Counter) EdgeIngressName() string {
+	return c.EdgeIngress
 }
 
 // IngressName returns the metric ingress name.
@@ -62,12 +69,13 @@ func (c Counter) ServiceName() string {
 
 // Histogram represents a histogram metric.
 type Histogram struct {
-	Name     string
-	Relative bool
-	Ingress  string
-	Service  string
-	Sum      float64
-	Count    uint64
+	Name        string
+	Relative    bool
+	EdgeIngress string
+	Ingress     string
+	Service     string
+	Sum         float64
+	Count       uint64
 }
 
 // HistogramFromMetric returns a histogram metric from a prometheus
@@ -82,6 +90,11 @@ func HistogramFromMetric(m *dto.Metric) *Histogram {
 		Sum:   hist.GetSampleSum(),
 		Count: hist.GetSampleCount(),
 	}
+}
+
+// EdgeIngressName returns the metric edge ingress name.
+func (h Histogram) EdgeIngressName() string {
+	return h.EdgeIngress
 }
 
 // IngressName returns the metric ingress name.
