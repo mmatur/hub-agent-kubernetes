@@ -22,8 +22,9 @@ type tableKey struct {
 
 func toTableKey(grp DataPointGroup) tableKey {
 	return tableKey{
-		Ingress: grp.Ingress,
-		Service: grp.Service,
+		EdgeIngress: grp.EdgeIngress,
+		Ingress:     grp.Ingress,
+		Service:     grp.Service,
 	}
 }
 
@@ -111,7 +112,7 @@ func (s *Store) Insert(svcs map[SetKey]DataPoint) {
 // ForEachFunc represents a function that will be called while iterating over a table.
 // Each time this function is called, a unique ingress and service will
 // be given with their set of points.
-type ForEachFunc func(ingr, svc string, pnts DataPoints)
+type ForEachFunc func(edgeIngr, ingr, svc string, pnts DataPoints)
 
 // ForEach iterates over a table, executing fn for each row.
 func (s *Store) ForEach(tbl string, fn ForEachFunc) {
@@ -124,7 +125,7 @@ func (s *Store) ForEach(tbl string, fn ForEachFunc) {
 	}
 
 	for k, v := range table {
-		fn(k.Ingress, k.Service, v)
+		fn(k.EdgeIngress, k.Ingress, k.Service, v)
 	}
 }
 
@@ -148,7 +149,7 @@ func (s *Store) ForEachUnmarked(tbl string, fn ForEachFunc) WaterMarks {
 			continue
 		}
 
-		fn(k.Ingress, k.Service, v[mark:])
+		fn(k.EdgeIngress, k.Ingress, k.Service, v[mark:])
 	}
 
 	return newMarks

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	dto "github.com/prometheus/client_model/go"
-	"github.com/rs/zerolog/log"
 )
 
 // TraefikParser parses Traefik metrics into a common form.
@@ -100,8 +99,6 @@ func (p TraefikParser) parseRouterRequestTotal(metrics []*dto.Metric, state Scra
 
 func (p TraefikParser) guessEdgeIngress(lbls []*dto.LabelPair, state ScrapeState) string {
 	name := getLabel(lbls, "router")
-
-	log.Debug().Str("metrics_name", name).Msg("Parse metrics")
 
 	parts := strings.SplitN(name, "@", 2)
 	if len(parts) != 2 {

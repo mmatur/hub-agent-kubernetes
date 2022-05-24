@@ -40,7 +40,7 @@ func (v *DataPointView) FindByIngressAndService(table, ingress, service string, 
 		groupFound    bool
 		err           error
 	)
-	v.store.ForEach(table, func(ingr, svc string, points DataPoints) {
+	v.store.ForEach(table, func(_, ingr, svc string, points DataPoints) {
 		if ingr != ingress || svc != service {
 			return
 		}
@@ -79,7 +79,7 @@ func (v *DataPointView) FindByService(table, service string, from, to time.Time)
 	fromTS, toTS := from.Unix(), to.Unix()
 
 	var groups []DataPoints
-	v.store.ForEach(table, func(_, svc string, points DataPoints) {
+	v.store.ForEach(table, func(_, _, svc string, points DataPoints) {
 		if svc != service {
 			return
 		}
@@ -109,7 +109,7 @@ func (v *DataPointView) FindByIngress(table, ingress string, from, to time.Time)
 	fromTS, toTS := from.Unix(), to.Unix()
 
 	var groups []DataPoints
-	v.store.ForEach(table, func(ingr, _ string, points DataPoints) {
+	v.store.ForEach(table, func(_, ingr, _ string, points DataPoints) {
 		if ingr != ingress {
 			return
 		}

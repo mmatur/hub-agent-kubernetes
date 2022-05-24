@@ -255,7 +255,7 @@ func TestDataPointView_FindByIngressAndService(t *testing.T) {
 				require.Equal(t, test.input.table, table)
 
 				for _, group := range test.groups {
-					fn(group.Ingress, group.Service, group.DataPoints)
+					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
 				}
 			}}
 
@@ -612,7 +612,7 @@ func TestDataPointView_FindByService(t *testing.T) {
 				require.Equal(t, test.input.table, table)
 
 				for _, group := range test.groups {
-					fn(group.Ingress, group.Service, group.DataPoints)
+					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
 				}
 			}}
 
@@ -961,7 +961,7 @@ func TestDataPointView_FindByIngress(t *testing.T) {
 				require.Equal(t, test.input.table, table)
 
 				for _, group := range test.groups {
-					fn(group.Ingress, group.Service, group.DataPoints)
+					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
 				}
 			}}
 

@@ -118,11 +118,12 @@ func (m *Manager) send(ctx context.Context, tbls []string) error {
 	for _, name := range tbls {
 		tbl := name
 
-		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(ingr, svc string, pnts DataPoints) {
+		tblMarks[tbl] = m.store.ForEachUnmarked(tbl, func(edgeIngr, ingr, svc string, pnts DataPoints) {
 			toSend[tbl] = append(toSend[tbl], DataPointGroup{
-				Ingress:    ingr,
-				Service:    svc,
-				DataPoints: pnts,
+				EdgeIngress: edgeIngr,
+				Ingress:     ingr,
+				Service:     svc,
+				DataPoints:  pnts,
 			})
 		})
 	}

@@ -8,6 +8,10 @@
       "namespace": "org.traefik.hub",
       "fields": [
         {
+                "name": "edge_ingress",
+                "type": "string"
+        },
+        {
           "name": "ingress",
           "type": "string"
         },
