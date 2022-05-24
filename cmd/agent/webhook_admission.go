@@ -7,6 +7,8 @@ import (
 	stdlog "log"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ettle/strcase"
@@ -95,7 +97,9 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	acpAdmission, edgeIngressAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, cliCtx.String(flagIngressClassName), cliCtx.String(flagTraefikEntryPoint))
+	ingressClassName := cliCtx.String(flagIngressClassName)
+	traefikEntryPoint := cliCtx.String(flagTraefikEntryPoint)
+	acpAdmission, edgeIngressAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, ingressClassName, traefikEntryPoint)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -201,18 +205,26 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		acpWatcher.Run(ctx)
 	}()
 
-	edgeIngressWatcher, err := edgeingress.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer, clientSet, ingressClassName, traefikEntryPoint)
+	traefikClientSet, err := traefikclientset.NewForConfig(config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create Traefik client set: %w", err)
+	}
+
+	watcherCfg := edgeingress.WatcherConfig{
+		IngressClassName:        ingressClassName,
+		TraefikEntryPoint:       traefikEntryPoint,
+		AgentNamespace:          currentNamespace(),
+		EdgeIngressSyncInterval: time.Minute,
+		CertRetryInterval:       time.Minute,
+		CertSyncInterval:        time.Hour,
+	}
+	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, watcherCfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
 	go func() {
 		edgeIngressWatcher.Run(ctx)
 	}()
-
-	traefikClientSet, err := traefikclientset.NewForConfig(config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create Traefik client set: %w", err)
-	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
@@ -266,4 +278,18 @@ func initIngressClass(ctx context.Context, clientSet clientset.Interface, ingres
 	}
 
 	return nil
+}
+
+func currentNamespace() string {
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		if ns := strings.TrimSpace(string(data)); ns != "" {
+			return ns
+		}
+	}
+
+	return "default"
 }

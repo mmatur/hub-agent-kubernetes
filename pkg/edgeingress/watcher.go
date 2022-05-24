@@ -3,7 +3,6 @@ package edgeingress
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -11,8 +10,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
@@ -22,69 +23,113 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const (
+	catchAllName = "hub-catch-all"
+	secretName   = "hub-certificate"
+)
+
 // PlatformClient for the EdgeIngress service.
 type PlatformClient interface {
 	GetEdgeIngresses(ctx context.Context) ([]EdgeIngress, error)
 	GetCertificate(ctx context.Context) (Certificate, error)
 }
 
+// WatcherConfig holds the watcher configuration.
+type WatcherConfig struct {
+	IngressClassName  string
+	TraefikEntryPoint string
+	AgentNamespace    string
+
+	EdgeIngressSyncInterval time.Duration
+	CertRetryInterval       time.Duration
+	CertSyncInterval        time.Duration
+}
+
 // Watcher watches hub EdgeIngresses and sync them with the cluster.
 type Watcher struct {
-	interval          time.Duration
-	client            PlatformClient
-	hubClientSet      hubclientset.Interface
-	hubInformer       hubinformer.SharedInformerFactory
-	clientSet         clientset.Interface
-	ingressClassName  string
-	traefikEntryPoint string
+	config WatcherConfig
+
+	client           PlatformClient
+	hubClientSet     hubclientset.Interface
+	hubInformer      hubinformer.SharedInformerFactory
+	clientSet        clientset.Interface
+	traefikClientSet v1alpha1.TraefikV1alpha1Interface
 }
 
 // NewWatcher returns a new Watcher.
-func NewWatcher(interval time.Duration, client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, clientSet clientset.Interface, ingressClassName, traefikEntryPoint string) (*Watcher, error) {
-	if ingressClassName == "" {
-		return nil, errors.New("ingressClassName must be set")
-	}
-
+func NewWatcher(client PlatformClient, hubClientSet hubclientset.Interface, clientSet clientset.Interface, traefikClientSet v1alpha1.TraefikV1alpha1Interface, hubInformer hubinformer.SharedInformerFactory, config WatcherConfig) (*Watcher, error) {
 	return &Watcher{
-		interval:          interval,
-		client:            client,
-		hubClientSet:      hubClientSet,
-		hubInformer:       hubInformer,
-		clientSet:         clientSet,
-		ingressClassName:  ingressClassName,
-		traefikEntryPoint: traefikEntryPoint,
+		config: config,
+
+		client:           client,
+		hubClientSet:     hubClientSet,
+		hubInformer:      hubInformer,
+		clientSet:        clientSet,
+		traefikClientSet: traefikClientSet,
 	}, nil
 }
 
 // Run runs Watcher.
 func (w *Watcher) Run(ctx context.Context) {
-	t := time.NewTicker(w.interval)
+	t := time.NewTicker(w.config.EdgeIngressSyncInterval)
 	defer t.Stop()
+
+	certSyncInterval := time.After(w.config.CertSyncInterval)
+	ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
+	if err := w.syncCertificate(ctxSync); err != nil {
+		log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
+		certSyncInterval = time.After(w.config.CertRetryInterval)
+	}
+	cancel()
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info().Msg("Stopping EdgeIngress watcher")
 			return
-		case <-t.C:
-			ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
-			w.syncEdgeIngresses(ctxSync)
 
+		case <-t.C:
+			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
+			w.syncEdgeIngresses(ctxSync)
+			cancel()
+
+		case <-certSyncInterval:
+			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
+			if err := w.syncCertificate(ctxSync); err != nil {
+				log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
+				certSyncInterval = time.After(w.config.CertRetryInterval)
+				cancel()
+				continue
+			}
+			certSyncInterval = time.After(w.config.CertSyncInterval)
 			cancel()
 		}
 	}
 }
 
+func (w *Watcher) syncCertificate(ctx context.Context) error {
+	certificate, err := w.client.GetCertificate(ctx)
+	if err != nil {
+		return fmt.Errorf("get certificate: %w", err)
+	}
+
+	if err = w.upsertSecret(ctx, certificate); err != nil {
+		return fmt.Errorf("upsert secret: %w", err)
+	}
+
+	return w.createIngressCatchAll(ctx)
+}
+
 func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 	platformEdgeIngresses, err := w.client.GetEdgeIngresses(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("Fetching EdgeIngresses")
+		log.Error().Err(err).Msg("Unable to fetch EdgeIngresses")
 		return
 	}
 
 	clusterEdgeIngresses, err := w.hubInformer.Hub().V1alpha1().EdgeIngresses().Lister().List(labels.Everything())
 	if err != nil {
-		log.Error().Err(err).Msg("Listing EdgeIngresses")
+		log.Error().Err(err).Msg("Unable to obtain EdgeIngresses")
 		return
 	}
 
@@ -111,7 +156,7 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 				log.Error().Err(err).
 					Str("name", platformEdgeIng.Name).
 					Str("namespace", platformEdgeIng.Namespace).
-					Msg("Creating EdgeIngress")
+					Msg("Unable to create EdgeIngress")
 			}
 			continue
 		}
@@ -121,7 +166,7 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 			log.Error().Err(err).
 				Str("name", clusterEdgeIng.Name).
 				Str("namespace", clusterEdgeIng.Namespace).
-				Msg("Updating EdgeIngress")
+				Msg("Unable to update EdgeIngress")
 		}
 	}
 
@@ -131,13 +176,13 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 func (w *Watcher) syncChildAndUpdateConnectionStatus(ctx context.Context, edgeIngress *hubv1alpha1.EdgeIngress) {
 	connectionStatus := hubv1alpha1.EdgeIngressConnectionUp
 
-	if err := w.syncChildResources(ctx, edgeIngress); err != nil {
+	if err := w.upsertIngress(ctx, edgeIngress); err != nil {
 		connectionStatus = hubv1alpha1.EdgeIngressConnectionDown
 
 		log.Error().Err(err).
 			Str("name", edgeIngress.Name).
 			Str("namespace", edgeIngress.Namespace).
-			Msg("Sync child resources when updating EdgeIngress")
+			Msg("Unable to upsert ingress")
 	}
 
 	if err := w.updateEdgeIngressConnectionStatus(ctx, edgeIngress, connectionStatus); err != nil {
@@ -148,33 +193,150 @@ func (w *Watcher) syncChildAndUpdateConnectionStatus(ctx context.Context, edgeIn
 	}
 }
 
-func (w *Watcher) syncChildResources(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) error {
-	if err := w.upsertSecret(ctx, edgeIng); err != nil {
-		return fmt.Errorf("upserting secret: %w", err)
+func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) error {
+	ing, err := w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Get(ctx, edgeIng.Name, metav1.GetOptions{})
+	if err != nil && !kerror.IsNotFound(err) {
+		return fmt.Errorf("get ingress: %w", err)
 	}
 
-	if err := w.upsertIngress(ctx, edgeIng); err != nil {
-		return fmt.Errorf("upserting ingress: %w", err)
+	if kerror.IsNotFound(err) {
+		ing = buildIngress(edgeIng, &netv1.Ingress{}, w.config.IngressClassName, w.config.TraefikEntryPoint)
+		_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Create(ctx, ing, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create ingress: %w", err)
+		}
+
+		log.Debug().
+			Str("name", ing.Name).
+			Str("namespace", ing.Namespace).
+			Msg("Ingress created")
+
+		return nil
+	}
+
+	ing = buildIngress(edgeIng, ing, w.config.IngressClassName, w.config.TraefikEntryPoint)
+	_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Update(ctx, ing, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update ingress: %w", err)
+	}
+
+	log.Debug().
+		Str("name", ing.Name).
+		Str("namespace", ing.Namespace).
+		Msg("Ingress updated")
+
+	return nil
+}
+
+func (w *Watcher) createIngressCatchAll(ctx context.Context) error {
+	stripPrefix := &traefikv1alpha1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "strip-prefix-catch-all",
+			Namespace: w.config.AgentNamespace,
+		},
+		Spec: traefikv1alpha1.MiddlewareSpec{
+			StripPrefixRegex: &traefikv1alpha1.StripPrefixRegex{Regex: []string{".*"}},
+		},
+	}
+
+	addPrefix := &traefikv1alpha1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "add-prefix-catch-all",
+			Namespace: w.config.AgentNamespace,
+		},
+		Spec: traefikv1alpha1.MiddlewareSpec{
+			AddPrefix: &traefikv1alpha1.AddPrefix{Prefix: "/edge-ingresses/in-progress"},
+		},
+	}
+
+	_, err := w.traefikClientSet.Middlewares(w.config.AgentNamespace).Create(ctx, stripPrefix, metav1.CreateOptions{})
+	if err != nil && !kerror.IsAlreadyExists(err) {
+		return err
+	}
+
+	_, err = w.traefikClientSet.Middlewares(w.config.AgentNamespace).Create(ctx, addPrefix, metav1.CreateOptions{})
+	if err != nil && !kerror.IsAlreadyExists(err) {
+		return err
+	}
+
+	middlewares := fmt.Sprintf("%s-strip-prefix-catch-all@kubernetescrd,%s-add-prefix-catch-all@kubernetescrd",
+		w.config.AgentNamespace,
+		w.config.AgentNamespace)
+
+	pathType := netv1.PathTypePrefix
+	ing := &netv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      catchAllName,
+			Namespace: w.config.AgentNamespace,
+			Annotations: map[string]string{
+				"traefik.ingress.kubernetes.io/router.tls":         "true",
+				"traefik.ingress.kubernetes.io/router.entrypoints": w.config.TraefikEntryPoint,
+				"traefik.ingress.kubernetes.io/router.middlewares": middlewares,
+				"traefik.ingress.kubernetes.io/router.priority":    "1",
+			},
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "traefik-hub",
+			},
+		},
+		Spec: netv1.IngressSpec{
+			IngressClassName: pointer.StringPtr(w.config.IngressClassName),
+			TLS:              []netv1.IngressTLS{{SecretName: secretName}},
+			Rules: []netv1.IngressRule{
+				{
+					IngressRuleValue: netv1.IngressRuleValue{
+						HTTP: &netv1.HTTPIngressRuleValue{
+							Paths: []netv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathType,
+									Backend: netv1.IngressBackend{
+										Service: &netv1.IngressServiceBackend{
+											Name: catchAllName,
+											Port: netv1.ServiceBackendPort{
+												Number: 443,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = w.clientSet.NetworkingV1().Ingresses(w.config.AgentNamespace).Create(ctx, ing, metav1.CreateOptions{})
+	if err != nil && !kerror.IsAlreadyExists(err) {
+		return fmt.Errorf("create ingress: %w", err)
 	}
 
 	return nil
 }
 
-func (w *Watcher) upsertSecret(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) error {
-	// This call can be optimized, since we are under pressure we chose the quickest solution.
-	cert, err := w.client.GetCertificate(ctx)
-	if err != nil {
-		return err
-	}
-
-	secret, err := w.clientSet.CoreV1().Secrets(edgeIng.Namespace).Get(ctx, edgeIng.Name, metav1.GetOptions{})
+func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate) error {
+	secret, err := w.clientSet.CoreV1().Secrets(w.config.AgentNamespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get secret: %w", err)
 	}
 
 	if kerror.IsNotFound(err) {
-		secret = buildSecret(edgeIng, &corev1.Secret{}, cert)
-		_, err = w.clientSet.CoreV1().Secrets(edgeIng.Namespace).Create(ctx, secret, metav1.CreateOptions{})
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: w.config.AgentNamespace,
+				Annotations: map[string]string{
+					"app.kubernetes.io/managed-by": "traefik-hub",
+				},
+			},
+			Type: corev1.SecretTypeTLS,
+			Data: map[string][]byte{
+				"tls.crt": cert.Certificate,
+				"tls.key": cert.PrivateKey,
+			},
+		}
+
+		_, err = w.clientSet.CoreV1().Secrets(w.config.AgentNamespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create secret: %w", err)
 		}
@@ -191,51 +353,19 @@ func (w *Watcher) upsertSecret(ctx context.Context, edgeIng *hubv1alpha1.EdgeIng
 		return nil
 	}
 
-	secret = buildSecret(edgeIng, secret, cert)
-	_, updateErr := w.clientSet.CoreV1().Secrets(edgeIng.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
-	if updateErr != nil {
-		return fmt.Errorf("update secret: %w", updateErr)
+	secret.Data = map[string][]byte{
+		"tls.crt": cert.Certificate,
+		"tls.key": cert.PrivateKey,
+	}
+	_, err = w.clientSet.CoreV1().Secrets(w.config.AgentNamespace).Update(ctx, secret, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update secret: %w", err)
 	}
 
 	log.Debug().
 		Str("name", secret.Name).
 		Str("namespace", secret.Namespace).
 		Msg("Secret updated")
-
-	return nil
-}
-
-func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIngress) error {
-	ing, err := w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Get(ctx, edgeIng.Name, metav1.GetOptions{})
-	if err != nil && !kerror.IsNotFound(err) {
-		return fmt.Errorf("get ingress: %w", err)
-	}
-
-	if kerror.IsNotFound(err) {
-		ing = buildIngress(edgeIng, &netv1.Ingress{}, w.ingressClassName, w.traefikEntryPoint)
-		_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Create(ctx, ing, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("create ingress: %w", err)
-		}
-
-		log.Debug().
-			Str("name", ing.Name).
-			Str("namespace", ing.Namespace).
-			Msg("Ingress created")
-
-		return nil
-	}
-
-	ing = buildIngress(edgeIng, ing, w.ingressClassName, w.traefikEntryPoint)
-	_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Update(ctx, ing, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("update ingress: %w", err)
-	}
-
-	log.Debug().
-		Str("name", ing.Name).
-		Str("namespace", ing.Namespace).
-		Msg("Ingress updated")
 
 	return nil
 }
@@ -276,8 +406,8 @@ func (w *Watcher) createEdgeIngress(ctx context.Context, edgeIng *EdgeIngress) e
 		Str("namespace", obj.Namespace).
 		Msg("EdgeIngress created")
 
-	if err = w.syncChildResources(ctx, obj); err != nil {
-		return fmt.Errorf("sync child resource: %w", err)
+	if err = w.upsertIngress(ctx, obj); err != nil {
+		return fmt.Errorf("upsert ingress: %w", err)
 	}
 
 	return w.updateEdgeIngressConnectionStatus(ctx, obj, hubv1alpha1.EdgeIngressConnectionUp)
@@ -302,8 +432,8 @@ func (w *Watcher) updateEdgeIngress(ctx context.Context, oldEdgeIng *hubv1alpha1
 		Str("namespace", obj.Namespace).
 		Msg("EdgeIngress updated")
 
-	if err = w.syncChildResources(ctx, obj); err != nil {
-		return fmt.Errorf("sync child resource: %w", err)
+	if err = w.upsertIngress(ctx, obj); err != nil {
+		return fmt.Errorf("upsert ingress: %w", err)
 	}
 
 	return w.updateEdgeIngressConnectionStatus(ctx, obj, hubv1alpha1.EdgeIngressConnectionUp)
@@ -319,7 +449,7 @@ func (w *Watcher) cleanEdgeIngresses(ctx context.Context, edgeIngs map[string]*h
 		}
 		err := w.hubClientSet.HubV1alpha1().EdgeIngresses(edgeIng.Namespace).Delete(ctx, edgeIng.Name, opts)
 		if err != nil {
-			log.Error().Err(err).Msg("Deleting EdgeIngress")
+			log.Error().Err(err).Msg("Unable to delete EdgeIngress")
 
 			continue
 		}
@@ -379,13 +509,13 @@ func buildIngress(edgeIng *hubv1alpha1.EdgeIngress, ing *netv1.Ingress, ingressC
 		},
 	}
 
+	// No secret is needed for TLS because we will use the wildcard certificate configured in the catch-all ingress.
 	pathType := netv1.PathTypePrefix
 	ing.Spec = netv1.IngressSpec{
 		IngressClassName: pointer.StringPtr(ingressClassName),
 		TLS: []netv1.IngressTLS{
 			{
-				Hosts:      []string{edgeIng.Status.Domain},
-				SecretName: edgeIng.Name,
+				Hosts: []string{edgeIng.Status.Domain},
 			},
 		},
 		Rules: []netv1.IngressRule{
@@ -414,29 +544,4 @@ func buildIngress(edgeIng *hubv1alpha1.EdgeIngress, ing *netv1.Ingress, ingressC
 	}
 
 	return ing
-}
-
-func buildSecret(edgeIng *hubv1alpha1.EdgeIngress, secret *corev1.Secret, cert Certificate) *corev1.Secret {
-	secret.ObjectMeta = metav1.ObjectMeta{
-		Name:      edgeIng.Name,
-		Namespace: edgeIng.Namespace,
-		Annotations: map[string]string{
-			"app.kubernetes.io/managed-by": "traefik-hub",
-		},
-		OwnerReferences: []metav1.OwnerReference{
-			{
-				APIVersion: "hub.traefik.io/v1alpha1",
-				Kind:       "EdgeIngress",
-				Name:       edgeIng.Name,
-				UID:        edgeIng.UID,
-			},
-		},
-	}
-	secret.Type = corev1.SecretTypeTLS
-	secret.Data = map[string][]byte{
-		"tls.crt": cert.Certificate,
-		"tls.key": cert.PrivateKey,
-	}
-
-	return secret
 }

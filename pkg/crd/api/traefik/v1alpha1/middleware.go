@@ -19,7 +19,23 @@ type Middleware struct {
 
 // MiddlewareSpec holds the Middleware configuration.
 type MiddlewareSpec struct {
-	ForwardAuth *ForwardAuth `json:"forwardAuth,omitempty"`
+	ForwardAuth      *ForwardAuth      `json:"forwardAuth,omitempty"`
+	StripPrefixRegex *StripPrefixRegex `json:"stripPrefixRegex,omitempty"`
+	AddPrefix        *AddPrefix        `json:"addPrefix,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// AddPrefix holds the AddPrefix configuration.
+type AddPrefix struct {
+	Prefix string `json:"prefix,omitempty" toml:"prefix,omitempty" yaml:"prefix,omitempty" export:"true"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// StripPrefixRegex holds the StripPrefixRegex configuration.
+type StripPrefixRegex struct {
+	Regex []string `json:"regex,omitempty" toml:"regex,omitempty" yaml:"regex,omitempty" export:"true"`
 }
 
 // +k8s:deepcopy-gen=true

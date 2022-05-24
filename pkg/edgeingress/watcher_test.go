@@ -10,6 +10,7 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -120,10 +121,16 @@ func Test_WatcherRun(t *testing.T) {
 		},
 	}
 
-	_, err := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer, clientSet, "", "traefikhub-tunl")
-	require.Error(t, err)
+	traefikClientSet := traefikkubemock.NewSimpleClientset()
 
-	w, err := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer, clientSet, "traefik-hub", "traefikhub-tunl")
+	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
+		IngressClassName:        "traefik-hub",
+		TraefikEntryPoint:       "traefikhub-tunl",
+		AgentNamespace:          "hub-agent",
+		EdgeIngressSyncInterval: time.Millisecond,
+		CertRetryInterval:       time.Millisecond,
+		CertSyncInterval:        time.Millisecond,
+	})
 
 	require.NoError(t, err)
 
@@ -197,8 +204,7 @@ func Test_WatcherRun(t *testing.T) {
 			IngressClassName: pointer.StringPtr("traefik-hub"),
 			TLS: []netv1.IngressTLS{
 				{
-					Hosts:      []string{edgeIngress.Domain},
-					SecretName: edgeIngress.Name,
+					Hosts: []string{edgeIngress.Domain},
 				},
 			},
 			Rules: []netv1.IngressRule{
@@ -225,25 +231,6 @@ func Test_WatcherRun(t *testing.T) {
 				},
 			},
 		}, ing.Spec)
-
-		// Make sure the secrets related to the edgeIngress is created.
-		ctx = context.Background()
-		secret, errL := clientSet.CoreV1().Secrets(edgeIngress.Namespace).Get(ctx, edgeIngress.Name, metav1.GetOptions{})
-		require.NoError(t, errL)
-
-		assert.Equal(t, []metav1.OwnerReference{
-			{
-				APIVersion: "hub.traefik.io/v1alpha1",
-				Kind:       "EdgeIngress",
-				Name:       edgeIng.Name,
-				UID:        edgeIng.UID,
-			},
-		}, secret.ObjectMeta.OwnerReferences)
-
-		assert.Equal(t, map[string][]byte{
-			"tls.crt": []byte("cert"),
-			"tls.key": []byte("private"),
-		}, secret.Data)
 	}
 }
 
