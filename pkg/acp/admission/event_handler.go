@@ -98,14 +98,6 @@ func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {
 		return newCfg.BasicAuth.ForwardUsernameHeader != oldCfg.BasicAuth.ForwardUsernameHeader ||
 			newCfg.BasicAuth.StripAuthorizationHeader != oldCfg.BasicAuth.StripAuthorizationHeader
 
-	case newCfg.DigestAuth != nil:
-		if oldCfg.DigestAuth == nil {
-			return true
-		}
-
-		return newCfg.DigestAuth.ForwardUsernameHeader != oldCfg.DigestAuth.ForwardUsernameHeader ||
-			newCfg.DigestAuth.StripAuthorizationHeader != oldCfg.DigestAuth.StripAuthorizationHeader
-
 	default:
 		return false
 	}

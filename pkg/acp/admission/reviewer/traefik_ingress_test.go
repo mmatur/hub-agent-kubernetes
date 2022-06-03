@@ -11,7 +11,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
@@ -310,25 +309,6 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
 		},
-		{
-			desc: "add Digest authentication",
-			config: &acp.Config{DigestAuth: &digestauth.Config{
-				StripAuthorizationHeader: true,
-				ForwardUsernameHeader:    "User",
-			}},
-			oldIngAnno: map[string]string{},
-			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
-				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
-			},
-			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
-				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
-			},
-			wantAuthResponseHeaders: []string{"User", "Authorization"},
-		},
 	}
 
 	for _, test := range tests {
@@ -418,15 +398,6 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			desc: "Update middleware with basic configuration",
 			config: &acp.Config{
 				BasicAuth: &basicauth.Config{
-					StripAuthorizationHeader: true,
-				},
-			},
-			wantAuthResponseHeaders: []string{"Authorization"},
-		},
-		{
-			desc: "Update middleware with digest configuration",
-			config: &acp.Config{
-				DigestAuth: &digestauth.Config{
 					StripAuthorizationHeader: true,
 				},
 			},

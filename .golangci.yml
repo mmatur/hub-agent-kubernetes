@@ -171,10 +171,6 @@ issues:
         - gocyclo
     - path: pkg/metrics/protocol/protocol.go
       text: '[[:alpha:]]+V\dSchema is a global variable'
-    # Digest auth uses md5 in tests.
-    - path: pkg/acp/digestauth/digest_auth_request_test.go
-      linters:
-        - gosec
     # False positive.
     - path: pkg/metrics/store_test.go
       text: 'Multiplication of durations: `-1 \* time\.Duration\(n\) \* gran`'

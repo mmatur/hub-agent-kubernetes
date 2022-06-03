@@ -85,13 +85,6 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 		if cfg.BasicAuth.StripAuthorizationHeader {
 			headerToFwd = append(headerToFwd, "Authorization")
 		}
-	case cfg.DigestAuth != nil:
-		if headerName := cfg.DigestAuth.ForwardUsernameHeader; headerName != "" {
-			headerToFwd = append(headerToFwd, headerName)
-		}
-		if cfg.DigestAuth.StripAuthorizationHeader {
-			headerToFwd = append(headerToFwd, "Authorization")
-		}
 	default:
 		return nil, errors.New("unsupported ACP type")
 	}

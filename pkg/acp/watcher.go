@@ -192,14 +192,6 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 			StripAuthorizationHeader: a.BasicAuth.StripAuthorizationHeader,
 			ForwardUsernameHeader:    a.BasicAuth.ForwardUsernameHeader,
 		}
-
-	case a.DigestAuth != nil:
-		spec.DigestAuth = &hubv1alpha1.AccessControlPolicyDigestAuth{
-			Users:                    a.DigestAuth.Users,
-			Realm:                    a.DigestAuth.Realm,
-			StripAuthorizationHeader: a.DigestAuth.StripAuthorizationHeader,
-			ForwardUsernameHeader:    a.DigestAuth.ForwardUsernameHeader,
-		}
 	}
 
 	return spec

@@ -125,37 +125,6 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 				},
 			},
 		},
-		{
-			desc: "Digest Auth access control policy",
-			objects: []runtime.Object{
-				&hubv1alpha1.AccessControlPolicy{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myacp",
-						Namespace: "myns",
-					},
-					Spec: hubv1alpha1.AccessControlPolicySpec{
-						DigestAuth: &hubv1alpha1.AccessControlPolicyDigestAuth{
-							Users:                    []string{"toto:realm:secret", "titi:realm:secret"},
-							Realm:                    "myrealm",
-							StripAuthorizationHeader: true,
-						},
-					},
-				},
-			},
-			want: map[string]*AccessControlPolicy{
-				"myacp@myns": {
-					Name:      "myacp",
-					Namespace: "myns",
-					ClusterID: "cluster-id",
-					Method:    "digestauth",
-					DigestAuth: &AccessControlPolicyDigestAuth{
-						Users:                    "toto:realm:redacted,titi:realm:redacted",
-						Realm:                    "myrealm",
-						StripAuthorizationHeader: true,
-					},
-				},
-			},
-		},
 	}
 
 	for _, test := range tests {

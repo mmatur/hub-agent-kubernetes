@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
@@ -275,50 +274,6 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
 		},
-		{
-			desc: "add Digest authentication",
-			config: &acp.Config{DigestAuth: &digestauth.Config{
-				StripAuthorizationHeader: true,
-				ForwardUsernameHeader:    "User",
-			}},
-			oldIng: traefikv1alpha1.IngressRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "name",
-					Namespace: "test",
-					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-old-policy@test",
-						"custom-annotation":                    "foobar",
-					},
-				},
-				Spec: traefikv1alpha1.IngressRouteSpec{
-					Routes: []traefikv1alpha1.Route{{}},
-				},
-			},
-			ing: traefikv1alpha1.IngressRoute{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "name",
-					Namespace: "test",
-					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-policy@test",
-						"custom-annotation":                    "foobar",
-					},
-				},
-				Spec: traefikv1alpha1.IngressRouteSpec{
-					Routes: []traefikv1alpha1.Route{{}},
-				},
-			},
-			wantPatch: []traefikv1alpha1.Route{
-				{
-					Middlewares: []traefikv1alpha1.MiddlewareRef{
-						{
-							Name:      "zz-my-policy-test",
-							Namespace: "test",
-						},
-					},
-				},
-			},
-			wantAuthResponseHeaders: []string{"User", "Authorization"},
-		},
 	}
 
 	for _, test := range tests {
@@ -399,15 +354,6 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			desc: "Update middleware with basic configuration",
 			config: &acp.Config{
 				BasicAuth: &basicauth.Config{
-					StripAuthorizationHeader: true,
-				},
-			},
-			wantAuthResponseHeaders: []string{"Authorization"},
-		},
-		{
-			desc: "Update middleware with digest configuration",
-			config: &acp.Config{
-				DigestAuth: &digestauth.Config{
 					StripAuthorizationHeader: true,
 				},
 			},

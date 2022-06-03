@@ -46,14 +46,6 @@ func (f *Fetcher) getAccessControlPolicies(clusterID string) (map[string]*Access
 				StripAuthorizationHeader: policy.Spec.BasicAuth.StripAuthorizationHeader,
 				ForwardUsernameHeader:    policy.Spec.BasicAuth.ForwardUsernameHeader,
 			}
-		case policy.Spec.DigestAuth != nil:
-			acp.Method = "digestauth"
-			acp.DigestAuth = &AccessControlPolicyDigestAuth{
-				Users:                    removePassword(policy.Spec.DigestAuth.Users),
-				Realm:                    policy.Spec.DigestAuth.Realm,
-				StripAuthorizationHeader: policy.Spec.DigestAuth.StripAuthorizationHeader,
-				ForwardUsernameHeader:    policy.Spec.DigestAuth.ForwardUsernameHeader,
-			}
 		default:
 			continue
 		}
@@ -68,15 +60,12 @@ func removePassword(rawUsers []string) string {
 	var users []string
 
 	for _, u := range rawUsers {
-		parts := strings.Split(u, ":")
-
-		// Digest format: user:realm:secret
-		if len(parts) == 3 {
-			users = append(users, parts[0]+":"+parts[1]+":redacted")
+		i := strings.Index(u, ":")
+		if i <= 0 {
 			continue
 		}
 
-		users = append(users, parts[0]+":redacted")
+		users = append(users, u[:i]+":redacted")
 	}
 
 	return strings.Join(users, ",")

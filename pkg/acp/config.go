@@ -2,16 +2,14 @@ package acp
 
 import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 )
 
 // Config is the configuration of an Access Control Policy. It is used to setup ACP handlers.
 type Config struct {
-	JWT        *jwt.Config
-	BasicAuth  *basicauth.Config
-	DigestAuth *digestauth.Config
+	JWT       *jwt.Config
+	BasicAuth *basicauth.Config
 }
 
 // ConfigFromPolicy returns an ACP configuration for the given policy.
@@ -43,18 +41,6 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 				Realm:                    basicCfg.Realm,
 				StripAuthorizationHeader: basicCfg.StripAuthorizationHeader,
 				ForwardUsernameHeader:    basicCfg.ForwardUsernameHeader,
-			},
-		}
-
-	case policy.Spec.DigestAuth != nil:
-		digestCfg := policy.Spec.DigestAuth
-
-		return &Config{
-			DigestAuth: &digestauth.Config{
-				Users:                    digestCfg.Users,
-				Realm:                    digestCfg.Realm,
-				StripAuthorizationHeader: digestCfg.StripAuthorizationHeader,
-				ForwardUsernameHeader:    digestCfg.ForwardUsernameHeader,
 			},
 		}
 

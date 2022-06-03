@@ -29,9 +29,8 @@ type AccessControlPolicy struct {
 
 // AccessControlPolicySpec configures an access control policy.
 type AccessControlPolicySpec struct {
-	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
-	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
-	DigestAuth *AccessControlPolicyDigestAuth `json:"digestAuth,omitempty"`
+	JWT       *AccessControlPolicyJWT       `json:"jwt,omitempty"`
+	BasicAuth *AccessControlPolicyBasicAuth `json:"basicAuth,omitempty"`
 }
 
 // Hash return AccessControlPolicySpec hash.
@@ -62,14 +61,6 @@ type AccessControlPolicyJWT struct {
 
 // AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
 type AccessControlPolicyBasicAuth struct {
-	Users                    []string `json:"users,omitempty"`
-	Realm                    string   `json:"realm,omitempty"`
-	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`
-	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
-}
-
-// AccessControlPolicyDigestAuth holds the HTTP digest authentication configuration.
-type AccessControlPolicyDigestAuth struct {
 	Users                    []string `json:"users,omitempty"`
 	Realm                    string   `json:"realm,omitempty"`
 	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`

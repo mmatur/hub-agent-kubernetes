@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/digestauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 )
@@ -169,15 +168,6 @@ func buildRoutes(cfgs map[string]*acp.Config) (http.Handler, error) {
 			}
 			path := "/" + name
 			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering basic auth ACP handler")
-			mux.Handle(path, h)
-
-		case cfg.DigestAuth != nil:
-			h, err := digestauth.NewHandler(cfg.DigestAuth, name)
-			if err != nil {
-				return nil, fmt.Errorf("create %q digest auth ACP handler: %w", name, err)
-			}
-			path := "/" + name
-			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering digest auth ACP handler")
 			mux.Handle(path, h)
 
 		default:
