@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ldez/go-git-cmd-wrapper/v2/clone"
 	"github.com/ldez/go-git-cmd-wrapper/v2/config"
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
