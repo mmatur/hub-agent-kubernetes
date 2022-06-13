@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
@@ -102,24 +103,21 @@ func Test_WatcherRun(t *testing.T) {
 		"toUpdate": "4vJBrpeDJLuGzikpIg0ZJTca9FQ=",
 	}
 
-	var callCount int
-	client := clientMock{
-		getCertificateFunc: func() (Certificate, error) {
-			return Certificate{
-				Certificate: []byte("cert"),
-				PrivateKey:  []byte("private"),
-			}, nil
-		},
-		getEdgeIngressesFunc: func() ([]EdgeIngress, error) {
-			callCount++
+	client := newPlatformClientMock(t)
+	client.OnGetCertificate().TypedReturns(Certificate{
+		Certificate: []byte("cert"),
+		PrivateKey:  []byte("private"),
+	}, nil)
 
+	var callCount int
+	client.OnGetEdgeIngresses().
+		TypedReturns(edgeIngresses, nil).
+		Run(func(_ mock.Arguments) {
+			callCount++
 			if callCount > 1 {
 				cancel()
 			}
-
-			return edgeIngresses, nil
-		},
-	}
+		})
 
 	traefikClientSet := traefikkubemock.NewSimpleClientset()
 
@@ -232,17 +230,4 @@ func Test_WatcherRun(t *testing.T) {
 			},
 		}, ing.Spec)
 	}
-}
-
-type clientMock struct {
-	getEdgeIngressesFunc func() ([]EdgeIngress, error)
-	getCertificateFunc   func() (Certificate, error)
-}
-
-func (c clientMock) GetEdgeIngresses(_ context.Context) ([]EdgeIngress, error) {
-	return c.getEdgeIngressesFunc()
-}
-
-func (c clientMock) GetCertificate(_ context.Context) (Certificate, error) {
-	return c.getCertificateFunc()
 }

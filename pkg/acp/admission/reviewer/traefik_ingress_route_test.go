@@ -104,10 +104,7 @@ func TestTraefikIngressRoute_CanReviewChecksKind(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			policies := func(canonicalName string) *acp.Config {
-				return nil
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", nil, nil)
 			review := NewTraefikIngressRoute(fwdAuthMdlwrs)
 
 			var ing netv1.Ingress
@@ -282,10 +279,11 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 			t.Parallel()
 
 			traefikClientSet := traefikkubemock.NewSimpleClientset()
-			policies := func(canonicalName string) *acp.Config {
-				return test.config
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+
+			policies := newPolicyGetterMock(t)
+			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 			rev := NewTraefikIngressRoute(fwdAuthMdlwrs)
 
 			oldB, err := json.Marshal(test.oldIng)
@@ -378,10 +376,11 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				},
 			}
 			traefikClientSet := traefikkubemock.NewSimpleClientset(&middleware)
-			policies := func(canonicalName string) *acp.Config {
-				return test.config
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
+
+			policies := newPolicyGetterMock(t)
+			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 			rev := NewTraefikIngressRoute(fwdAuthMdlwrs)
 
 			ing := traefikv1alpha1.IngressRoute{

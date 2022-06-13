@@ -36,15 +36,9 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 		},
 	}
 
-	client := &backendMock{
-		createACPFunc: func(policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-			assert.Equal(t, policyCreate, policy)
+	client := newBackendMock(t)
+	client.OnCreateACP(policyCreate).TypedReturns(&acp.ACP{Version: "version-1"}, nil).Once()
 
-			return &acp.ACP{
-				Version: "version-1",
-			}, nil
-		},
-	}
 	h := NewACPHandler(client)
 
 	now := time.Now()
@@ -103,9 +97,7 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 
 	// Conflict version scenario.
-	client.createACPFunc = func(policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-		return nil, platform.ErrVersionConflict
-	}
+	client.OnCreateACP(policyCreate).TypedReturns(nil, platform.ErrVersionConflict).Once()
 
 	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
@@ -144,16 +136,8 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 		},
 	}
 
-	client := &backendMock{
-		updateACPFunc: func(oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-			assert.Equal(t, "oldVersion", oldVersion)
-			assert.Equal(t, policyUpdate, policy)
-
-			return &acp.ACP{
-				Version: "newVersion",
-			}, nil
-		},
-	}
+	client := newBackendMock(t)
+	client.OnUpdateACP("oldVersion", policyUpdate).TypedReturns(&acp.ACP{Version: "newVersion"}, nil).Once()
 
 	h := NewACPHandler(client)
 
@@ -232,9 +216,7 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 
 	// Conflict version scenario.
-	client.updateACPFunc = func(oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-		return nil, platform.ErrVersionConflict
-	}
+	client.OnUpdateACP("oldVersion", policyUpdate).TypedReturns(nil, platform.ErrVersionConflict).Once()
 
 	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
@@ -259,16 +241,19 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 	testCases := []struct {
 		desc          string
+		backendMock   func(t *testing.T) *backendMock
 		deleteACPFunc func(oldVersion, name string) error
 		response      *admv1.AdmissionResponse
 	}{
 		{
 			desc: "authorize ACP deletion",
-			deleteACPFunc: func(oldVersion, name string) error {
-				assert.Equal(t, "oldVersion", oldVersion)
-				assert.Equal(t, "acp", name)
+			backendMock: func(t *testing.T) *backendMock {
+				t.Helper()
 
-				return nil
+				client := newBackendMock(t)
+				client.OnDeleteACP("oldVersion", "acp").TypedReturns(nil).Once()
+
+				return client
 			},
 			response: &admv1.AdmissionResponse{
 				UID:     "id",
@@ -277,8 +262,13 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 		},
 		{
 			desc: "conflict version scenario",
-			deleteACPFunc: func(oldVersion, name string) error {
-				return platform.ErrVersionConflict
+			backendMock: func(t *testing.T) *backendMock {
+				t.Helper()
+
+				client := newBackendMock(t)
+				client.OnDeleteACP("oldVersion", "acp").TypedReturns(platform.ErrVersionConflict).Once()
+
+				return client
 			},
 			response: &admv1.AdmissionResponse{
 				UID:     "id",
@@ -329,15 +319,7 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 				Response: &admv1.AdmissionResponse{},
 			}
 
-			var callCount int
-			client := &backendMock{
-				deleteACPFunc: func(oldVersion, name string) error {
-					callCount++
-					return test.deleteACPFunc(oldVersion, name)
-				},
-			}
-
-			h := NewACPHandler(client)
+			h := NewACPHandler(test.backendMock(t))
 
 			now := time.Now()
 			nowFunc := func() time.Time {
@@ -358,21 +340,12 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.response, gotAr.Response)
-			assert.Equal(t, 1, callCount)
 		})
 	}
 }
 
 func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
-	var callCount int
-	client := &backendMock{
-		createACPFunc: func(policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-			callCount++
-			return nil, nil
-		},
-	}
-
-	h := NewACPHandler(client)
+	h := NewACPHandler(nil)
 
 	spec := hubv1alpha1.AccessControlPolicySpec{
 		JWT: &hubv1alpha1.AccessControlPolicyJWT{
@@ -440,7 +413,6 @@ func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
-	assert.Equal(t, 0, callCount)
 }
 
 func TestHandler_ServeHTTP_notAnAccessControlPolicy(t *testing.T) {
@@ -528,24 +500,6 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-type backendMock struct {
-	createACPFunc func(policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
-	updateACPFunc func(oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error)
-	deleteACPFunc func(oldVersion, name string) error
-}
-
-func (m *backendMock) CreateACP(_ context.Context, createReq *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-	return m.createACPFunc(createReq)
-}
-
-func (m *backendMock) UpdateACP(_ context.Context, oldVersion string, policy *hubv1alpha1.AccessControlPolicy) (*acp.ACP, error) {
-	return m.updateACPFunc(oldVersion, policy)
-}
-
-func (m *backendMock) DeleteACP(_ context.Context, oldVersion, name string) error {
-	return m.deleteACPFunc(oldVersion, name)
 }
 
 func mustMarshal(t *testing.T, obj interface{}) []byte {

@@ -397,7 +397,7 @@ func (c *Client) UpdateEdgeIngress(ctx context.Context, namespace, name, lastKno
 }
 
 // DeleteEdgeIngress deletes an edge ingress.
-func (c *Client) DeleteEdgeIngress(ctx context.Context, lastKnownVersion, namespace, name string) error {
+func (c *Client) DeleteEdgeIngress(ctx context.Context, namespace, name, lastKnownVersion string) error {
 	id := name + "@" + namespace
 
 	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "edge-ingresses", id))

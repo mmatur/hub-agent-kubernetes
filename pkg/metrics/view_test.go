@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -251,15 +252,17 @@ func TestDataPointView_FindByIngressAndService(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			store := &storeMock{forEach: func(table string, fn ForEachFunc) {
-				require.Equal(t, test.input.table, table)
-
-				for _, group := range test.groups {
-					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
-				}
-			}}
+			store := newDataPointGroupIteratorMock(t)
+			store.OnForEachRaw(test.input.table, mock.Anything).
+				TypedRun(func(_ string, fn ForEachFunc) {
+					for _, group := range test.groups {
+						fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
+					}
+				}).
+				Maybe()
 
 			view := DataPointView{store: store, nowFunc: func() time.Time { return now }}
+
 			gotPoints, err := view.FindByIngressAndService(test.input.table,
 				test.input.ingress, test.input.service,
 				test.input.from, test.input.to)
@@ -608,13 +611,14 @@ func TestDataPointView_FindByService(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			store := &storeMock{forEach: func(table string, fn ForEachFunc) {
-				require.Equal(t, test.input.table, table)
-
-				for _, group := range test.groups {
-					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
-				}
-			}}
+			store := newDataPointGroupIteratorMock(t)
+			store.OnForEachRaw(test.input.table, mock.Anything).
+				TypedRun(func(s string, fn ForEachFunc) {
+					for _, group := range test.groups {
+						fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
+					}
+				}).
+				Maybe()
 
 			view := DataPointView{store: store, nowFunc: func() time.Time { return now }}
 			gotPoints := view.FindByService(test.input.table, test.input.service, test.input.from, test.input.to)
@@ -957,13 +961,14 @@ func TestDataPointView_FindByIngress(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			store := &storeMock{forEach: func(table string, fn ForEachFunc) {
-				require.Equal(t, test.input.table, table)
-
-				for _, group := range test.groups {
-					fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
-				}
-			}}
+			store := newDataPointGroupIteratorMock(t)
+			store.OnForEachRaw(test.input.table, mock.Anything).
+				TypedRun(func(_ string, fn ForEachFunc) {
+					for _, group := range test.groups {
+						fn(group.EdgeIngress, group.Ingress, group.Service, group.DataPoints)
+					}
+				}).
+				Maybe()
 
 			view := DataPointView{store: store, nowFunc: func() time.Time { return now }}
 			gotPoints := view.FindByIngress(test.input.table, test.input.ingress, test.input.from, test.input.to)
@@ -991,12 +996,4 @@ func genPoint(ts time.Time, secs, reqs, reqErrs, reqClientErrs int64, respTimeSu
 		RequestClientErrPercent: float64(reqClientErrs) / float64(reqs),
 		AvgResponseTime:         respTimeSum / float64(respTimeCount),
 	}
-}
-
-type storeMock struct {
-	forEach func(table string, fn ForEachFunc)
-}
-
-func (s storeMock) ForEach(tbl string, fn ForEachFunc) {
-	s.forEach(tbl, fn)
 }

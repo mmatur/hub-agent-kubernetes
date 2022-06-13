@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
@@ -85,15 +84,9 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 
-	client := &backendMock{
-		createEdgeIngress: func(createReq *platform.CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-			if !reflect.DeepEqual(wantCreateReq, createReq) {
-				return nil, errors.New("invalid create request")
-			}
+	client := newBackendMock(t)
+	client.OnCreateEdgeIngress(wantCreateReq).TypedReturns(createdEdgeIngress, nil).Once()
 
-			return createdEdgeIngress, nil
-		},
-	}
 	h := NewHandler(client)
 	h.now = func() time.Time { return now.Time }
 
@@ -167,11 +160,9 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := &backendMock{
-		createEdgeIngress: func(createReq *platform.CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-			return nil, platform.ErrVersionConflict
-		},
-	}
+	client := newBackendMock(t)
+	client.OnCreateEdgeIngressRaw(mock.Anything).TypedReturns(nil, platform.ErrVersionConflict).Once()
+
 	h := NewHandler(client)
 
 	b := mustMarshal(t, admissionRev)
@@ -288,21 +279,10 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 
-	client := &backendMock{
-		updateEdgeIngress: func(namespace, name, lastKnownVersion string, updateReq *platform.UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-			if namespace != edgeIngNamespace || name != edgeIngName {
-				return nil, errors.New("updating wrong EdgeIngress")
-			}
-			if version != lastKnownVersion {
-				return nil, errors.New("expected to be called with the old edge ingress version")
-			}
-			if !reflect.DeepEqual(wantUpdateReq, updateReq) {
-				return nil, errors.New("expected the new version of the edge ingress")
-			}
+	client := newBackendMock(t)
+	client.OnUpdateEdgeIngress(edgeIngNamespace, edgeIngName, version, wantUpdateReq).
+		TypedReturns(updatedEdgeIngress, nil).Once()
 
-			return updatedEdgeIngress, nil
-		},
-	}
 	h := NewHandler(client)
 	h.now = func() time.Time { return now.Time }
 
@@ -409,11 +389,10 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := &backendMock{
-		updateEdgeIngress: func(namespace, name, lastKnownVersion string, updateReq *platform.UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-			return nil, platform.ErrVersionConflict
-		},
-	}
+	client := newBackendMock(t)
+	client.OnUpdateEdgeIngressRaw(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		TypedReturns(nil, platform.ErrVersionConflict).Once()
+
 	h := NewHandler(client)
 
 	b := mustMarshal(t, admissionRev)
@@ -488,18 +467,10 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := &backendMock{
-		deleteEdgeIngress: func(lastKnownVersion, namespace, name string) error {
-			if namespace != edgeIngNamespace || name != edgeIngName {
-				return errors.New("updating wrong EdgeIngress")
-			}
-			if version != lastKnownVersion {
-				return errors.New("expected to be called with the old edge ingress version")
-			}
+	client := newBackendMock(t)
+	client.OnDeleteEdgeIngress(edgeIngNamespace, edgeIngName, version).
+		TypedReturns(nil).Once()
 
-			return nil
-		},
-	}
 	h := NewHandler(client)
 
 	b := mustMarshal(t, admissionRev)
@@ -570,11 +541,10 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := &backendMock{
-		deleteEdgeIngress: func(oldVersion, namespace, name string) error {
-			return platform.ErrVersionConflict
-		},
-	}
+	client := newBackendMock(t)
+	client.OnDeleteEdgeIngressRaw(mock.Anything, mock.Anything, mock.Anything).
+		TypedReturns(platform.ErrVersionConflict).Once()
+
 	h := NewHandler(client)
 
 	b := mustMarshal(t, admissionRev)
@@ -684,24 +654,6 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-type backendMock struct {
-	createEdgeIngress func(ing *platform.CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error)
-	updateEdgeIngress func(namespace, name, lastKnownVersion string, updateReq *platform.UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error)
-	deleteEdgeIngress func(oldVersion, namespace, name string) error
-}
-
-func (m *backendMock) CreateEdgeIngress(_ context.Context, createReq *platform.CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-	return m.createEdgeIngress(createReq)
-}
-
-func (m *backendMock) UpdateEdgeIngress(_ context.Context, namespace, name, lastKnownVersion string, updateReq *platform.UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error) {
-	return m.updateEdgeIngress(namespace, name, lastKnownVersion, updateReq)
-}
-
-func (m *backendMock) DeleteEdgeIngress(_ context.Context, oldVersion, namespace, name string) error {
-	return m.deleteEdgeIngress(oldVersion, namespace, name)
 }
 
 func mustMarshal(t *testing.T, obj interface{}) []byte {

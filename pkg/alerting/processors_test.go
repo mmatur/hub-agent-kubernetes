@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/metrics"
 )
@@ -27,10 +26,11 @@ func TestThresholdProcessor_Process(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc     string
-		rule     *Rule
-		on       func(view *mockDataPointsFinder, logs *mockLogProvider)
-		expected expected
+		desc           string
+		rule           *Rule
+		dataPointsMock func(testing.TB) *dataPointsFinderMock
+		logsMock       func(testing.TB) *logProviderMock
+		expected       expected
 	}{
 		{
 			desc: "No alert: Rule with no service and ingress",
@@ -43,7 +43,9 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			expected: expected{requireErr: require.Error},
+			dataPointsMock: newDataPointsFinderMock,
+			logsMock:       newLogProviderMock,
+			expected:       expected{requireErr: require.Error},
 		},
 		{
 			desc: "Alert: Rule with service needs 1 occurrence: rule matches 1 data point",
@@ -57,23 +59,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return(serviceLogs, nil).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns(serviceLogs, nil).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -108,23 +121,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 101},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return(serviceLogs, nil).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns(serviceLogs, nil).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -159,19 +183,25 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 			},
@@ -188,23 +218,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 101},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return(serviceLogs, nil).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns(serviceLogs, nil).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -239,19 +280,25 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 110},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 			},
@@ -268,23 +315,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 110},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return(serviceLogs, nil).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns(serviceLogs, nil).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -319,19 +377,25 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 110},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 			},
@@ -348,23 +412,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 0},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 80},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 110},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return(serviceLogs, nil).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns(serviceLogs, nil).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -399,23 +474,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByService", "1m", "service-1@myns",
+					OnFindByService("1m", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 110},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return([]byte{}, errors.New("boom")).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns([]byte{}, errors.New("boom")).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -449,19 +535,25 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByIngress", "1m", "ingress-1@myns",
+					OnFindByIngress("1m", "ingress-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 				alert: &Alert{
@@ -495,23 +587,34 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  5 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByIngressAndService", "1m", "ingress-1@myns", "service-1@myns",
+					OnFindByIngressAndService("1m", "ingress-1@myns", "service-1@myns",
 						time.Date(2021, 1, 1, 8, 15, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 20, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: now.Add(-4 * time.Minute).Unix(), ReqPerS: 90},
 						{Timestamp: now.Add(-3 * time.Minute).Unix(), ReqPerS: 120},
 						{Timestamp: now.Add(-2 * time.Minute).Unix(), ReqPerS: 80},
 					}, nil).
 					Once()
 
+				return view
+			},
+			logsMock: func(tb testing.TB) *logProviderMock {
+				tb.Helper()
+
+				logs := newLogProviderMock(tb)
 				logs.
-					On("GetServiceLogs", "myns", "service-1", logLines, logMaxLineLength).
-					Return([]byte{}, errors.New("boom")).
+					OnGetServiceLogs("myns", "service-1", logLines, logMaxLineLength).
+					TypedReturns([]byte{}, errors.New("boom")).
 					Once()
+
+				return logs
 			},
 			expected: expected{
 				requireErr: require.NoError,
@@ -545,19 +648,25 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  48 * time.Hour,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByIngress", "1d", "ingress-1@myns",
+					OnFindByIngress("1d", "ingress-1@myns",
 						time.Date(2020, 12, 29, 0, 0, 0, 0, time.UTC),
 						time.Date(2020, 12, 31, 0, 0, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: time.Date(2020, 12, 30, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 90},
 						{Timestamp: time.Date(2020, 12, 31, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 120},
 						{Timestamp: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Unix(), ReqPerS: 80},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 				alert: &Alert{
@@ -590,17 +699,23 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  10 * time.Hour,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByIngress", "1h", "ingress-1@myns",
+					OnFindByIngress("1h", "ingress-1@myns",
 						time.Date(2020, 12, 31, 21, 0, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 7, 0, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: time.Date(2021, 1, 1, 2, 0, 0, 0, time.UTC).Unix(), ReqPerS: 120},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 				alert: &Alert{
@@ -631,17 +746,23 @@ func TestThresholdProcessor_Process(t *testing.T) {
 					TimeRange:  30 * time.Minute,
 				},
 			},
-			on: func(view *mockDataPointsFinder, logs *mockLogProvider) {
+			dataPointsMock: func(tb testing.TB) *dataPointsFinderMock {
+				tb.Helper()
+
+				view := newDataPointsFinderMock(tb)
 				view.
-					On("FindByIngress", "10m", "ingress-1@myns",
+					OnFindByIngress("10m", "ingress-1@myns",
 						time.Date(2021, 1, 1, 7, 40, 0, 0, time.UTC),
 						time.Date(2021, 1, 1, 8, 10, 0, 0, time.UTC),
 					).
-					Return(metrics.DataPoints{
+					TypedReturns(metrics.DataPoints{
 						{Timestamp: time.Date(2021, 1, 1, 7, 50, 0, 0, time.UTC).Unix(), ReqPerS: 120},
-					}, nil).
+					}).
 					Once()
+
+				return view
 			},
+			logsMock: newLogProviderMock,
 			expected: expected{
 				requireErr: require.NoError,
 				alert: &Alert{
@@ -668,26 +789,16 @@ func TestThresholdProcessor_Process(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			logs := &mockLogProvider{}
-			logs.Test(t)
-
-			view := &mockDataPointsFinder{}
-			view.Test(t)
-
-			if test.on != nil {
-				test.on(view, logs)
-			}
+			logs := test.logsMock(t)
+			view := test.dataPointsMock(t)
 
 			threshProc := NewThresholdProcessor(view, logs)
 			threshProc.nowFunc = func() time.Time { return now }
 
 			alert, err := threshProc.Process(context.Background(), test.rule)
-
-			logs.AssertExpectations(t)
-			view.AssertExpectations(t)
+			test.expected.requireErr(t, err)
 
 			assert.Equal(t, test.expected.alert, alert)
-			test.expected.requireErr(t, err)
 		})
 	}
 }
@@ -766,37 +877,4 @@ func TestGetValue(t *testing.T) {
 			assert.Equal(t, test.expected.value, value)
 		})
 	}
-}
-
-type mockDataPointsFinder struct {
-	mock.Mock
-}
-
-func (m *mockDataPointsFinder) FindByIngressAndService(table, ingress, service string, from, to time.Time) (metrics.DataPoints, error) {
-	call := m.Called(table, ingress, service, from, to)
-
-	return call.Get(0).(metrics.DataPoints), call.Error(1)
-}
-
-func (m *mockDataPointsFinder) FindByService(table, service string, from, to time.Time) metrics.DataPoints {
-	call := m.Called(table, service, from, to)
-
-	if dataPoints := call.Get(0); dataPoints != nil {
-		return dataPoints.(metrics.DataPoints)
-	}
-	return nil
-}
-
-func (m *mockDataPointsFinder) FindByIngress(table, ingress string, from, to time.Time) metrics.DataPoints {
-	return m.Called(table, ingress, from, to).Get(0).(metrics.DataPoints)
-}
-
-type mockLogProvider struct {
-	mock.Mock
-}
-
-func (m *mockLogProvider) GetServiceLogs(_ context.Context, namespace, name string, lines, maxLen int) ([]byte, error) {
-	call := m.Called(namespace, name, lines, maxLen)
-
-	return call.Get(0).([]byte), call.Error(1)
 }

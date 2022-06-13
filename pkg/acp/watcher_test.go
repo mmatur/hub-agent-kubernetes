@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
@@ -49,34 +50,34 @@ func Test_WatcherRun(t *testing.T) {
 	cache.WaitForCacheSync(ctx.Done(), acpInformer.HasSynced)
 
 	var callCount int
-	client := clientMock{
-		getACPsFunc: func() ([]ACP, error) {
-			callCount++
 
+	client := newClientMock(t)
+	client.OnGetACPs().
+		TypedReturns([]ACP{
+			{
+				Name: "toCreate",
+				Config: Config{
+					JWT: &jwt.Config{
+						PublicKey: "secret",
+					},
+				},
+			},
+			{
+				Name: "toUpdate",
+				Config: Config{
+					JWT: &jwt.Config{
+						PublicKey: "secretUpdated",
+					},
+				},
+			},
+		}, nil).
+		Run(func(_ mock.Arguments) {
+			callCount++
 			if callCount > 1 {
 				cancel()
 			}
+		})
 
-			return []ACP{
-				{
-					Name: "toCreate",
-					Config: Config{
-						JWT: &jwt.Config{
-							PublicKey: "secret",
-						},
-					},
-				},
-				{
-					Name: "toUpdate",
-					Config: Config{
-						JWT: &jwt.Config{
-							PublicKey: "secretUpdated",
-						},
-					},
-				},
-			}, nil
-		},
-	}
 	w := NewWatcher(time.Millisecond, client, clientSetHub, hubInformer)
 	go w.Run(ctx)
 
@@ -92,12 +93,4 @@ func Test_WatcherRun(t *testing.T) {
 
 	_, err = clientSetHub.HubV1alpha1().AccessControlPolicies().Get(ctx, "toDelete", metav1.GetOptions{})
 	require.Error(t, err)
-}
-
-type clientMock struct {
-	getACPsFunc func() ([]ACP, error)
-}
-
-func (c clientMock) GetACPs(_ context.Context) ([]ACP, error) {
-	return c.getACPsFunc()
 }

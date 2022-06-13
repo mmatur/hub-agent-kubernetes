@@ -1,0 +1,3 @@
+package edgeingress
+
+// mocktail:PlatformClient

@@ -588,7 +588,7 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			err = c.DeleteEdgeIngress(context.Background(), test.version, test.namespace, test.name)
+			err = c.DeleteEdgeIngress(context.Background(), test.namespace, test.name, test.version)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)

@@ -21,11 +21,8 @@ import (
 )
 
 func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
-	i := ingressClassesMock{
-		getDefaultControllerFunc: func() (string, error) {
-			return ingclass.ControllerTypeTraefik, nil
-		},
-	}
+	ingClasses := newIngressClassesMock(t)
+	ingClasses.OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil)
 
 	tests := []struct {
 		desc      string
@@ -111,11 +108,8 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			policies := func(canonicalName string) *acp.Config {
-				return nil
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := NewTraefikIngress(i, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", nil, nil)
+			review := NewTraefikIngress(ingClasses, fwdAuthMdlwrs)
 
 			var ing netv1.Ingress
 			b, err := json.Marshal(ing)
@@ -123,10 +117,8 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 
 			ar := admv1.AdmissionReview{
 				Request: &admv1.AdmissionRequest{
-					Kind: test.kind,
-					Object: runtime.RawExtension{
-						Raw: b,
-					},
+					Kind:   test.kind,
+					Object: runtime.RawExtension{Raw: b},
 				},
 			}
 
@@ -139,60 +131,120 @@ func TestTraefikIngress_CanReviewChecksKind(t *testing.T) {
 
 func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 	tests := []struct {
-		desc                   string
-		annotation             string
-		spec                   string
-		wrongDefaultController bool
-		canReview              bool
-		canReviewErr           assert.ErrorAssertionFunc
+		desc               string
+		annotation         string
+		spec               string
+		ingressClassesMock func(t *testing.T) IngressClasses
+		canReview          assert.BoolAssertionFunc
+		canReviewErr       assert.ErrorAssertionFunc
 	}{
 		{
-			desc:         "can review a valid resource",
-			canReview:    true,
+			desc: "can review a valid resource",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					Parent
+			},
+			canReview:    assert.True,
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:                   "can't review if the default controller is not of the correct type",
-			wrongDefaultController: true,
-			canReview:              false,
-			canReviewErr:           assert.NoError,
-		},
-		{
-			desc:         "can review if annotation is correct",
-			annotation:   "traefik",
-			canReview:    true,
+			desc: "can't review if the default controller is not of the correct type",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns("nope", nil).Once().
+					Parent
+			},
+			canReview:    assert.False,
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:         "can review if using a custom ingress class (annotation)",
-			annotation:   "custom-traefik-ingress-class",
-			canReview:    true,
+			desc:       "can review if annotation is correct",
+			annotation: "traefik",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					Parent
+			},
+			canReview:    assert.True,
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:         "can review if using a custom ingress class (spec)",
-			spec:         "custom-traefik-ingress-class",
-			canReview:    true,
+			desc:       "can review if using a custom ingress class (annotation)",
+			annotation: "custom-traefik-ingress-class",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					OnGetController("custom-traefik-ingress-class").TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					Parent
+			},
+			canReview:    assert.True,
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:         "can't review if using another controller",
-			spec:         "powpow",
-			canReview:    false,
+			desc: "can review if using a custom ingress class (spec)",
+			spec: "custom-traefik-ingress-class",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					OnGetController("custom-traefik-ingress-class").TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					Parent
+			},
+			canReview:    assert.True,
+			canReviewErr: assert.NoError,
+		},
+		{
+			desc: "can't review if using another controller",
+			spec: "powpow",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					OnGetController("powpow").TypedReturns("", errors.New("nope")).Once().
+					Parent
+			},
+			canReview:    assert.False,
 			canReviewErr: assert.Error,
 		},
 		{
-			desc:         "spec takes priority over annotation#1",
-			annotation:   "powpow",
-			spec:         "custom-traefik-ingress-class",
-			canReview:    true,
+			desc:       "spec takes priority over annotation#1",
+			annotation: "powpow",
+			spec:       "custom-traefik-ingress-class",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					OnGetController("custom-traefik-ingress-class").TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					Parent
+			},
+			canReview:    assert.True,
 			canReviewErr: assert.NoError,
 		},
 		{
-			desc:         "spec takes priority over annotation#2",
-			annotation:   "traefik",
-			spec:         "powpow",
-			canReview:    false,
+			desc:       "spec takes priority over annotation#2",
+			annotation: "traefik",
+			spec:       "powpow",
+			ingressClassesMock: func(t *testing.T) IngressClasses {
+				t.Helper()
+
+				return newIngressClassesMock(t).
+					OnGetDefaultController().TypedReturns(ingclass.ControllerTypeTraefik, nil).Once().
+					OnGetController("powpow").TypedReturns("", errors.New("nope")).Once().
+					Parent
+			},
+			canReview:    assert.False,
 			canReviewErr: assert.Error,
 		},
 	}
@@ -202,26 +254,8 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			i := ingressClassesMock{
-				getControllerFunc: func(name string) (string, error) {
-					if name == "custom-traefik-ingress-class" {
-						return ingclass.ControllerTypeTraefik, nil
-					}
-					return "", errors.New("nope")
-				},
-				getDefaultControllerFunc: func() (string, error) {
-					if test.wrongDefaultController {
-						return "nope", nil
-					}
-					return ingclass.ControllerTypeTraefik, nil
-				},
-			}
-
-			policies := func(canonicalName string) *acp.Config {
-				return nil
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), nil)
-			review := NewTraefikIngress(i, fwdAuthMdlwrs)
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", nil, nil)
+			review := NewTraefikIngress(test.ingressClassesMock(t), fwdAuthMdlwrs)
 
 			ing := netv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -252,7 +286,7 @@ func TestTraefikIngress_CanReviewChecksIngressClass(t *testing.T) {
 
 			ok, err := review.CanReview(ar)
 			test.canReviewErr(t, err)
-			assert.Equal(t, test.canReview, ok)
+			test.canReview(t, ok)
 		})
 	}
 }
@@ -317,11 +351,13 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			t.Parallel()
 
 			traefikClientSet := traefikkubemock.NewSimpleClientset()
-			policies := func(canonicalName string) *acp.Config {
-				return test.config
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
+
+			policies := newPolicyGetterMock(t)
+			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
+
+			rev := NewTraefikIngress(newIngressClassesMock(t), fwdAuthMdlwrs)
 
 			oldIng := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -370,7 +406,8 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				assert.Equal(t, test.wantPatch[k], patch["value"].(map[string]string)[k])
 			}
 
-			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").
+				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 
@@ -421,12 +458,14 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 					},
 				},
 			}
+
 			traefikClientSet := traefikkubemock.NewSimpleClientset(&middleware)
-			policies := func(canonicalName string) *acp.Config {
-				return test.config
-			}
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policyGetterMock(policies), traefikClientSet.TraefikV1alpha1())
-			rev := NewTraefikIngress(ingressClassesMock{}, fwdAuthMdlwrs)
+
+			policies := newPolicyGetterMock(t)
+			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
+			rev := NewTraefikIngress(newIngressClassesMock(t), fwdAuthMdlwrs)
 
 			ing := struct {
 				Metadata metav1.ObjectMeta `json:"metadata"`
@@ -442,13 +481,12 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 
 			ar := admv1.AdmissionReview{
 				Request: &admv1.AdmissionRequest{
-					Object: runtime.RawExtension{
-						Raw: b,
-					},
+					Object: runtime.RawExtension{Raw: b},
 				},
 			}
 
-			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").
+				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 			assert.Equal(t, []string{"fwdHeader"}, m.Spec.ForwardAuth.AuthResponseHeaders)
@@ -457,30 +495,12 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, p)
 
-			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").
+				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 
 			assert.Equal(t, test.wantAuthResponseHeaders, m.Spec.ForwardAuth.AuthResponseHeaders)
 		})
 	}
-}
-
-type policyGetterMock func(canonicalName string) *acp.Config
-
-func (m policyGetterMock) GetConfig(canonicalName string) (*acp.Config, error) {
-	return m(canonicalName), nil
-}
-
-type ingressClassesMock struct {
-	getControllerFunc        func(name string) (string, error)
-	getDefaultControllerFunc func() (string, error)
-}
-
-func (m ingressClassesMock) GetController(name string) (string, error) {
-	return m.getControllerFunc(name)
-}
-
-func (m ingressClassesMock) GetDefaultController() (string, error) {
-	return m.getDefaultControllerFunc()
 }

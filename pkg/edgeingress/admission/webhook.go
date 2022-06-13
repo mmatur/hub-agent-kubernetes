@@ -20,7 +20,7 @@ import (
 type Backend interface {
 	CreateEdgeIngress(ctx context.Context, ing *platform.CreateEdgeIngressReq) (*edgeingress.EdgeIngress, error)
 	UpdateEdgeIngress(ctx context.Context, namespace, name, lastKnownVersion string, updateReq *platform.UpdateEdgeIngressReq) (*edgeingress.EdgeIngress, error)
-	DeleteEdgeIngress(ctx context.Context, lastKnownVersion, namespace, name string) error
+	DeleteEdgeIngress(ctx context.Context, namespace, name, lastKnownVersion string) error
 }
 
 // Handler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
@@ -174,7 +174,7 @@ func (h Handler) reviewUpdateOperation(ctx context.Context, oldEdgeIng, newEdgeI
 func (h Handler) reviewDeleteOperation(ctx context.Context, oldEdgeIng *hubv1alpha1.EdgeIngress) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Deleting EdgeIngress resource")
 
-	if err := h.backend.DeleteEdgeIngress(ctx, oldEdgeIng.Status.Version, oldEdgeIng.Namespace, oldEdgeIng.Name); err != nil {
+	if err := h.backend.DeleteEdgeIngress(ctx, oldEdgeIng.Namespace, oldEdgeIng.Name, oldEdgeIng.Status.Version); err != nil {
 		return nil, fmt.Errorf("delete edge ingress: %w", err)
 	}
 	return nil, nil
