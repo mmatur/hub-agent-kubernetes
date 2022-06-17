@@ -1,5 +1,13 @@
 # Traefik Hub Agent for Kubernetes
 
+<p align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./traefik-hub-horizontal-dark-mode@3x.png">
+      <source media="(prefers-color-scheme: light)" srcset="./traefik-hub-horizontal-light-mode@3x.png">
+      <img alt="Traefik Hub Logo" src="./traefik-hub-horizontal-light-mode@3x.png">
+    </picture>
+</p>
+
 ## Usage
 
 ### Commands
