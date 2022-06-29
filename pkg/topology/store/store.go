@@ -77,7 +77,7 @@ func New(ctx context.Context, cfg Config) (*Store, error) {
 
 func (s *Store) cloneRepository(ctx context.Context) error {
 	if disableGitSSLVerify() {
-		output, err := git.Config(config.Global, config.Add("http.sslVerify", "false"))
+		output, err := git.Config(config.Global, config.Add("http.sslVerify", "false"), clone.Depth("1"), clone.NoSingleBranch)
 		if err != nil {
 			return fmt.Errorf("%w: %s", err, output)
 		}
@@ -92,7 +92,7 @@ func (s *Store) cloneRepository(ctx context.Context) error {
 
 	if err := backoff.RetryNotify(func() error {
 		// Setup local repo for topology files, by cloning hub distant repository.
-		output, err := git.CloneWithContext(ctx, clone.Repository(s.gitRepo))
+		output, err := git.CloneWithContext(ctx, clone.Repository(s.gitRepo), clone.Depth("1"), clone.NoSingleBranch)
 		if err != nil {
 			switch {
 			case strings.Contains(output, "already exists and is not an empty directory"):
