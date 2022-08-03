@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 )
 
 // Client allows interacting with the tunnel service.
@@ -87,6 +88,7 @@ func (c *Client) ListClusterTunnelEndpoints(ctx context.Context) ([]Endpoint, er
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

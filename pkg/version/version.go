@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net/http"
 	"runtime"
 	"runtime/debug"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 )
@@ -95,4 +97,10 @@ func moduleName() string {
 		return buildInfo.Main.Path
 	}
 	return ""
+}
+
+// SetUserAgent sets the user-agent on an HTTP request.
+func SetUserAgent(req *http.Request) {
+	ua := fmt.Sprintf("hub-agent-kubernetes/%s (%s; %s; %s)", Version(), commit, runtime.GOOS, runtime.GOARCH)
+	req.Header.Set("User-Agent", strings.TrimSpace(ua))
 }

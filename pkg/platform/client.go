@@ -152,6 +152,7 @@ func (c *Client) Link(ctx context.Context, kubeID string) (string, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -193,6 +194,7 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -232,6 +234,7 @@ func (c *Client) GetACPs(ctx context.Context) ([]acp.ACP, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -271,6 +274,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -297,6 +301,7 @@ func (c *Client) ListVerifiedDomains(ctx context.Context) ([]string, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -341,6 +346,7 @@ func (c *Client) CreateEdgeIngress(ctx context.Context, createReq *CreateEdgeIng
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -390,6 +396,7 @@ func (c *Client) UpdateEdgeIngress(ctx context.Context, namespace, name, lastKno
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", lastKnownVersion)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -435,6 +442,7 @@ func (c *Client) DeleteEdgeIngress(ctx context.Context, namespace, name, lastKno
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", lastKnownVersion)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -481,6 +489,7 @@ func (c *Client) CreateACP(ctx context.Context, policy *hubv1alpha1.AccessContro
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -533,6 +542,7 @@ func (c *Client) UpdateACP(ctx context.Context, oldVersion string, policy *hubv1
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", oldVersion)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -576,6 +586,7 @@ func (c *Client) DeleteACP(ctx context.Context, oldVersion, name string) error {
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", oldVersion)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -613,6 +624,7 @@ func (c *Client) GetEdgeIngresses(ctx context.Context) ([]edgeingress.EdgeIngres
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -652,6 +664,7 @@ func (c *Client) GetWildcardCertificate(ctx context.Context) (edgeingress.Certif
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -737,6 +750,7 @@ func (c *Client) FetchTopology(ctx context.Context) (topology state.Cluster, top
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept-Encoding", "gzip")
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -783,6 +797,7 @@ func (c *Client) PatchTopology(ctx context.Context, patch []byte, lastKnownVersi
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/merge-patch+json")
 	req.Header.Set("Last-Known-Version", strconv.FormatInt(lastKnownVersion, 10))
+	version.SetUserAgent(req)
 
 	// This operation cannot be retried without calling FetchTopology in between.
 	resp, err := c.httpClient.Do(req)

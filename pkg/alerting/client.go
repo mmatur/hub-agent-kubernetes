@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 )
 
 // Client for the alerting service.
@@ -61,6 +63,8 @@ func (c *Client) GetRules(ctx context.Context) ([]Rule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+
+	version.SetUserAgent(req)
 
 	c.setAuthHeader(req)
 
@@ -120,6 +124,8 @@ func (c *Client) PreflightAlerts(ctx context.Context, data []Alert) ([]Alert, er
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
+	version.SetUserAgent(req)
+
 	c.setAuthHeader(req)
 
 	resp, err := c.httpClient.Do(req)
@@ -170,6 +176,8 @@ func (c *Client) SendAlerts(ctx context.Context, data []Alert) error {
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
+
+	version.SetUserAgent(req)
 
 	c.setAuthHeader(req)
 

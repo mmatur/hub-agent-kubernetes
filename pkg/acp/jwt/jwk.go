@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/pquerna/cachecontrol"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"gopkg.in/square/go-jose.v2"
 )
 
@@ -243,6 +244,8 @@ func fetchKeys(ctx context.Context, client *http.Client, url string) (*jose.JSON
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to build fetch keys request: %w", err)
 	}
+
+	version.SetUserAgent(req)
 
 	resp, err := client.Do(req)
 	if err != nil {

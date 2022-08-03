@@ -28,6 +28,7 @@ import (
 
 	"github.com/hamba/avro"
 	"github.com/traefik/hub-agent-kubernetes/pkg/metrics/protocol"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 )
 
 // Client for the token service.
@@ -74,6 +75,7 @@ func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string]
 
 	c.setAuthHeader(req)
 	req.Header.Set("Accept", "avro/binary;v2")
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -116,6 +118,7 @@ func (c *Client) Send(ctx context.Context, data map[string][]DataPointGroup) err
 
 	c.setAuthHeader(req)
 	req.Header.Set("Content-Type", "avro/binary;v2")
+	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

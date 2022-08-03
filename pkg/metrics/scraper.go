@@ -26,6 +26,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 )
 
 // Parser names.
@@ -182,6 +183,9 @@ func (s *Scraper) scrapeMetrics(ctx context.Context, target string) ([]*dto.Metr
 	if err != nil {
 		return nil, err
 	}
+
+	version.SetUserAgent(req)
+
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
