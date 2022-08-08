@@ -4,7 +4,7 @@ FROM golang:1-alpine AS delve-builder
 # GCC is needed
 RUN apk --no-cache --no-progress add build-base
 
-RUN go install github.com/go-delve/delve/cmd/dlv@v1.8.3
+RUN go install github.com/go-delve/delve/cmd/dlv@v1.9.0
 
 FROM alpine
 
