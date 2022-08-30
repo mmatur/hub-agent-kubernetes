@@ -20,6 +20,7 @@ package acp
 import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 )
 
@@ -27,6 +28,7 @@ import (
 type Config struct {
 	JWT       *jwt.Config
 	BasicAuth *basicauth.Config
+	OIDC      *oidc.Config
 }
 
 // ConfigFromPolicy returns an ACP configuration for the given policy.
@@ -61,6 +63,49 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 			},
 		}
 
+	case policy.Spec.OIDC != nil:
+		oidcCfg := policy.Spec.OIDC
+
+		conf := &Config{
+			OIDC: &oidc.Config{
+				Issuer:         oidcCfg.Issuer,
+				ClientID:       oidcCfg.ClientID,
+				RedirectURL:    oidcCfg.RedirectURL,
+				LogoutURL:      oidcCfg.LogoutURL,
+				Scopes:         oidcCfg.Scopes,
+				AuthParams:     oidcCfg.AuthParams,
+				ForwardHeaders: oidcCfg.ForwardHeaders,
+				Claims:         oidcCfg.Claims,
+			},
+		}
+
+		if oidcCfg.Secret != nil {
+			conf.OIDC.Secret = &oidc.SecretReference{
+				Name:      oidcCfg.Secret.Name,
+				Namespace: oidcCfg.Secret.Namespace,
+			}
+		}
+
+		if oidcCfg.StateCookie != nil {
+			conf.OIDC.StateCookie = &oidc.AuthStateCookie{
+				Path:     oidcCfg.StateCookie.Path,
+				Domain:   oidcCfg.StateCookie.Domain,
+				SameSite: oidcCfg.StateCookie.SameSite,
+				Secure:   oidcCfg.StateCookie.Secure,
+			}
+		}
+
+		if oidcCfg.StateCookie != nil {
+			conf.OIDC.Session = &oidc.AuthSession{
+				Path:     oidcCfg.Session.Path,
+				Domain:   oidcCfg.Session.Domain,
+				SameSite: oidcCfg.Session.SameSite,
+				Secure:   oidcCfg.Session.Secure,
+				Refresh:  oidcCfg.Session.Refresh,
+			}
+		}
+
+		return conf
 	default:
 		return &Config{}
 	}

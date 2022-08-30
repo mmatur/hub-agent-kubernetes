@@ -22,14 +22,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"reflect"
 	"sync"
 
+	"github.com/mitchellh/hashstructure/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // NOTE: if we use the same watcher for all resources, then we need to restart it when new CRDs are
@@ -38,11 +40,19 @@ import (
 // Also, if multiple clients of this watcher are not interested in the same resources
 // add a parameter to NewWatcher to subscribe only to a subset of events.
 
+type oidcSecret struct {
+	ClientSecret   string
+	SessionKey     string
+	StateCookieKey string
+}
+
 // Watcher watches access control policy resources and builds configurations out of them.
 type Watcher struct {
 	configsMu sync.RWMutex
 	configs   map[string]*acp.Config
-	previous  map[string]*acp.Config
+	previous  uint64
+
+	secrets map[string]oidcSecret
 
 	refresh chan struct{}
 
@@ -54,6 +64,7 @@ type Watcher struct {
 func NewWatcher(switcher *HTTPHandlerSwitcher) *Watcher {
 	return &Watcher{
 		configs:  make(map[string]*acp.Config),
+		secrets:  make(map[string]oidcSecret),
 		refresh:  make(chan struct{}, 1),
 		switcher: switcher,
 	}
@@ -66,29 +77,24 @@ func (w *Watcher) Run(ctx context.Context) {
 		case <-w.refresh:
 			w.configsMu.RLock()
 
-			if reflect.DeepEqual(w.previous, w.configs) {
-				w.configsMu.RUnlock()
-				continue
-			}
+			w.populateSecrets()
 
-			cfgs := make(map[string]*acp.Config, len(w.configs))
-			for k, v := range w.configs {
-				cfgs[k] = v
+			hash, err := hashstructure.Hash(w.configs, hashstructure.FormatV2, nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Unable to hash")
 			}
-
-			w.previous = cfgs
 
 			w.configsMu.RUnlock()
 
-			log.Debug().Msg("Refreshing ACP handlers")
-
-			routes, err := buildRoutes(cfgs)
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to switch ACP handlers")
+			if err == nil && w.previous == hash {
 				continue
 			}
 
-			w.switcher.UpdateHandler(routes)
+			w.previous = hash
+
+			log.Debug().Msg("Refreshing ACP handlers")
+
+			w.switcher.UpdateHandler(w.buildRoutes(ctx))
 
 		case <-ctx.Done():
 			return
@@ -96,20 +102,58 @@ func (w *Watcher) Run(ctx context.Context) {
 	}
 }
 
+func (w *Watcher) populateSecrets() {
+	for name, config := range w.configs {
+		logger := log.With().Str("acp_name", name).Logger()
+
+		if config.OIDC == nil {
+			continue
+		}
+
+		if config.OIDC.Secret == nil {
+			logger.Error().Msg("Secret is missing")
+			continue
+		}
+
+		logger = logger.With().Str("secret_namespace", config.OIDC.Secret.Namespace).
+			Str("secret_name", config.OIDC.Secret.Name).Logger()
+
+		secret, ok := w.secrets[config.OIDC.Secret.Namespace+"@"+config.OIDC.Secret.Name]
+		if !ok {
+			logger.Error().Msg("Secret is missing")
+			continue
+		}
+
+		if err := populateSecrets(config.OIDC, secret); err != nil {
+			logger.Error().Err(err).Msg("error while populating secrets")
+		}
+	}
+}
+
 // OnAdd implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnAdd(obj interface{}) {
-	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
-	if !ok {
+	switch v := obj.(type) {
+	case *hubv1alpha1.AccessControlPolicy:
+		w.configsMu.Lock()
+		w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
+		w.configsMu.Unlock()
+
+	case *corev1.Secret:
+		w.configsMu.Lock()
+		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
+			ClientSecret:   string(v.Data["clientSecret"]),
+			SessionKey:     string(v.Data["sessionKey"]),
+			StateCookieKey: string(v.Data["stateCookieKey"]),
+		}
+		w.configsMu.Unlock()
+
+	default:
 		log.Error().
 			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received add event of unknown type")
 		return
 	}
-
-	w.configsMu.Lock()
-	w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
-	w.configsMu.Unlock()
 
 	select {
 	case w.refresh <- struct{}{}:
@@ -119,20 +163,28 @@ func (w *Watcher) OnAdd(obj interface{}) {
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnUpdate(_, newObj interface{}) {
-	v, ok := newObj.(*hubv1alpha1.AccessControlPolicy)
-	if !ok {
+	switch v := newObj.(type) {
+	case *hubv1alpha1.AccessControlPolicy:
+		w.configsMu.Lock()
+		w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
+		w.configsMu.Unlock()
+
+	case *corev1.Secret:
+		w.configsMu.Lock()
+		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
+			ClientSecret:   string(v.Data["clientSecret"]),
+			SessionKey:     string(v.Data["sessionKey"]),
+			StateCookieKey: string(v.Data["stateCookieKey"]),
+		}
+		w.configsMu.Unlock()
+
+	default:
 		log.Error().
 			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", newObj)).
 			Msg("Received update event of unknown type")
 		return
 	}
-
-	cfg := acp.ConfigFromPolicy(v)
-
-	w.configsMu.Lock()
-	w.configs[v.ObjectMeta.Name] = cfg
-	w.configsMu.Unlock()
 
 	select {
 	case w.refresh <- struct{}{}:
@@ -142,8 +194,18 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnDelete(obj interface{}) {
-	v, ok := obj.(*hubv1alpha1.AccessControlPolicy)
-	if !ok {
+	switch v := obj.(type) {
+	case *hubv1alpha1.AccessControlPolicy:
+		w.configsMu.Lock()
+		delete(w.configs, v.ObjectMeta.Name)
+		w.configsMu.Unlock()
+
+	case *corev1.Secret:
+		w.configsMu.Lock()
+		delete(w.secrets, v.Namespace+"@"+v.Name)
+		w.configsMu.Unlock()
+
+	default:
 		log.Error().
 			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
@@ -151,46 +213,93 @@ func (w *Watcher) OnDelete(obj interface{}) {
 		return
 	}
 
-	w.configsMu.Lock()
-	delete(w.configs, v.ObjectMeta.Name)
-	w.configsMu.Unlock()
-
 	select {
 	case w.refresh <- struct{}{}:
 	default:
 	}
 }
 
-func buildRoutes(cfgs map[string]*acp.Config) (http.Handler, error) {
+func (w *Watcher) buildRoutes(ctx context.Context) http.Handler {
+	w.configsMu.RLock()
+	defer w.configsMu.RUnlock()
+
 	mux := http.NewServeMux()
 
-	for name, cfg := range cfgs {
-		switch {
-		case cfg.JWT != nil:
-			jwtHandler, err := jwt.NewHandler(cfg.JWT, name)
-			if err != nil {
-				return nil, fmt.Errorf("create %q JWT ACP handler: %w", name, err)
-			}
+	for name, cfg := range w.configs {
+		path := "/" + name
 
-			path := "/" + name
+		logger := log.With().Str("acp_name", name).Str("acp_type", getACPType(cfg)).Logger()
 
-			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering JWT ACP handler")
-
-			mux.Handle(path, jwtHandler)
-
-		case cfg.BasicAuth != nil:
-			h, err := basicauth.NewHandler(cfg.BasicAuth, name)
-			if err != nil {
-				return nil, fmt.Errorf("create %q basic auth ACP handler: %w", name, err)
-			}
-			path := "/" + name
-			log.Debug().Str("acp_name", name).Str("path", path).Msg("Registering basic auth ACP handler")
-			mux.Handle(path, h)
-
-		default:
-			return nil, errors.New("unknown ACP handler type")
+		route, err := buildRoute(ctx, name, cfg)
+		if err != nil {
+			logger.Error().Err(err).Msg("create ACP handler")
+			continue
 		}
+
+		logger.Debug().Msg("Registering ACP handler")
+
+		mux.Handle(path, route)
 	}
 
-	return mux, nil
+	return mux
+}
+
+func buildRoute(ctx context.Context, name string, cfg *acp.Config) (http.Handler, error) {
+	switch {
+	case cfg.JWT != nil:
+		return jwt.NewHandler(cfg.JWT, name)
+
+	case cfg.BasicAuth != nil:
+		return basicauth.NewHandler(cfg.BasicAuth, name)
+
+	case cfg.OIDC != nil:
+		return oidc.NewHandler(ctx, cfg.OIDC, name)
+
+	default:
+		return nil, fmt.Errorf("unknown handler type for ACP %s", name)
+	}
+}
+
+func getACPType(cfg *acp.Config) string {
+	switch {
+	case cfg.JWT != nil:
+		return "JWT"
+
+	case cfg.BasicAuth != nil:
+		return "Basic Auth"
+
+	case cfg.OIDC != nil:
+		return "OIDC"
+
+	default:
+		return "unknown"
+	}
+}
+
+func populateSecrets(config *oidc.Config, secret oidcSecret) error {
+	if secret.ClientSecret == "" {
+		return errors.New("clientSecret is missing in secret")
+	}
+
+	if secret.SessionKey == "" {
+		return errors.New("sessionKey is missing in secret")
+	}
+
+	if secret.StateCookieKey == "" {
+		return errors.New("stateCookieKey is missing in secret")
+	}
+
+	config.ClientSecret = secret.ClientSecret
+
+	if config.Session == nil {
+		config.Session = &oidc.AuthSession{}
+	}
+	config.Session.Secret = secret.SessionKey
+
+	if config.StateCookie == nil {
+		config.StateCookie = &oidc.AuthStateCookie{}
+	}
+	config.StateCookie.Secret = secret.StateCookieKey
+
+	return nil
 }

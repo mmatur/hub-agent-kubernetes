@@ -87,6 +87,7 @@ func parseIngressClass(obj []byte) (ingClassName, ingClassAnno string, err error
 
 func headerToForward(cfg *acp.Config) ([]string, error) {
 	var headerToFwd []string
+
 	switch {
 	case cfg.JWT != nil:
 		for headerName := range cfg.JWT.ForwardHeaders {
@@ -95,6 +96,7 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 		if cfg.JWT.StripAuthorizationHeader {
 			headerToFwd = append(headerToFwd, "Authorization")
 		}
+
 	case cfg.BasicAuth != nil:
 		if headerName := cfg.BasicAuth.ForwardUsernameHeader; headerName != "" {
 			headerToFwd = append(headerToFwd, headerName)
@@ -102,9 +104,17 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 		if cfg.BasicAuth.StripAuthorizationHeader {
 			headerToFwd = append(headerToFwd, "Authorization")
 		}
+
+	case cfg.OIDC != nil:
+		for headerName := range cfg.OIDC.ForwardHeaders {
+			headerToFwd = append(headerToFwd, headerName)
+		}
+		headerToFwd = append(headerToFwd, "Authorization", "Cookie")
+
 	default:
 		return nil, errors.New("unsupported ACP type")
 	}
+
 	return headerToFwd, nil
 }
 

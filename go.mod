@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/abbot/go-http-auth v0.4.0
+	github.com/coreos/go-oidc/v3 v3.2.0
 	github.com/ettle/strcase v0.1.1
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/go-chi/chi/v5 v5.0.7
@@ -13,6 +14,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.1
 	github.com/hashicorp/go-version v1.5.0
 	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
+	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/pquerna/cachecontrol v0.1.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.35.0
@@ -20,6 +22,7 @@ require (
 	github.com/stretchr/testify v1.7.5
 	github.com/urfave/cli/v2 v2.10.3
 	github.com/vulcand/predicate v1.2.0
+	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	gopkg.in/square/go-jose.v2 v2.6.0
 	k8s.io/api v0.20.2
@@ -65,7 +68,6 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect

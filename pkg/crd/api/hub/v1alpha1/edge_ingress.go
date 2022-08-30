@@ -18,7 +18,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // TODO need to be replaced by sh256?
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -56,13 +56,13 @@ type EdgeIngressSpec struct {
 }
 
 // Hash generates the hash of the spec.
-func (in EdgeIngressSpec) Hash() (string, error) {
+func (in *EdgeIngressSpec) Hash() (string, error) {
 	b, err := json.Marshal(in)
 	if err != nil {
 		return "", fmt.Errorf("encode ACP: %w", err)
 	}
 
-	hash := sha1.New()
+	hash := sha1.New() //nolint:gosec // TODO need to be replaced by sh256?
 	hash.Write(b)
 
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil

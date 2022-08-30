@@ -27,6 +27,7 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -189,6 +190,44 @@ func needUpdate(a ACP, policy *hubv1alpha1.AccessControlPolicy) bool {
 func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 	spec := hubv1alpha1.AccessControlPolicySpec{}
 	switch {
+	case a.OIDC != nil:
+		spec.OIDC = &hubv1alpha1.AccessControlOIDC{
+			Issuer:         a.OIDC.Issuer,
+			ClientID:       a.OIDC.ClientID,
+			RedirectURL:    a.OIDC.RedirectURL,
+			LogoutURL:      a.OIDC.LogoutURL,
+			AuthParams:     a.OIDC.AuthParams,
+			Scopes:         a.OIDC.Scopes,
+			ForwardHeaders: a.OIDC.ForwardHeaders,
+			Claims:         a.OIDC.Claims,
+		}
+
+		if a.OIDC.Secret != nil {
+			spec.OIDC.Secret = &corev1.SecretReference{
+				Name:      a.OIDC.Secret.Name,
+				Namespace: a.OIDC.Secret.Namespace,
+			}
+		}
+
+		if a.OIDC.StateCookie != nil {
+			spec.OIDC.StateCookie = &hubv1alpha1.StateCookie{
+				SameSite: a.OIDC.StateCookie.SameSite,
+				Secure:   a.OIDC.StateCookie.Secure,
+				Domain:   a.OIDC.StateCookie.Domain,
+				Path:     a.OIDC.StateCookie.Path,
+			}
+		}
+
+		if a.OIDC.Session != nil {
+			spec.OIDC.Session = &hubv1alpha1.Session{
+				SameSite: a.OIDC.Session.SameSite,
+				Secure:   a.OIDC.Session.Secure,
+				Domain:   a.OIDC.Session.Domain,
+				Path:     a.OIDC.Session.Path,
+				Refresh:  a.OIDC.Session.Refresh,
+			}
+		}
+
 	case a.JWT != nil:
 		spec.JWT = &hubv1alpha1.AccessControlPolicyJWT{
 			SigningSecret:              a.JWT.SigningSecret,

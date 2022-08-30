@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,6 +49,7 @@ type AccessControlPolicy struct {
 type AccessControlPolicySpec struct {
 	JWT       *AccessControlPolicyJWT       `json:"jwt,omitempty"`
 	BasicAuth *AccessControlPolicyBasicAuth `json:"basicAuth,omitempty"`
+	OIDC      *AccessControlOIDC            `json:"oidc,omitempty"`
 }
 
 // Hash return AccessControlPolicySpec hash.
@@ -82,6 +84,49 @@ type AccessControlPolicyBasicAuth struct {
 	Realm                    string   `json:"realm,omitempty"`
 	StripAuthorizationHeader bool     `json:"stripAuthorizationHeader,omitempty"`
 	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
+}
+
+// AccessControlOIDC holds the OIDC authentication configuration.
+type AccessControlOIDC struct {
+	Issuer   string `json:"issuer,omitempty"`
+	ClientID string `json:"clientId,omitempty"`
+	TLS      *TLS   `json:"tls,omitempty"`
+
+	Secret *corev1.SecretReference `json:"secret,omitempty"`
+
+	RedirectURL string            `json:"redirectUrl,omitempty"`
+	LogoutURL   string            `json:"logoutUrl,omitempty"`
+	AuthParams  map[string]string `json:"authParams,omitempty"`
+
+	StateCookie *StateCookie `json:"stateCookie,omitempty"`
+	Session     *Session     `json:"session,omitempty"`
+
+	Scopes         []string          `json:"scopes,omitempty"`
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+	Claims         string            `json:"claims,omitempty"`
+}
+
+// TLS holds the TLS configuration.
+type TLS struct {
+	CABundle           []byte `json:"caBundle"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+}
+
+// StateCookie holds state cookie configuration.
+type StateCookie struct {
+	SameSite string `json:"sameSite,omitempty"`
+	Secure   bool   `json:"secure,omitempty"`
+	Domain   string `json:"domain,omitempty"`
+	Path     string `json:"path,omitempty"`
+}
+
+// Session holds session configuration.
+type Session struct {
+	SameSite string `json:"sameSite,omitempty"`
+	Secure   bool   `json:"secure,omitempty"`
+	Domain   string `json:"domain,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Refresh  *bool  `json:"refresh,omitempty"`
 }
 
 // AccessControlPolicyStatus is the status of the access control policy.

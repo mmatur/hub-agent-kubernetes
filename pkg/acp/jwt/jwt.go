@@ -48,6 +48,30 @@ type Config struct {
 	Claims                     string
 }
 
+func (cfg *Config) keySet() (KeySet, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	if cfg.JWKsFile != "" {
+		if cfg.JWKsFile.IsPath() {
+			return NewFileKeySet(cfg.JWKsFile.String()), nil
+		}
+
+		ks, err := NewContentKeySet([]byte(cfg.JWKsFile))
+		if err != nil {
+			return nil, fmt.Errorf("new content key set: %w. If using a file path, maybe the file does not exist", err)
+		}
+		return ks, nil
+	}
+
+	if cfg.JWKsURL != "" && !strings.HasPrefix(cfg.JWKsURL, "/") {
+		return NewRemoteKeySet(cfg.JWKsURL), nil
+	}
+
+	return nil, nil
+}
+
 // Handler is a JWT ACP Handler.
 type Handler struct {
 	name string
@@ -115,7 +139,7 @@ func NewHandler(cfg *Config, polName string) (*Handler, error) {
 		tokenQueryKey = cfg.TokenQueryKey
 	}
 
-	ks, err := keySet(cfg)
+	ks, err := cfg.keySet()
 	if err != nil {
 		return nil, err
 	}
@@ -132,26 +156,6 @@ func NewHandler(cfg *Config, polName string) (*Handler, error) {
 		tokQryKey:            tokenQueryKey,
 		validateCustomClaims: pred,
 	}, nil
-}
-
-func keySet(src *Config) (KeySet, error) {
-	if src.JWKsFile != "" {
-		if src.JWKsFile.IsPath() {
-			return NewFileKeySet(src.JWKsFile.String()), nil
-		}
-
-		ks, err := NewContentKeySet([]byte(src.JWKsFile))
-		if err != nil {
-			return nil, fmt.Errorf("new content key set: %w. If using a file path, maybe the file does not exist", err)
-		}
-		return ks, nil
-	}
-
-	if src.JWKsURL != "" && !strings.HasPrefix(src.JWKsURL, "/") {
-		return NewRemoteKeySet(src.JWKsURL), nil
-	}
-
-	return nil, nil
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -197,26 +201,6 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.WriteHeader(http.StatusOK)
-}
-
-// jwtExtractor extracts JWTs from HTTP requests.
-type jwtExtractor struct {
-	tokQryKey string
-}
-
-// ExtractToken extracts a JWT from an HTTP request. It first looks in the "Authorization" header then in a query parameter
-// named as configured by `tokQryKey`. It returns an error if no JWT was found.
-func (j jwtExtractor) ExtractToken(req *http.Request) (string, error) {
-	rawJWT := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	if rawJWT == "" {
-		rawJWT = req.URL.Query().Get(j.tokQryKey)
-	}
-
-	if rawJWT == "" {
-		return "", errors.New("no JWT found in request")
-	}
-
-	return rawJWT, nil
 }
 
 // keyFunc returns a function to find the correct key to validate its given JWT's signature.
@@ -316,4 +300,24 @@ func (h *Handler) remoteKeySet(iss string) (*RemoteKeySet, error) {
 	h.dynKeySetsMu.Unlock()
 
 	return rks, nil
+}
+
+// jwtExtractor extracts JWTs from HTTP requests.
+type jwtExtractor struct {
+	tokQryKey string
+}
+
+// ExtractToken extracts a JWT from an HTTP request. It first looks in the "Authorization" header then in a query parameter
+// named as configured by `tokQryKey`. It returns an error if no JWT was found.
+func (j jwtExtractor) ExtractToken(req *http.Request) (string, error) {
+	rawJWT := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	if rawJWT == "" {
+		rawJWT = req.URL.Query().Get(j.tokQryKey)
+	}
+
+	if rawJWT == "" {
+		return "", errors.New("no JWT found in request")
+	}
+
+	return rawJWT, nil
 }

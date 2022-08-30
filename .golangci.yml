@@ -127,6 +127,10 @@ linters:
     - interfacer # deprecated
     - scopelint # deprecated
     - golint # deprecated
+    - nosnakecase # deprecated
+    - ifshort # deprecated
+    - structcheck # deprecated
+    - exhaustivestruct # deprecated
     - sqlclosecheck # not relevant (SQL)
     - rowserrcheck # not relevant (SQL)
     - execinquery # not relevant (SQL)
@@ -139,7 +143,6 @@ linters:
     - goerr113
     - wrapcheck
     - exhaustive
-    - exhaustivestruct
     - exhaustruct
     - nonamedreturns
     - testpackage
@@ -154,7 +157,6 @@ linters:
     - ireturn
     - contextcheck
     - errchkjson
-    - structcheck
 
 issues:
   exclude-use-default: false
@@ -172,7 +174,6 @@ issues:
         - gochecknoinits
         - gochecknoglobals
         - maintidx
-        - nosnakecase
     - path: pkg/crd/api/.*
       linters:
         - tagliatelle
@@ -207,11 +208,19 @@ issues:
     - path: pkg/acp/watcher.go
       linters:
         - gocognit
-    - path: pkg/crd/api/hub/v1alpha1/edge_ingress.go
+    - path: pkg/acp/oidc/oidc.go
+      text: "Function 'ServeHTTP' has too many statements"
       linters:
-        - gosec # sha1 is not used to encrypt data, no security issue
+        - funlen
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: pkg/acp/oidc/oidc.go
+      text: "cyclomatic complexity 21 of func `(.*).ServeHTTP` is high"
+      linters:
+        - gocyclo
+    - path: pkg/acp/oidc/oidc_test.go
+      text: "G101: Potential hardcoded credentials"
+      linters:
+        - gosec
     - path: pkg/platform/client_test.go
       linters:
         - gocognit
-    - path: cmd/agent/controller.go
-      text: '(O_WRONLY|O_CREATE|O_TRUNC) contains underscore'
