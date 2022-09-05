@@ -211,10 +211,6 @@ func isUsingACP(ar admv1.AdmissionReview) (bool, error) {
 			return false, err
 		}
 		polName = obj.Metadata.Annotations[reviewer.AnnotationHubAuth]
-
-		if obj.Metadata.Labels["app.kubernetes.io/managed-by"] != "traefik-hub" {
-			return false, nil
-		}
 	}
 
 	var oldObj struct {
