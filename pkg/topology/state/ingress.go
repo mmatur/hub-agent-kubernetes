@@ -24,16 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// ControllerTypeTraefik is the controller value for an Ingress Class handled by Traefik.
-const ControllerTypeTraefik = "traefik.io/ingress-controller"
-
 func (f *Fetcher) getIngresses() (map[string]*Ingress, error) {
 	ingresses, err := f.fetchIngresses()
-	if err != nil {
-		return nil, err
-	}
-
-	ingressClasses, err := f.fetchIngressClasses()
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +40,7 @@ func (f *Fetcher) getIngresses() (map[string]*Ingress, error) {
 				Namespace: ingress.Namespace,
 			},
 			IngressMeta: IngressMeta{
-				ControllerType: getControllerType(ingress, ingressClasses),
-				Annotations:    sanitizeAnnotations(ingress.Annotations),
+				Annotations: sanitizeAnnotations(ingress.Annotations),
 			},
 			IngressClassName: ingress.Spec.IngressClassName,
 			TLS:              ingress.Spec.TLS,
@@ -62,29 +53,6 @@ func (f *Fetcher) getIngresses() (map[string]*Ingress, error) {
 	}
 
 	return result, nil
-}
-
-func (f *Fetcher) fetchIngressClasses() ([]*netv1.IngressClass, error) {
-	ingressClasses, err := f.k8s.Networking().V1().IngressClasses().Lister().List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
-	v1beta1IngressClasses, err := f.k8s.Networking().V1beta1().IngressClasses().Lister().List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ingressClass := range v1beta1IngressClasses {
-		networking, err := marshalToIngressClassNetworkingV1(ingressClass)
-		if err != nil {
-			return nil, err
-		}
-
-		ingressClasses = append(ingressClasses, networking)
-	}
-
-	return ingressClasses, nil
 }
 
 func (f *Fetcher) fetchIngresses() ([]*netv1.Ingress, error) {
@@ -137,41 +105,6 @@ func getIngressServices(ingress *netv1.Ingress) []string {
 	}
 
 	return result
-}
-
-func getControllerType(ingress *netv1.Ingress, ingressClasses []*netv1.IngressClass) string {
-	// Look for ingressClassName in Ingress spec.
-	var ingressClassName string
-	if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName != "" {
-		ingressClassName = *ingress.Spec.IngressClassName
-	}
-
-	// Look for ingressClassName in annotations if it was not found in the Ingress spec.
-	if ingressClassName == "" {
-		// TODO: For now we don't support custom ingress class names so this could break.
-		return ingress.Annotations["kubernetes.io/ingress.class"]
-	}
-
-	// Find the matching ingress class.
-	var ingressClass *netv1.IngressClass
-	for _, ic := range ingressClasses {
-		if ic.Name == ingressClassName {
-			ingressClass = ic
-			break
-		}
-	}
-
-	if ingressClass == nil {
-		return ingressClassName
-	}
-
-	switch ingressClass.Spec.Controller {
-	case ControllerTypeTraefik:
-		return "traefik"
-
-	default:
-		return ingressClass.Spec.Controller
-	}
 }
 
 func toNetworkingV1(ing *netv1beta1.Ingress) (*netv1.Ingress, error) {
@@ -249,21 +182,6 @@ func marshalToIngressNetworkingV1(ing *netv1beta1.Ingress) (*netv1.Ingress, erro
 
 	ni := &netv1.Ingress{}
 	if err := ni.Unmarshal(data); err != nil {
-		return nil, err
-	}
-
-	return ni, nil
-}
-
-func marshalToIngressClassNetworkingV1(ing *netv1beta1.IngressClass) (*netv1.IngressClass, error) {
-	data, err := ing.Marshal()
-	if err != nil {
-		return nil, err
-	}
-
-	ni := &netv1.IngressClass{}
-	err = ni.Unmarshal(data)
-	if err != nil {
 		return nil, err
 	}
 

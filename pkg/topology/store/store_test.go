@@ -65,6 +65,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": {
 						"annotations":{"key":"value"},
@@ -114,6 +122,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": {
 						"annotations":{"key":"new-value"}
@@ -157,6 +173,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": {
 						"annotations": null
@@ -201,6 +225,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": {
 						"externalPorts": [8080, 8081]
@@ -236,6 +268,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": null
 				}
@@ -285,6 +325,14 @@ func TestStore_Write_fetchAndPatch(t *testing.T) {
 				},
 			},
 			wantPatch: `{
+				"ingresses":{
+					"ingress-1@ns": {
+						"group":"", 
+						"kind":"",
+						"name":"ingress-1",
+						"namespace":"ns"
+					}
+				},
 				"services": {
 					"service-1@ns": null,
 					"service-2@ns": {

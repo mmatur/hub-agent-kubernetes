@@ -115,5 +115,6 @@ func (s *Store) buildPatch(lastTopology []byte, st state.Cluster) ([]byte, []byt
 	if err != nil {
 		return nil, nil, fmt.Errorf("build merge patch: %w", err)
 	}
+
 	return patch, newTopology, nil
 }

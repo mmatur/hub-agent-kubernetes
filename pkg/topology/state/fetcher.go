@@ -24,8 +24,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
-	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
+	"github.com/rs/zerolog/log"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
+	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	traefikinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -35,31 +40,18 @@ type Fetcher struct {
 	serverVersion string
 
 	k8s       informers.SharedInformerFactory
+	traefik   traefikinformer.SharedInformerFactory
 	clientSet clientset.Interface
 }
 
 // NewFetcher creates a new Fetcher.
-func NewFetcher(ctx context.Context) (*Fetcher, error) {
-	config, err := kube.InClusterConfigWithRetrier(2)
-	if err != nil {
-		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
-	}
-
-	clientSet, err := clientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface) (*Fetcher, error) {
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	return watchAll(ctx, clientSet, serverVersion.GitVersion)
-}
-
-func watchAll(ctx context.Context, clientSet clientset.Interface, serverVersion string) (*Fetcher, error) {
-	serverSemVer, err := version.NewVersion(serverVersion)
+	serverSemVer, err := version.NewVersion(serverVersion.GitVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
 	}
@@ -68,6 +60,10 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, serverVersion 
 		return nil, fmt.Errorf("unsupported version: %s", serverSemVer)
 	}
 
+	return watchAll(ctx, clientSet, traefikClientSet, serverVersion.GitVersion)
+}
+
+func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion string) (*Fetcher, error) {
 	kubernetesFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 
 	kubernetesFactory.Core().V1().Pods().Informer()
@@ -86,7 +82,26 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, serverVersion 
 		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
 	}
 
+	traefikFactory := traefikinformer.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)
+
+	hasTraefikCRDs, err := hasTraefikCRDs(clientSet.Discovery())
+	if err != nil {
+		return nil, fmt.Errorf("check presence of Traefik IngressRoute, TraefikService and TLSOption CRD: %w", err)
+	}
+
+	if hasTraefikCRDs {
+		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
+		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
+	} else {
+		msg := "The agent has been installed in a cluster where the Traefik Proxy CustomResourceDefinitions are not installed. " +
+			"If you want to install these CustomResourceDefinitions and take advantage of them in Traefik Hub, " +
+			"the agent needs to be restarted in order to load them. " +
+			"Run 'kubectl -n hub-agent delete pod -l app=hub-agent,component=controller'"
+		log.Info().Msg(msg)
+	}
+
 	kubernetesFactory.Start(ctx.Done())
+	traefikFactory.Start(ctx.Done())
 
 	for typ, ok := range kubernetesFactory.WaitForCacheSync(ctx.Done()) {
 		if !ok {
@@ -94,9 +109,16 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, serverVersion 
 		}
 	}
 
+	for typ, ok := range traefikFactory.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return nil, fmt.Errorf("timed out waiting for Traefik CRD caches to sync %s", typ)
+		}
+	}
+
 	return &Fetcher{
 		serverVersion: serverVersion,
 		k8s:           kubernetesFactory,
+		traefik:       traefikFactory,
 		clientSet:     clientSet,
 	}, nil
 }
@@ -117,7 +139,40 @@ func (f *Fetcher) FetchState() (*Cluster, error) {
 		return nil, err
 	}
 
+	cluster.IngressRoutes, err = f.getIngressRoutes()
+	if err != nil {
+		return nil, err
+	}
+
 	return &cluster, nil
+}
+
+func hasTraefikCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
+	crdList, err := clientSet.ServerResourcesForGroupVersion(traefikv1alpha1.SchemeGroupVersion.String())
+	if err != nil {
+		if kerror.IsNotFound(err) ||
+			// because the fake client doesn't return the right error type.
+			strings.HasSuffix(err.Error(), " not found") {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, kind := range []string{ResourceKindIngressRoute, ResourceKindTraefikService, ResourceKindTLSOption} {
+		var exists bool
+		for _, resource := range crdList.APIResources {
+			if resource.Kind == kind {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func objectKey(name, ns string) string {

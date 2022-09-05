@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/ettle/strcase"
+	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent-kubernetes/pkg/heartbeat"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
@@ -110,6 +111,11 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
+	traefikClientSet, err := traefikclientset.NewForConfig(kubeCfg)
+	if err != nil {
+		return fmt.Errorf("create Traefik client set: %w", err)
+	}
+
 	platformClient, err := platform.NewClient(platformURL, token)
 	if err != nil {
 		return fmt.Errorf("build platform client: %w", err)
@@ -124,7 +130,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("setup agent: %w", err)
 	}
 
-	topoFetcher, err := state.NewFetcher(cliCtx.Context)
+	topoFetcher, err := state.NewFetcher(cliCtx.Context, kubeClient, traefikClientSet)
 	if err != nil {
 		return err
 	}

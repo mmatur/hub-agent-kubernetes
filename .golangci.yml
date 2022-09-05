@@ -188,6 +188,9 @@ issues:
     # False positive.
     - path: pkg/metrics/store_test.go
       text: 'Multiplication of durations: `-1 \* time\.Duration\(n\) \* gran`'
+    # Keep for historical reason.
+    - path: pkg/topology/state/cluster.go
+      text: "json\\(camel\\): got '(metricsURLs)' want '(metricsUrLs)'"
     # Reducing cyclomatic complexity would reduce readability.
     - path: pkg/acp/admission/reviewer/traefik_ingress_route.go
       linters:

@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,8 +85,9 @@ func TestFetcher_GetServices(t *testing.T) {
 	}
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
+	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, "v1.20.1")
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
 	require.NoError(t, err)
 
 	gotSvcs, err := f.getServices()
@@ -152,8 +154,9 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 	}
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
+	traefikClient := traefikkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, "v1.20.1")
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
 	require.NoError(t, err)
 
 	gotSvcs, err := f.getServices()
@@ -226,7 +229,9 @@ func TestFetcher_GetServiceLogs(t *testing.T) {
 		return true, nil, nil
 	})
 
-	f, err := watchAll(context.Background(), kubeClient, "v1.20.1")
+	traefikClient := traefikkubemock.NewSimpleClientset()
+
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
 	require.NoError(t, err)
 
 	got, err := f.GetServiceLogs(context.Background(), "myns", "myService", 20, 200)
@@ -308,7 +313,9 @@ func TestFetcher_GetServiceLogsHandlesTooManyPods(t *testing.T) {
 		return true, nil, nil
 	})
 
-	f, err := watchAll(context.Background(), kubeClient, "v1.20.1")
+	traefikClient := traefikkubemock.NewSimpleClientset()
+
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
 	require.NoError(t, err)
 
 	got, err := f.GetServiceLogs(context.Background(), "myns", "myService", 2, 200)
