@@ -121,7 +121,7 @@ func Test_WatcherRun(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnGetCertificate().TypedReturns(Certificate{
+	client.OnGetWildcardCertificate().TypedReturns(Certificate{
 		Certificate: []byte("cert"),
 		PrivateKey:  []byte("private"),
 	}, nil)
@@ -282,7 +282,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t).
-		OnGetCertificate().TypedReturns(
+		OnGetWildcardCertificate().TypedReturns(
 		Certificate{
 			Certificate: []byte("cert"),
 			PrivateKey:  []byte("private"),

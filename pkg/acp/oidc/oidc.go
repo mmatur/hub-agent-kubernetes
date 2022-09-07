@@ -259,16 +259,6 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// 9th step of diagram.
-	var idToken *oidc.IDToken
-	idToken, err = h.verifier.Verify(req.Context(), sess.IDToken)
-	if err != nil {
-		logger.Debug().Err(err).Msg("Invalid ID token")
-		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-
-		return
-	}
-
 	// Refresh the session is possible only if we can return a redirect to the user.
 	// If we can't, we check the token and continue without update the session user.
 	if refreshSession && h.shouldRedirect(req) {
@@ -279,12 +269,24 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		http.Redirect(
-			rw,
-			req,
-			forwardedURL,
-			http.StatusFound,
-		)
+		if req.Header.Get("From") != "nginx" {
+			http.Redirect(
+				rw,
+				req,
+				forwardedURL,
+				http.StatusFound,
+			)
+
+			return
+		}
+	}
+
+	// 9th step of diagram.
+	var idToken *oidc.IDToken
+	idToken, err = h.verifier.Verify(req.Context(), sess.IDToken)
+	if err != nil {
+		logger.Debug().Err(err).Msg("Invalid ID token")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 
 		return
 	}
@@ -406,6 +408,17 @@ func (h *Handler) redirectToProvider(rw http.ResponseWriter, req *http.Request, 
 	// which leads to 3rd step of diagram:
 	// makes the browser send an /authorize to the auth server.
 	// spec: section 3.1.2.1.
+
+	if req.Header.Get("From") == "nginx" {
+		rw.Header().Add("url_redirect", h.oauth.AuthCodeURL(
+			state.RedirectID,
+			opts...,
+		)+"&fix=1") // nginx quick fix
+		rw.WriteHeader(http.StatusUnauthorized)
+
+		return
+	}
+
 	http.Redirect(
 		rw,
 		req,

@@ -41,7 +41,8 @@ const annotationDefaultIngressClass = "ingressclass.kubernetes.io/is-default-cla
 
 // Supported ingress controller types.
 const (
-	ControllerTypeTraefik = "traefik.io/ingress-controller"
+	ControllerTypeNginxCommunity = "k8s.io/ingress-nginx"
+	ControllerTypeTraefik        = "traefik.io/ingress-controller"
 )
 
 // Watcher watches for IngressClass resources, maintaining a local cache of these resources,

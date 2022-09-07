@@ -20,33 +20,31 @@ package reviewer
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	admv1 "k8s.io/api/admission/v1"
 )
 
-const annotationTraefikMiddlewares = "traefik.ingress.kubernetes.io/router.middlewares"
-
-// TraefikIngress is a reviewer that can handle Traefik ingress resources.
-// Note that this reviewer requires Traefik middleware CRD to be defined in the cluster.
-// It also requires Traefik to have the Kubernetes CRD provider enabled.
-type TraefikIngress struct {
-	ingressClasses     IngressClasses
-	fwdAuthMiddlewares FwdAuthMiddlewares
+// NginxIngress is a reviewer that handles Nginx Ingress resources.
+type NginxIngress struct {
+	agentAddress   string
+	ingressClasses IngressClasses
+	policies       PolicyGetter
 }
 
-// NewTraefikIngress returns a Traefik ingress reviewer.
-func NewTraefikIngress(ingClasses IngressClasses, fwdAuthMiddlewares FwdAuthMiddlewares) *TraefikIngress {
-	return &TraefikIngress{
-		ingressClasses:     ingClasses,
-		fwdAuthMiddlewares: fwdAuthMiddlewares,
+// NewNginxIngress returns an Nginx ingress reviewer.
+func NewNginxIngress(authServerAddr string, ingClasses IngressClasses, policies PolicyGetter) *NginxIngress {
+	return &NginxIngress{
+		agentAddress:   authServerAddr,
+		ingressClasses: ingClasses,
+		policies:       policies,
 	}
 }
 
 // CanReview returns whether this reviewer can handle the given admission review request.
-func (r TraefikIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
+func (r NginxIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 	resource := ar.Request.Kind
 
 	// Check resource type. Only continue if it's a legacy Ingress (<1.18) or an Ingress resource.
@@ -71,10 +69,11 @@ func (r TraefikIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 			return false, fmt.Errorf("get ingress class controller from ingress class name: %w", err)
 		}
 
-		return isTraefik(ctrlr), nil
+		return isNginx(ctrlr), nil
 	}
+
 	if ingClassAnno != "" {
-		if ingClassAnno == defaultAnnotationTraefik {
+		if ingClassAnno == defaultAnnotationNginx {
 			return true, nil
 		}
 
@@ -90,7 +89,7 @@ func (r TraefikIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 			return false, fmt.Errorf("get ingress class controller from annotation: %w", err)
 		}
 
-		return isTraefik(ctrlr), nil
+		return isNginx(ctrlr), nil
 	}
 
 	defaultCtrlr, err := r.ingressClasses.GetDefaultController()
@@ -98,12 +97,12 @@ func (r TraefikIngress) CanReview(ar admv1.AdmissionReview) (bool, error) {
 		return false, fmt.Errorf("get default ingress class controller: %w", err)
 	}
 
-	return isTraefik(defaultCtrlr), nil
+	return isNginx(defaultCtrlr), nil
 }
 
 // Review reviews the given admission review request and optionally returns the required patch.
-func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error) {
-	l := log.Ctx(ctx).With().Str("reviewer", "TraefikIngress").Logger()
+func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error) {
+	l := log.Ctx(ctx).With().Str("reviewer", "NginxIngress").Logger()
 	ctx = l.WithContext(ctx)
 
 	log.Ctx(ctx).Info().Msg("Reviewing Ingress resource")
@@ -126,35 +125,31 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 		return nil, nil
 	}
 
-	routerMiddlewares := ing.Metadata.Annotations[annotationTraefikMiddlewares]
+	nginxAnno := map[string]string{}
+	if polName == "" {
+		log.Ctx(ctx).Debug().Msg("No ACP annotation found")
+	} else {
+		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("ACP annotation is present")
 
-	if prevPolName != "" {
-		routerMiddlewares = r.clearPreviousFwdAuthMiddleware(ctx, prevPolName, ing.Metadata.Namespace, routerMiddlewares)
-	}
-
-	if polName != "" {
-		var middlewareName string
-		middlewareName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ing.Metadata.Namespace)
+		var polCfg *acp.Config
+		polCfg, err = r.policies.GetConfig(polName)
 		if err != nil {
 			return nil, err
 		}
 
-		routerMiddlewares = appendMiddleware(
-			routerMiddlewares,
-			fmt.Sprintf("%s-%s@kubernetescrd", ing.Metadata.Namespace, middlewareName),
-		)
+		nginxAnno, err = genNginxAnnotations(polName, polCfg, r.agentAddress)
+		if err != nil {
+			return nil, err
+		}
 	}
+	nginxAnno = mergeSnippets(nginxAnno, ing.Metadata.Annotations)
 
-	if ing.Metadata.Annotations[annotationTraefikMiddlewares] == routerMiddlewares {
+	if noNginxPatchRequired(ing.Metadata.Annotations, nginxAnno) {
 		log.Ctx(ctx).Debug().Str("acp_name", polName).Msg("No patch required")
 		return nil, nil
 	}
 
-	if routerMiddlewares != "" {
-		ing.Metadata.Annotations[annotationTraefikMiddlewares] = routerMiddlewares
-	} else {
-		delete(ing.Metadata.Annotations, annotationTraefikMiddlewares)
-	}
+	setNginxAnnotations(ing.Metadata.Annotations, nginxAnno)
 
 	log.Ctx(ctx).Info().Str("acp_name", polName).Msg("Patching resource")
 
@@ -165,42 +160,27 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 	}, nil
 }
 
-func (r TraefikIngress) clearPreviousFwdAuthMiddleware(ctx context.Context, polName, namespace, routerMiddlewares string) string {
-	log.Ctx(ctx).Debug().Str("prev_acp_name", polName).Msg("Clearing previous ACP settings")
-
-	middlewareName := middlewareName(polName)
-	oldCanonicalMiddlewareName := fmt.Sprintf("%s-%s@kubernetescrd", namespace, middlewareName)
-
-	return removeMiddleware(routerMiddlewares, oldCanonicalMiddlewareName)
-}
-
-// appendMiddleware appends newMiddleware to the comma-separated list of middlewareList.
-func appendMiddleware(middlewareList, newMiddleware string) string {
-	if middlewareList == "" {
-		return newMiddleware
-	}
-
-	return middlewareList + "," + newMiddleware
-}
-
-// removeMiddleware removes the middleware named toRemove from the given middlewareList, if found.
-func removeMiddleware(middlewareList, toRemove string) string {
-	var res []string
-
-	for _, m := range strings.Split(middlewareList, ",") {
-		if m != toRemove {
-			res = append(res, m)
+func noNginxPatchRequired(anno, nginxAnno map[string]string) bool {
+	for k, v := range nginxAnno {
+		if anno[k] != v {
+			return false
 		}
 	}
 
-	return strings.Join(res, ",")
+	return true
 }
 
-// middlewareName returns the ForwardAuth middleware desc for the given ACP.
-func middlewareName(polName string) string {
-	return fmt.Sprintf("zz-%s", strings.ReplaceAll(polName, "@", "-"))
+func setNginxAnnotations(anno, nginxAnno map[string]string) {
+	for k, v := range nginxAnno {
+		if v == "" {
+			delete(anno, k)
+			continue
+		}
+
+		anno[k] = v
+	}
 }
 
-func isTraefik(ctrlr string) bool {
-	return ctrlr == ingclass.ControllerTypeTraefik
+func isNginx(ctrlr string) bool {
+	return ctrlr == ingclass.ControllerTypeNginxCommunity
 }

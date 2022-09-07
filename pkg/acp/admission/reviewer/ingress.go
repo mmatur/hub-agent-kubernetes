@@ -31,6 +31,7 @@ const AnnotationHubAuth = "hub.traefik.io/access-control-policy"
 
 // Ingress controller default annotations.
 const (
+	defaultAnnotationNginx   = "nginx"
 	defaultAnnotationTraefik = "traefik"
 )
 
@@ -120,7 +121,7 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 
 func isDefaultIngressClassValue(value string) bool {
 	switch value {
-	case defaultAnnotationTraefik:
+	case defaultAnnotationTraefik, defaultAnnotationNginx:
 		return true
 	default:
 		return false

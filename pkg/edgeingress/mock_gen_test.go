@@ -25,109 +25,6 @@ func newPlatformClientMock(tb testing.TB) *platformClientMock {
 	return m
 }
 
-func (_m *platformClientMock) GetWildcardCertificate(_ context.Context) (Certificate, error) {
-	_ret := _m.Called()
-
-	_ra0, _ := _ret.Get(0).(Certificate)
-	_rb1 := _ret.Error(1)
-
-	return _ra0, _rb1
-}
-
-func (_m *platformClientMock) OnGetCertificate() *platformClientGetCertificateCall {
-	return &platformClientGetCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
-}
-
-func (_m *platformClientMock) OnGetCertificateRaw() *platformClientGetCertificateCall {
-	return &platformClientGetCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
-}
-
-type platformClientGetCertificateCall struct {
-	*mock.Call
-	Parent *platformClientMock
-}
-
-func (_c *platformClientGetCertificateCall) Panic(msg string) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) Once() *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) Twice() *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) Times(i int) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) WaitUntil(w <-chan time.Time) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) After(d time.Duration) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) Run(fn func(args mock.Arguments)) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) Maybe() *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) TypedReturns(a Certificate, b error) *platformClientGetCertificateCall {
-	_c.Call = _c.Return(a, b)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) ReturnsFn(fn func() (Certificate, error)) *platformClientGetCertificateCall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) TypedRun(fn func()) *platformClientGetCertificateCall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		fn()
-	})
-	return _c
-}
-
-func (_c *platformClientGetCertificateCall) OnGetCertificate() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificate()
-}
-
-func (_c *platformClientGetCertificateCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
-	return _c.Parent.OnGetCertificateByDomains(domains)
-}
-
-func (_c *platformClientGetCertificateCall) OnGetEdgeIngresses() *platformClientGetEdgeIngressesCall {
-	return _c.Parent.OnGetEdgeIngresses()
-}
-
-func (_c *platformClientGetCertificateCall) OnGetCertificateRaw() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificateRaw()
-}
-
-func (_c *platformClientGetCertificateCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
-	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
-}
-
-func (_c *platformClientGetCertificateCall) OnGetEdgeIngressesRaw() *platformClientGetEdgeIngressesCall {
-	return _c.Parent.OnGetEdgeIngressesRaw()
-}
-
 func (_m *platformClientMock) GetCertificateByDomains(_ context.Context, domains []string) (Certificate, error) {
 	_ret := _m.Called(domains)
 
@@ -212,10 +109,6 @@ func (_c *platformClientGetCertificateByDomainsCall) TypedRun(fn func([]string))
 	return _c
 }
 
-func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificate() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificate()
-}
-
 func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
@@ -224,8 +117,8 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetEdgeIngresses() *platf
 	return _c.Parent.OnGetEdgeIngresses()
 }
 
-func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateRaw() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificateRaw()
+func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
 }
 
 func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
@@ -234,6 +127,10 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomainsRa
 
 func (_c *platformClientGetCertificateByDomainsCall) OnGetEdgeIngressesRaw() *platformClientGetEdgeIngressesCall {
 	return _c.Parent.OnGetEdgeIngressesRaw()
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
 }
 
 func (_m *platformClientMock) GetEdgeIngresses(_ context.Context) ([]EdgeIngress, error) {
@@ -315,10 +212,6 @@ func (_c *platformClientGetEdgeIngressesCall) TypedRun(fn func()) *platformClien
 	return _c
 }
 
-func (_c *platformClientGetEdgeIngressesCall) OnGetCertificate() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificate()
-}
-
 func (_c *platformClientGetEdgeIngressesCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
@@ -327,8 +220,8 @@ func (_c *platformClientGetEdgeIngressesCall) OnGetEdgeIngresses() *platformClie
 	return _c.Parent.OnGetEdgeIngresses()
 }
 
-func (_c *platformClientGetEdgeIngressesCall) OnGetCertificateRaw() *platformClientGetCertificateCall {
-	return _c.Parent.OnGetCertificateRaw()
+func (_c *platformClientGetEdgeIngressesCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
 }
 
 func (_c *platformClientGetEdgeIngressesCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
@@ -337,4 +230,111 @@ func (_c *platformClientGetEdgeIngressesCall) OnGetCertificateByDomainsRaw(domai
 
 func (_c *platformClientGetEdgeIngressesCall) OnGetEdgeIngressesRaw() *platformClientGetEdgeIngressesCall {
 	return _c.Parent.OnGetEdgeIngressesRaw()
+}
+
+func (_c *platformClientGetEdgeIngressesCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
+}
+
+func (_m *platformClientMock) GetWildcardCertificate(_ context.Context) (Certificate, error) {
+	_ret := _m.Called()
+
+	_ra0, _ := _ret.Get(0).(Certificate)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return &platformClientGetWildcardCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
+}
+
+func (_m *platformClientMock) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return &platformClientGetWildcardCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
+}
+
+type platformClientGetWildcardCertificateCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Panic(msg string) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Once() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Twice() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Times(i int) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) WaitUntil(w <-chan time.Time) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) After(d time.Duration) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Run(fn func(args mock.Arguments)) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Maybe() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) TypedReturns(a Certificate, b error) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) ReturnsFn(fn func() (Certificate, error)) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) TypedRun(fn func()) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetEdgeIngresses() *platformClientGetEdgeIngressesCall {
+	return _c.Parent.OnGetEdgeIngresses()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetEdgeIngressesRaw() *platformClientGetEdgeIngressesCall {
+	return _c.Parent.OnGetEdgeIngressesRaw()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
 }
