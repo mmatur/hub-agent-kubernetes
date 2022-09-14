@@ -47,9 +47,10 @@ type AccessControlPolicy struct {
 
 // AccessControlPolicySpec configures an access control policy.
 type AccessControlPolicySpec struct {
-	JWT       *AccessControlPolicyJWT       `json:"jwt,omitempty"`
-	BasicAuth *AccessControlPolicyBasicAuth `json:"basicAuth,omitempty"`
-	OIDC      *AccessControlOIDC            `json:"oidc,omitempty"`
+	JWT        *AccessControlPolicyJWT       `json:"jwt,omitempty"`
+	BasicAuth  *AccessControlPolicyBasicAuth `json:"basicAuth,omitempty"`
+	OIDC       *AccessControlOIDC            `json:"oidc,omitempty"`
+	OIDCGoogle *AccessControlOIDCGoogle      `json:"oidcGoogle,omitempty"`
 }
 
 // Hash return AccessControlPolicySpec hash.
@@ -104,6 +105,25 @@ type AccessControlOIDC struct {
 	Scopes         []string          `json:"scopes,omitempty"`
 	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
 	Claims         string            `json:"claims,omitempty"`
+}
+
+// AccessControlOIDCGoogle holds the Google OIDC authentication configuration.
+type AccessControlOIDCGoogle struct {
+	ClientID string `json:"clientId,omitempty"`
+	TLS      *TLS   `json:"tls,omitempty"`
+
+	Secret *corev1.SecretReference `json:"secret,omitempty"`
+
+	RedirectURL string            `json:"redirectUrl,omitempty"`
+	LogoutURL   string            `json:"logoutUrl,omitempty"`
+	AuthParams  map[string]string `json:"authParams,omitempty"`
+
+	StateCookie *StateCookie `json:"stateCookie,omitempty"`
+	Session     *Session     `json:"session,omitempty"`
+
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+	// Emails are the allowed emails to connect.
+	Emails []string `json:"emails"`
 }
 
 // TLS holds the TLS configuration.

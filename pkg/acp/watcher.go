@@ -111,16 +111,7 @@ func (w *Watcher) Run(ctx context.Context) {
 					continue
 				}
 
-				policy.Spec = buildAccessControlPolicySpec(a)
-				policy.Status.Version = a.Version
-
-				var err error
-				policy.Status.SpecHash, err = policy.Spec.Hash()
-				if err != nil {
-					log.Error().Err(err).Str("name", policy.Name).Msg("Build spec hash")
-					continue
-				}
-				if err := w.updatePolicy(ctx, policy); err != nil {
+				if err := w.updatePolicy(ctx, a, policy); err != nil {
 					log.Error().Err(err).Str("name", policy.Name).Msg("Upsert ACP")
 				}
 			}
@@ -157,7 +148,16 @@ func (w *Watcher) createPolicy(ctx context.Context, acp ACP) error {
 	return nil
 }
 
-func (w *Watcher) updatePolicy(ctx context.Context, policy *hubv1alpha1.AccessControlPolicy) error {
+func (w *Watcher) updatePolicy(ctx context.Context, acp ACP, policy *hubv1alpha1.AccessControlPolicy) error {
+	policy.Spec = buildAccessControlPolicySpec(acp)
+	policy.Status.Version = acp.Version
+
+	var err error
+	policy.Status.SpecHash, err = policy.Spec.Hash()
+	if err != nil {
+		return fmt.Errorf("build spec hash: %w", err)
+	}
+
 	ctxUpdate, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -190,6 +190,41 @@ func needUpdate(a ACP, policy *hubv1alpha1.AccessControlPolicy) bool {
 func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 	spec := hubv1alpha1.AccessControlPolicySpec{}
 	switch {
+	case a.OIDCGoogle != nil:
+		spec.OIDCGoogle = &hubv1alpha1.AccessControlOIDCGoogle{
+			ClientID:       a.OIDCGoogle.ClientID,
+			RedirectURL:    a.OIDCGoogle.RedirectURL,
+			LogoutURL:      a.OIDCGoogle.LogoutURL,
+			AuthParams:     a.OIDCGoogle.AuthParams,
+			ForwardHeaders: a.OIDCGoogle.ForwardHeaders,
+			Emails:         a.OIDCGoogle.Emails,
+		}
+
+		if a.OIDCGoogle.Secret != nil {
+			spec.OIDC.Secret = &corev1.SecretReference{
+				Name:      a.OIDCGoogle.Secret.Name,
+				Namespace: a.OIDCGoogle.Secret.Namespace,
+			}
+		}
+
+		if a.OIDCGoogle.StateCookie != nil {
+			spec.OIDC.StateCookie = &hubv1alpha1.StateCookie{
+				SameSite: a.OIDCGoogle.StateCookie.SameSite,
+				Secure:   a.OIDCGoogle.StateCookie.Secure,
+				Domain:   a.OIDCGoogle.StateCookie.Domain,
+				Path:     a.OIDCGoogle.StateCookie.Path,
+			}
+		}
+
+		if a.OIDCGoogle.Session != nil {
+			spec.OIDC.Session = &hubv1alpha1.Session{
+				SameSite: a.OIDCGoogle.Session.SameSite,
+				Secure:   a.OIDCGoogle.Session.Secure,
+				Domain:   a.OIDCGoogle.Session.Domain,
+				Path:     a.OIDCGoogle.Session.Path,
+				Refresh:  a.OIDCGoogle.Session.Refresh,
+			}
+		}
 	case a.OIDC != nil:
 		spec.OIDC = &hubv1alpha1.AccessControlOIDC{
 			Issuer:         a.OIDC.Issuer,

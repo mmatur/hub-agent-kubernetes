@@ -380,6 +380,31 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader", "Authorization", "Cookie"},
 		},
+		{
+			desc: "add Google OIDC authentication",
+			config: &acp.Config{
+				OIDCGoogle: &acp.OIDCGoogle{
+					Config: oidc.Config{
+						ForwardHeaders: map[string]string{
+							"fwdHeader": "claim",
+						},
+					},
+					Emails: []string{"email@plop.com"},
+				},
+			},
+			oldIngAnno: map[string]string{},
+			ingAnno: map[string]string{
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
+			},
+			wantPatch: map[string]string{
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"fwdHeader", "Authorization", "Cookie"},
+		},
 	}
 
 	for _, test := range tests {

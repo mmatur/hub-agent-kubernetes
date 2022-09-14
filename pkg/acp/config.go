@@ -18,6 +18,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package acp
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
@@ -26,9 +29,17 @@ import (
 
 // Config is the configuration of an Access Control Policy. It is used to setup ACP handlers.
 type Config struct {
-	JWT       *jwt.Config
-	BasicAuth *basicauth.Config
-	OIDC      *oidc.Config
+	JWT        *jwt.Config
+	BasicAuth  *basicauth.Config
+	OIDC       *oidc.Config
+	OIDCGoogle *OIDCGoogle
+}
+
+// OIDCGoogle is the Google OIDC configuration.
+type OIDCGoogle struct {
+	oidc.Config
+
+	Emails []string `json:"emails,omitempty"`
 }
 
 // ConfigFromPolicy returns an ACP configuration for the given policy.
@@ -106,7 +117,63 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 		}
 
 		return conf
+	case policy.Spec.OIDCGoogle != nil:
+		oidcGoogleCfg := policy.Spec.OIDCGoogle
+
+		conf := &Config{
+			OIDCGoogle: &OIDCGoogle{
+				Config: oidc.Config{
+					Issuer:         "https://accounts.google.com",
+					ClientID:       oidcGoogleCfg.ClientID,
+					RedirectURL:    oidcGoogleCfg.RedirectURL,
+					LogoutURL:      oidcGoogleCfg.LogoutURL,
+					Scopes:         []string{"email"},
+					AuthParams:     oidcGoogleCfg.AuthParams,
+					ForwardHeaders: oidcGoogleCfg.ForwardHeaders,
+					Claims:         buildClaims(oidcGoogleCfg.Emails),
+				},
+				Emails: oidcGoogleCfg.Emails,
+			},
+		}
+
+		if oidcGoogleCfg.Secret != nil {
+			conf.OIDCGoogle.Secret = &oidc.SecretReference{
+				Name:      oidcGoogleCfg.Secret.Name,
+				Namespace: oidcGoogleCfg.Secret.Namespace,
+			}
+		}
+
+		if oidcGoogleCfg.StateCookie != nil {
+			conf.OIDCGoogle.StateCookie = &oidc.AuthStateCookie{
+				Path:     oidcGoogleCfg.StateCookie.Path,
+				Domain:   oidcGoogleCfg.StateCookie.Domain,
+				SameSite: oidcGoogleCfg.StateCookie.SameSite,
+				Secure:   oidcGoogleCfg.StateCookie.Secure,
+			}
+		}
+
+		if oidcGoogleCfg.StateCookie != nil {
+			conf.OIDCGoogle.Session = &oidc.AuthSession{
+				Path:     oidcGoogleCfg.Session.Path,
+				Domain:   oidcGoogleCfg.Session.Domain,
+				SameSite: oidcGoogleCfg.Session.SameSite,
+				Secure:   oidcGoogleCfg.Session.Secure,
+				Refresh:  oidcGoogleCfg.Session.Refresh,
+			}
+		}
+
+		return conf
 	default:
 		return &Config{}
 	}
+}
+
+// buildClaims builds the claims from the emails.
+func buildClaims(emails []string) string {
+	var claims []string
+	for _, email := range emails {
+		claims = append(claims, fmt.Sprintf(`Equals("email",%q)`, email))
+	}
+
+	return strings.Join(claims, "||")
 }

@@ -106,6 +106,13 @@ func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {
 
 		return !reflect.DeepEqual(oldCfg.OIDC.ForwardHeaders, newCfg.OIDC.ForwardHeaders)
 
+	case newCfg.OIDCGoogle != nil:
+		if oldCfg.OIDCGoogle == nil {
+			return true
+		}
+
+		return !reflect.DeepEqual(oldCfg.OIDCGoogle.ForwardHeaders, newCfg.OIDCGoogle.ForwardHeaders)
+
 	case newCfg.JWT != nil:
 		if oldCfg.JWT == nil {
 			return true

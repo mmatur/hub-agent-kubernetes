@@ -105,26 +105,30 @@ func (w *Watcher) Run(ctx context.Context) {
 func (w *Watcher) populateSecrets() {
 	for name, config := range w.configs {
 		logger := log.With().Str("acp_name", name).Logger()
+		cfg := config.OIDC
+		if cfg == nil && config.OIDCGoogle != nil {
+			cfg = &config.OIDCGoogle.Config
+		}
 
-		if config.OIDC == nil {
+		if cfg == nil {
 			continue
 		}
 
-		if config.OIDC.Secret == nil {
+		if cfg.Secret == nil {
 			logger.Error().Msg("Secret is missing")
 			continue
 		}
 
-		logger = logger.With().Str("secret_namespace", config.OIDC.Secret.Namespace).
-			Str("secret_name", config.OIDC.Secret.Name).Logger()
+		logger = logger.With().Str("secret_namespace", cfg.Secret.Namespace).
+			Str("secret_name", cfg.Secret.Name).Logger()
 
-		secret, ok := w.secrets[config.OIDC.Secret.Namespace+"@"+config.OIDC.Secret.Name]
+		secret, ok := w.secrets[cfg.Secret.Namespace+"@"+cfg.Secret.Name]
 		if !ok {
 			logger.Error().Msg("Secret is missing")
 			continue
 		}
 
-		if err := populateSecrets(config.OIDC, secret); err != nil {
+		if err := populateSecrets(cfg, secret); err != nil {
 			logger.Error().Err(err).Msg("error while populating secrets")
 		}
 	}
@@ -255,6 +259,9 @@ func buildRoute(ctx context.Context, name string, cfg *acp.Config) (http.Handler
 	case cfg.OIDC != nil:
 		return oidc.NewHandler(ctx, cfg.OIDC, name)
 
+	case cfg.OIDCGoogle != nil:
+		return oidc.NewHandler(ctx, &cfg.OIDCGoogle.Config, name)
+
 	default:
 		return nil, fmt.Errorf("unknown handler type for ACP %s", name)
 	}
@@ -270,6 +277,9 @@ func getACPType(cfg *acp.Config) string {
 
 	case cfg.OIDC != nil:
 		return "OIDC"
+
+	case cfg.OIDCGoogle != nil:
+		return "OIDCGoogle"
 
 	default:
 		return "unknown"
