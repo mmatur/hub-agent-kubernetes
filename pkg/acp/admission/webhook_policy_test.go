@@ -56,13 +56,6 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 	client := newBackendMock(t)
 	client.OnCreateACP(policyCreate).TypedReturns(&acp.ACP{Version: "version-1"}, nil).Once()
 
-	h := NewACPHandler(client)
-
-	now := time.Now()
-	nowFunc := func() time.Time {
-		return now
-	}
-
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
@@ -86,8 +79,13 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
 
+	now := time.Now()
+	h := NewACPHandler(client)
+	h.now = func() time.Time {
+		return now
+	}
+
 	h.ServeHTTP(rec, req)
-	h.now = nowFunc
 
 	var gotAr admv1.AdmissionReview
 	err = json.NewDecoder(rec.Body).Decode(&gotAr)
@@ -156,13 +154,6 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 	client := newBackendMock(t)
 	client.OnUpdateACP("oldVersion", policyUpdate).TypedReturns(&acp.ACP{Version: "newVersion"}, nil).Once()
 
-	h := NewACPHandler(client)
-
-	now := time.Now()
-	nowFunc := func() time.Time {
-		return now
-	}
-
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
@@ -203,10 +194,14 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
 
-	rec := httptest.NewRecorder()
+	now := time.Now()
+	h := NewACPHandler(client)
+	h.now = func() time.Time {
+		return now
+	}
 
+	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	h.now = nowFunc
 
 	var gotAr admv1.AdmissionReview
 	err = json.NewDecoder(rec.Body).Decode(&gotAr)
@@ -336,21 +331,18 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 				Response: &admv1.AdmissionResponse{},
 			}
 
-			h := NewACPHandler(test.backendMock(t))
-
-			now := time.Now()
-			nowFunc := func() time.Time {
-				return now
-			}
-
 			b := mustMarshal(t, admissionRev)
 			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 
-			rec := httptest.NewRecorder()
+			now := time.Now()
+			h := NewACPHandler(test.backendMock(t))
+			h.now = func() time.Time {
+				return now
+			}
 
+			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
-			h.now = nowFunc
 
 			var gotAr admv1.AdmissionReview
 			err = json.NewDecoder(rec.Body).Decode(&gotAr)
@@ -362,8 +354,6 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 }
 
 func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
-	h := NewACPHandler(nil)
-
 	spec := hubv1alpha1.AccessControlPolicySpec{
 		JWT: &hubv1alpha1.AccessControlPolicyJWT{
 			PublicKey: "secret",
@@ -406,19 +396,18 @@ func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	now := time.Now()
-	nowFunc := func() time.Time {
-		return now
-	}
-
 	b := mustMarshal(t, admissionRev)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
 
-	rec := httptest.NewRecorder()
+	now := time.Now()
+	h := NewACPHandler(nil)
+	h.now = func() time.Time {
+		return now
+	}
 
+	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	h.now = nowFunc
 
 	var gotAr admv1.AdmissionReview
 	err = json.NewDecoder(rec.Body).Decode(&gotAr)
