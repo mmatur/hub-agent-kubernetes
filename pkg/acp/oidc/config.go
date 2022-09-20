@@ -32,6 +32,7 @@ type Config struct {
 	LogoutURL   string            `json:"logoutUrl,omitempty"`
 	Scopes      []string          `json:"scopes,omitempty"`
 	AuthParams  map[string]string `json:"authParams,omitempty"`
+	Key         string            `json:"-"`
 	StateCookie *AuthStateCookie  `json:"stateCookie,omitempty"`
 	Session     *AuthSession      `json:"session,omitempty"`
 
@@ -105,26 +106,15 @@ func (cfg *Config) Validate() error {
 		return errors.New("missing client secret")
 	}
 
-	if cfg.Session.Secret == "" {
-		return errors.New("missing session secret")
+	if cfg.Key == "" {
+		return errors.New("missing key")
 	}
 
-	switch len(cfg.Session.Secret) {
+	switch len(cfg.Key) {
 	case 16, 24, 32:
 		break
 	default:
-		return errors.New("session secret must be 16, 24 or 32 characters long")
-	}
-
-	if cfg.StateCookie.Secret == "" {
-		return errors.New("missing state secret")
-	}
-
-	switch len(cfg.StateCookie.Secret) {
-	case 16, 24, 32:
-		break
-	default:
-		return errors.New("state secret must be 16, 24 or 32 characters long")
+		return errors.New("key must be 16, 24 or 32 characters long")
 	}
 
 	if cfg.RedirectURL == "" {
@@ -143,7 +133,6 @@ type SecretReference struct {
 
 // AuthStateCookie carries the state cookie configuration.
 type AuthStateCookie struct {
-	Secret   string `json:"-"`
 	Path     string `json:"path,omitempty"`
 	Domain   string `json:"domain,omitempty"`
 	SameSite string `json:"sameSite,omitempty"`
@@ -152,7 +141,6 @@ type AuthStateCookie struct {
 
 // AuthSession carries session and session cookie configuration.
 type AuthSession struct {
-	Secret   string `json:"-"`
 	Path     string `json:"path,omitempty"`
 	Domain   string `json:"domain,omitempty"`
 	SameSite string `json:"sameSite,omitempty"`

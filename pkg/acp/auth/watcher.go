@@ -41,13 +41,13 @@ import (
 // add a parameter to NewWatcher to subscribe only to a subset of events.
 
 type oidcSecret struct {
-	ClientSecret   string
-	SessionKey     string
-	StateCookieKey string
+	ClientSecret string
 }
 
 // Watcher watches access control policy resources and builds configurations out of them.
 type Watcher struct {
+	key string
+
 	configsMu sync.RWMutex
 	configs   map[string]*acp.Config
 	previous  uint64
@@ -61,8 +61,9 @@ type Watcher struct {
 
 // NewWatcher returns a new watcher to track ACP resources. It calls the given Updater when an ACP is modified at most
 // once every throttle.
-func NewWatcher(switcher *HTTPHandlerSwitcher) *Watcher {
+func NewWatcher(switcher *HTTPHandlerSwitcher, key string) *Watcher {
 	return &Watcher{
+		key:      key,
 		configs:  make(map[string]*acp.Config),
 		secrets:  make(map[string]oidcSecret),
 		refresh:  make(chan struct{}, 1),
@@ -138,16 +139,12 @@ func (w *Watcher) populateSecrets() {
 func (w *Watcher) OnAdd(obj interface{}) {
 	switch v := obj.(type) {
 	case *hubv1alpha1.AccessControlPolicy:
-		w.configsMu.Lock()
-		w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
-		w.configsMu.Unlock()
+		w.updateConfigFromPolicy(v)
 
 	case *corev1.Secret:
 		w.configsMu.Lock()
 		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
-			ClientSecret:   string(v.Data["clientSecret"]),
-			SessionKey:     string(v.Data["sessionKey"]),
-			StateCookieKey: string(v.Data["stateCookieKey"]),
+			ClientSecret: string(v.Data["clientSecret"]),
 		}
 		w.configsMu.Unlock()
 
@@ -169,16 +166,12 @@ func (w *Watcher) OnAdd(obj interface{}) {
 func (w *Watcher) OnUpdate(_, newObj interface{}) {
 	switch v := newObj.(type) {
 	case *hubv1alpha1.AccessControlPolicy:
-		w.configsMu.Lock()
-		w.configs[v.ObjectMeta.Name] = acp.ConfigFromPolicy(v)
-		w.configsMu.Unlock()
+		w.updateConfigFromPolicy(v)
 
 	case *corev1.Secret:
 		w.configsMu.Lock()
 		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
-			ClientSecret:   string(v.Data["clientSecret"]),
-			SessionKey:     string(v.Data["sessionKey"]),
-			StateCookieKey: string(v.Data["stateCookieKey"]),
+			ClientSecret: string(v.Data["clientSecret"]),
 		}
 		w.configsMu.Unlock()
 
@@ -193,6 +186,19 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 	select {
 	case w.refresh <- struct{}{}:
 	default:
+	}
+}
+
+func (w *Watcher) updateConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) {
+	w.configsMu.Lock()
+	defer w.configsMu.Unlock()
+
+	w.configs[policy.ObjectMeta.Name] = acp.ConfigFromPolicy(policy)
+	if w.configs[policy.ObjectMeta.Name].OIDC != nil {
+		w.configs[policy.ObjectMeta.Name].OIDC.Key = w.key
+	}
+	if w.configs[policy.ObjectMeta.Name].OIDCGoogle != nil {
+		w.configs[policy.ObjectMeta.Name].OIDCGoogle.Key = w.key
 	}
 }
 
@@ -291,25 +297,7 @@ func populateSecrets(config *oidc.Config, secret oidcSecret) error {
 		return errors.New("clientSecret is missing in secret")
 	}
 
-	if secret.SessionKey == "" {
-		return errors.New("sessionKey is missing in secret")
-	}
-
-	if secret.StateCookieKey == "" {
-		return errors.New("stateCookieKey is missing in secret")
-	}
-
 	config.ClientSecret = secret.ClientSecret
-
-	if config.Session == nil {
-		config.Session = &oidc.AuthSession{}
-	}
-	config.Session.Secret = secret.SessionKey
-
-	if config.StateCookie == nil {
-		config.StateCookie = &oidc.AuthStateCookie{}
-	}
-	config.StateCookie.Secret = secret.StateCookieKey
 
 	return nil
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/ettle/strcase"
+	"github.com/rs/zerolog/log"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent-kubernetes/pkg/heartbeat"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
@@ -36,6 +37,8 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -111,6 +114,10 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
+	if err = setupOIDCSecret(cliCtx, kubeClient, token); err != nil {
+		return fmt.Errorf("setup OIDC secret: %w", err)
+	}
+
 	traefikClientSet, err := traefikclientset.NewForConfig(kubeCfg)
 	if err != nil {
 		return fmt.Errorf("create Traefik client set: %w", err)
@@ -171,6 +178,36 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	return group.Wait()
+}
+
+func setupOIDCSecret(cliCtx *cli.Context, client clientset.Interface, token string) error {
+	ctx, cancel := context.WithTimeout(cliCtx.Context, time.Second*5)
+	defer cancel()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "hub-secret",
+			Annotations: map[string]string{
+				"app.kubernetes.io/managed-by": "traefik-hub",
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"key": []byte(token),
+		},
+	}
+
+	if _, err := client.CoreV1().Secrets(currentNamespace()).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+		if kerror.IsAlreadyExists(err) {
+			log.Ctx(ctx).Debug().Msg("hub secret is already here")
+
+			return nil
+		}
+
+		return fmt.Errorf("create secret: %w", err)
+	}
+
+	return nil
 }
 
 func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interface) (platform.Config, error) {

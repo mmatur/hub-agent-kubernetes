@@ -19,7 +19,6 @@ package oidc
 
 import (
 	"bytes"
-	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
@@ -46,19 +45,14 @@ type CookieSessionStore struct {
 }
 
 // NewCookieSessionStore creates a cookie session store.
-func NewCookieSessionStore(name string, cfg *AuthSession, rand Randr, maxSize int) (*CookieSessionStore, error) {
-	block, err := aes.NewCipher([]byte(cfg.Secret))
-	if err != nil {
-		return nil, err
-	}
-
+func NewCookieSessionStore(name string, block cipher.Block, cfg *AuthSession, rand Randr, maxSize int) *CookieSessionStore {
 	return &CookieSessionStore{
 		name:    name,
 		cfg:     cfg,
 		maxSize: maxSize,
 		block:   block,
 		rand:    rand,
-	}, nil
+	}
 }
 
 // Create stores the session data into the request cookies.

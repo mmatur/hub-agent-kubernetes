@@ -106,10 +106,10 @@ type Handler struct {
 	name string
 	rand random
 
-	verifier   IDTokenVerifier
-	oauth      OAuthProvider
-	session    SessionStore
-	stateBlock cipher.Block
+	verifier IDTokenVerifier
+	oauth    OAuthProvider
+	session  SessionStore
+	block    cipher.Block
 
 	validateClaims expr.Predicate
 
@@ -139,14 +139,9 @@ func NewHandler(ctx context.Context, cfg *Config, name string) (*Handler, error)
 		}
 	}
 
-	block, err := aes.NewCipher([]byte(cfg.StateCookie.Secret))
+	block, err := aes.NewCipher([]byte(cfg.Key))
 	if err != nil {
 		return nil, fmt.Errorf("new cipher: %w", err)
-	}
-
-	sess, err := NewCookieSessionStore(name+"-session", cfg.Session, newRandom(), maxCookieSize)
-	if err != nil {
-		return nil, fmt.Errorf("new cookie store: %w", err)
 	}
 
 	return &Handler{
@@ -160,8 +155,8 @@ func NewHandler(ctx context.Context, cfg *Config, name string) (*Handler, error)
 			Scopes:       cfg.Scopes,
 		},
 		rand:           newRandom(),
-		session:        sess,
-		stateBlock:     block,
+		session:        NewCookieSessionStore(name+"-session", block, cfg.Session, newRandom(), maxCookieSize),
+		block:          block,
 		validateClaims: pred,
 		client:         client,
 	}, nil
@@ -523,10 +518,10 @@ func (h *Handler) getStateCookie(r *http.Request) (*StateData, error) {
 		return nil, fmt.Errorf("decode state: %w", err)
 	}
 
-	blockSize := h.stateBlock.BlockSize()
+	blockSize := h.block.BlockSize()
 	decrypted := make([]byte, len(decoded)-blockSize)
 	iv := decoded[:blockSize]
-	stream := cipher.NewCTR(h.stateBlock, iv)
+	stream := cipher.NewCTR(h.block, iv)
 	stream.XORKeyStream(decrypted, decoded[blockSize:])
 
 	if err := json.Unmarshal(decrypted, &state); err != nil {
@@ -541,11 +536,11 @@ func (h *Handler) newStateCookie(state StateData) (*http.Cookie, error) {
 		return nil, fmt.Errorf("serialize state: %w", err)
 	}
 
-	blockSize := h.stateBlock.BlockSize()
+	blockSize := h.block.BlockSize()
 	encrypted := make([]byte, blockSize+len(statePayload))
 	iv := h.rand.Bytes(blockSize)
 	copy(encrypted[:blockSize], iv)
-	stream := cipher.NewCTR(h.stateBlock, iv)
+	stream := cipher.NewCTR(h.block, iv)
 	stream.XORKeyStream(encrypted[blockSize:], statePayload)
 
 	return &http.Cookie{

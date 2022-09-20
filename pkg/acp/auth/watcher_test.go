@@ -64,9 +64,7 @@ func createSecret(namespace, name string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Data: map[string][]byte{
-			"clientSecret":   []byte("1234567890123456"),
-			"sessionKey":     []byte("1234567890123456"),
-			"stateCookieKey": []byte("1234567890123456"),
+			"clientSecret": []byte("1234567890123456"),
 		},
 	}
 }
@@ -83,7 +81,7 @@ func TestWatcher_OnAddOIDC(t *testing.T) {
 	data = fmt.Sprintf(`{"issuer":%q}`, srv.URL)
 
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher := NewWatcher(switcher, "1234567891234567")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
@@ -117,7 +115,7 @@ func TestWatcher_OnAddOIDC(t *testing.T) {
 
 func TestWatcher_OnAdd(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher := NewWatcher(switcher, "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
@@ -186,7 +184,7 @@ func TestWatcher_OnAdd(t *testing.T) {
 
 func TestWatcher_OnUpdate(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher := NewWatcher(switcher, "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
@@ -239,7 +237,7 @@ func TestWatcher_OnUpdate(t *testing.T) {
 
 func TestWatcher_OnDelete(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher := NewWatcher(switcher, "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)

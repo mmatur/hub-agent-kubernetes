@@ -49,12 +49,6 @@ func TestNewMiddlewareFromSource_ValidatesConfiguration(t *testing.T) {
 				ClientID:     "bar",
 				ClientSecret: "bat",
 				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
 			},
 			wantErr: "validate configuration: missing issuer",
 		},
@@ -65,92 +59,8 @@ func TestNewMiddlewareFromSource_ValidatesConfiguration(t *testing.T) {
 				ClientID:     "",
 				ClientSecret: "bat",
 				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
 			},
 			wantErr: "validate configuration: missing client ID",
-		},
-		{
-			desc: "empty ClientSecret",
-			cfg: &Config{
-				Issuer:       "foo",
-				ClientID:     "bar",
-				ClientSecret: "",
-				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-			},
-			wantErr: "validate configuration: missing client secret",
-		},
-		{
-			desc: "empty Session Secret",
-			cfg: &Config{
-				Issuer:       "foo",
-				ClientID:     "bar",
-				ClientSecret: "bat",
-				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
-				Session: &AuthSession{
-					Secret: "",
-				},
-			},
-			wantErr: "validate configuration: missing session secret",
-		},
-		{
-			desc: "bad size for Session Secret",
-			cfg: &Config{
-				Issuer:       "foo",
-				ClientID:     "bar",
-				ClientSecret: "bat",
-				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
-				Session: &AuthSession{
-					Secret: "foo",
-				},
-			},
-			wantErr: "validate configuration: session secret must be 16, 24 or 32 characters long",
-		},
-		{
-			desc: "empty State Secret",
-			cfg: &Config{
-				Issuer:       "foo",
-				ClientID:     "bar",
-				ClientSecret: "bat",
-				RedirectURL:  "test",
-				StateCookie:  &AuthStateCookie{},
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-			},
-			wantErr: "validate configuration: missing state secret",
-		},
-		{
-			desc: "bad size for State Secret",
-			cfg: &Config{
-				Issuer:       "foo",
-				ClientID:     "bar",
-				ClientSecret: "bat",
-				RedirectURL:  "test",
-				StateCookie: &AuthStateCookie{
-					Secret: "foo",
-				},
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-			},
-			wantErr: "validate configuration: state secret must be 16, 24 or 32 characters long",
 		},
 	}
 
@@ -192,8 +102,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 					"hd": "example.com",
 				},
 				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-					Path:   "/",
+					Path: "/",
 				},
 			},
 			wantStatus:      http.StatusFound,
@@ -209,8 +118,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			cfg: &Config{
 				RedirectURL: "/callback",
 				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-					Path:   "/",
+					Path: "/",
 				},
 			},
 			wantStatus:      http.StatusFound,
@@ -223,8 +131,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			cfg: &Config{
 				RedirectURL: "example.com/callback",
 				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-					Path:   "/",
+					Path: "/",
 				},
 			},
 			wantStatus:      http.StatusFound,
@@ -235,9 +142,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			desc:    "returns unauthorized if method is PUT",
 			request: httptest.NewRequest(http.MethodPut, "/foo", nil),
 			cfg: &Config{
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
+				StateCookie: &AuthStateCookie{},
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -245,9 +150,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			desc:    "returns unauthorized if method is POST",
 			request: httptest.NewRequest(http.MethodPost, "/foo", nil),
 			cfg: &Config{
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
+				StateCookie: &AuthStateCookie{},
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -255,9 +158,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			desc:    "returns unauthorized if method is DELETE",
 			request: httptest.NewRequest(http.MethodDelete, "/foo", nil),
 			cfg: &Config{
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
+				StateCookie: &AuthStateCookie{},
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -265,9 +166,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			desc:    "returns unauthorized if method is PATCH",
 			request: httptest.NewRequest(http.MethodPatch, "/foo", nil),
 			cfg: &Config{
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
+				StateCookie: &AuthStateCookie{},
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -275,9 +174,7 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 			desc:    "returns unauthorized if path is favicon.ico",
 			request: httptest.NewRequest(http.MethodGet, "https://foo.com/favicon.ico", nil),
 			cfg: &Config{
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
+				StateCookie: &AuthStateCookie{},
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -290,7 +187,6 @@ func TestMiddleware_RedirectsCorrectly(t *testing.T) {
 					"hd": "example.com",
 				},
 				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
 					Path:   "/",
 					Domain: "example.com",
 				},
@@ -384,7 +280,6 @@ func TestMiddleware_ExchangesTokenOnCallback(t *testing.T) {
 		ClientSecret: "client-secret",
 		RedirectURL:  "http://foobar.com/callback",
 		StateCookie: &AuthStateCookie{
-			Secret:   "secret1234567890",
 			Path:     "/",
 			SameSite: "lax",
 			Secure:   true,
@@ -464,12 +359,6 @@ func TestMiddleware_ForwardsCorrectly(t *testing.T) {
 				ClientID:     "clientID",
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
 			},
 			idToken:    "badtoken, very bad token.",
 			wantStatus: http.StatusBadRequest,
@@ -482,12 +371,6 @@ func TestMiddleware_ForwardsCorrectly(t *testing.T) {
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
 				Claims:       "Equals(`group`,`dev`)",
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
 			},
 			idToken:    jwtToken,
 			wantStatus: http.StatusForbidden,
@@ -500,12 +383,6 @@ func TestMiddleware_ForwardsCorrectly(t *testing.T) {
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
 				Claims:       "Equals(`group`,`admin`)",
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
 				ForwardHeaders: map[string]string{
 					"X-App-Group": "group",
 				},
@@ -524,12 +401,6 @@ func TestMiddleware_ForwardsCorrectly(t *testing.T) {
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
 				Claims:       "Equals(`group`,`admin`)",
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
 				ForwardHeaders: map[string]string{
 					"x-App-Group": "group",
 				},
@@ -550,12 +421,6 @@ func TestMiddleware_ForwardsCorrectly(t *testing.T) {
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
 				Claims:       "Equals(`group`,`admin`)",
-				Session: &AuthSession{
-					Secret: "secret1234567890",
-				},
-				StateCookie: &AuthStateCookie{
-					Secret: "secret1234567890",
-				},
 				ForwardHeaders: map[string]string{
 					"x-App-Group": "group",
 				},
@@ -668,8 +533,6 @@ func TestMiddleware_LogsOutCorrectly(t *testing.T) {
 				ClientID:     "clientID",
 				ClientSecret: "secret1234567890",
 				RedirectURL:  "http://foo.com",
-				StateCookie:  &AuthStateCookie{Secret: "secret1234567890"},
-				Session:      &AuthSession{Secret: "secret1234567890"},
 				LogoutURL:    test.logoutURL,
 			}
 
@@ -713,11 +576,11 @@ func buildHandler(t *testing.T) *Handler {
 	require.NoError(t, err)
 
 	return &Handler{
-		name:       "test",
-		stateBlock: stateBlock,
-		rand:       newRandom(),
-		client:     client,
-		verifier:   verifier,
+		name:     "test",
+		block:    stateBlock,
+		rand:     newRandom(),
+		client:   client,
+		verifier: verifier,
 	}
 }
 
