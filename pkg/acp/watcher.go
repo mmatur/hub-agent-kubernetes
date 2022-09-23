@@ -201,14 +201,14 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 		}
 
 		if a.OIDCGoogle.Secret != nil {
-			spec.OIDC.Secret = &corev1.SecretReference{
+			spec.OIDCGoogle.Secret = &corev1.SecretReference{
 				Name:      a.OIDCGoogle.Secret.Name,
 				Namespace: a.OIDCGoogle.Secret.Namespace,
 			}
 		}
 
 		if a.OIDCGoogle.StateCookie != nil {
-			spec.OIDC.StateCookie = &hubv1alpha1.StateCookie{
+			spec.OIDCGoogle.StateCookie = &hubv1alpha1.StateCookie{
 				SameSite: a.OIDCGoogle.StateCookie.SameSite,
 				Secure:   a.OIDCGoogle.StateCookie.Secure,
 				Domain:   a.OIDCGoogle.StateCookie.Domain,
@@ -217,7 +217,7 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 		}
 
 		if a.OIDCGoogle.Session != nil {
-			spec.OIDC.Session = &hubv1alpha1.Session{
+			spec.OIDCGoogle.Session = &hubv1alpha1.Session{
 				SameSite: a.OIDCGoogle.Session.SameSite,
 				Secure:   a.OIDCGoogle.Session.Secure,
 				Domain:   a.OIDCGoogle.Session.Domain,
