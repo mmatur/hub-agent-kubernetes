@@ -157,6 +157,7 @@ linters:
     - ifshort # disable due to false-positive, the linter will be fixed https://github.com/esimonov/ifshort
     - varnamelen
     - nilnil
+    - nilerr
     - ireturn
     - contextcheck
     - errchkjson

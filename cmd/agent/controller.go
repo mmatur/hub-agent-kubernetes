@@ -143,6 +143,8 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	}
 	topoWatch := topology.NewWatcher(topoFetcher, store.New(platformClient))
 
+	checker := version.NewChecker(platformClient)
+
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 
 	group.Go(func() error {
@@ -175,6 +177,14 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	group.Go(func() error {
 		return webhookAdmission(ctx, cliCtx, platformClient)
+	})
+
+	group.Go(func() error {
+		if err := checker.Start(ctx); err != nil {
+			return err
+		}
+
+		return nil
 	})
 
 	return group.Wait()

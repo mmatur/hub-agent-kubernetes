@@ -29,9 +29,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const defaultVersion = "dev"
+
 // These variables are set when compiling the project.
 var (
-	version = "dev"
+	version = defaultVersion
 	commit  = ""
 	date    = ""
 )
@@ -101,6 +103,9 @@ func moduleName() string {
 
 // SetUserAgent sets the user-agent on an HTTP request.
 func SetUserAgent(req *http.Request) {
-	ua := fmt.Sprintf("hub-agent-kubernetes/%s (%s; %s; %s)", Version(), commit, runtime.GOOS, runtime.GOARCH)
-	req.Header.Set("User-Agent", strings.TrimSpace(ua))
+	req.Header.Set("User-Agent", strings.TrimSpace(userAgent()))
+}
+
+func userAgent() string {
+	return fmt.Sprintf("hub-agent-kubernetes/%s (%s; %s; %s)", version, commit, runtime.GOOS, runtime.GOARCH)
 }
