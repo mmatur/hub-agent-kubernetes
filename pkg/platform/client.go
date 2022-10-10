@@ -90,6 +90,56 @@ type UpdateEdgeIngressReq struct {
 	ACP     *ACP    `json:"acp,omitempty"`
 }
 
+// Command defines patch operation to apply on the cluster.
+type Command struct {
+	ID        string          `json:"id"`
+	CreatedAt time.Time       `json:"createdAt"`
+	Type      string          `json:"type"`
+	Data      json.RawMessage `json:"data"`
+}
+
+// CommandExecutionStatus describes the execution status of a command.
+type CommandExecutionStatus string
+
+// The different CommandExecutionStatus available.
+const (
+	CommandExecutionStatusSuccess CommandExecutionStatus = "success"
+	CommandExecutionStatusFailure CommandExecutionStatus = "failure"
+)
+
+// CommandExecutionReportError holds details about an execution failure.
+type CommandExecutionReportError struct {
+	// Type identifies the reason of the error.
+	Type string `json:"type"`
+
+	// Data is a freeform Type dependent value.
+	Data interface{} `json:"data,omitempty"`
+}
+
+// CommandExecutionReport describes the output of a command execution.
+type CommandExecutionReport struct {
+	ID     string                       `json:"id"`
+	Status CommandExecutionStatus       `json:"status"`
+	Error  *CommandExecutionReportError `json:"error,omitempty"`
+}
+
+// NewErrorCommandExecutionReport creates a new CommandExecutionReport with a status CommandExecutionStatusFailure.
+func NewErrorCommandExecutionReport(id string, err CommandExecutionReportError) *CommandExecutionReport {
+	return &CommandExecutionReport{
+		ID:     id,
+		Status: CommandExecutionStatusFailure,
+		Error:  &err,
+	}
+}
+
+// NewSuccessCommandExecutionReport creates a new CommandExecutionReport with a status CommandExecutionStatusSuccess.
+func NewSuccessCommandExecutionReport(id string) *CommandExecutionReport {
+	return &CommandExecutionReport{
+		ID:     id,
+		Status: CommandExecutionStatusSuccess,
+	}
+}
+
 type linkClusterReq struct {
 	KubeID   string `json:"kubeId"`
 	Platform string `json:"platform"`
@@ -871,6 +921,84 @@ func (c *Client) PatchTopology(ctx context.Context, patch []byte, lastKnownVersi
 	}
 
 	return body.Version, nil
+}
+
+// ListPendingCommands fetches the commands to apply on the cluster.
+func (c *Client) ListPendingCommands(ctx context.Context) ([]Command, error) {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "commands"))
+	if err != nil {
+		return nil, fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return nil, apiErr
+	}
+
+	var commands []Command
+	if err = json.NewDecoder(resp.Body).Decode(&commands); err != nil {
+		return nil, fmt.Errorf("decode list commands resp: %w", err)
+	}
+
+	return commands, nil
+}
+
+// SubmitCommandReports submits the given command execution reports.
+func (c *Client) SubmitCommandReports(ctx context.Context, reports []CommandExecutionReport) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "command-reports"))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	body, err := json.Marshal(reports)
+	if err != nil {
+		return fmt.Errorf("marshal command reports: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+
+	return nil
 }
 
 func newGzippedRequestWithContext(ctx context.Context, verb, u string, body []byte) (*http.Request, error) {

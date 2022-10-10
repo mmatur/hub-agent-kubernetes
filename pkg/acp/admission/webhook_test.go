@@ -96,13 +96,25 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 	tests := []struct {
 		desc      string
 		req       admv1.AdmissionRequest
-		reviewers func(*testing.T) []Reviewer
+		reviewers func(*testing.T) ([]Reviewer, Reviewer)
 		wantResp  admv1.AdmissionResponse
 	}{
 		{
+			desc: "returns nothing if there's no ACP defined",
+			req:  ingressWithoutACP,
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
+				t.Helper()
+				return nil, nil
+			},
+			wantResp: admv1.AdmissionResponse{
+				UID:     "uid",
+				Allowed: true,
+			},
+		},
+		{
 			desc: "returns patch when adding an ACP",
 			req:  ingressWithACP,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
@@ -112,7 +124,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 						"value": "add-acp",
 					}, nil).Once()
 
-				return []Reviewer{reviewer}
+				return []Reviewer{reviewer}, nil
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
@@ -127,7 +139,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 		{
 			desc: "returns patch when removing ACP",
 			req:  ingressWithACPRemoved,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
@@ -137,7 +149,7 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 						"value": "remove-acp",
 					}, nil).Once()
 
-				return []Reviewer{reviewer}
+				return []Reviewer{reviewer}, nil
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
@@ -152,14 +164,14 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 		{
 			desc: "allows to delete ingress using an ACP",
 			req:  deleteIngressWithACP,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
 				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(true, nil).Once()
 				reviewer.OnReviewRaw(mock.Anything).TypedReturns(nil, nil).Once()
 
-				return []Reviewer{reviewer}
+				return []Reviewer{reviewer}, nil
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
@@ -169,14 +181,14 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 		{
 			desc: "returns failure if Review fails",
 			req:  ingressWithACP,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
 				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(true, nil).Once()
 				reviewer.OnReviewRaw(mock.Anything).TypedReturns(nil, errors.New("boom")).Once()
 
-				return []Reviewer{reviewer}
+				return []Reviewer{reviewer}, nil
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
@@ -188,54 +200,47 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			desc: "returns failure if no reviewer found and ACP is defined",
+			desc: "fallback on default reviewer if no reviewer found",
 			req:  ingressWithACP,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
 				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(false, nil).Once()
 
-				return []Reviewer{reviewer}
+				defaultReviewer := newReviewerMock(t)
+				defaultReviewer.OnReviewRaw(mock.Anything).
+					TypedReturns(map[string]interface{}{"value": "add-acp"}, nil).
+					Once()
+
+				return []Reviewer{reviewer}, defaultReviewer
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
-				Allowed: false,
-				Result: &metav1.Status{
-					Status: "Failure",
-					Message: `unsupported or ambiguous Ingress Controller for resource "my-ingress" of kind "networking.k8s.io/v1, Kind=Ingress" in namespace "". ` +
-						`Supported Ingress Controller is Traefik; ` +
+				Allowed: true,
+				Patch:   []byte(`[{"value":"add-acp"}]`),
+				PatchType: func() *admv1.PatchType {
+					typ := admv1.PatchTypeJSONPatch
+					return &typ
+				}(),
+				Warnings: []string{
+					`unsupported or ambiguous Ingress Controller for resource "my-ingress" of kind "networking.k8s.io/v1, Kind=Ingress" in namespace "". ` +
+						"Falling back to Traefik; " +
 						`consider explicitly setting the "ingressClassName" property in your resource ` +
 						`or the "kubernetes.io/ingress.class" annotation (deprecated) or setting a default Ingress Controller if none is set`,
 				},
 			},
 		},
 		{
-			desc: "returns nothing if no reviewer found but no ACP is defined",
-			req:  ingressWithoutACP,
-			reviewers: func(t *testing.T) []Reviewer {
-				t.Helper()
-
-				reviewer := newReviewerMock(t)
-				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(false, nil).Once()
-
-				return []Reviewer{reviewer}
-			},
-			wantResp: admv1.AdmissionResponse{
-				UID:     "uid",
-				Allowed: true,
-			},
-		},
-		{
-			desc: "returns failure if CanReview fails and an ACP is defined",
+			desc: "returns failure if CanReview fails",
 			req:  ingressWithACP,
-			reviewers: func(t *testing.T) []Reviewer {
+			reviewers: func(t *testing.T) ([]Reviewer, Reviewer) {
 				t.Helper()
 
 				reviewer := newReviewerMock(t)
 				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(false, errors.New("boom")).Once()
 
-				return []Reviewer{reviewer}
+				return []Reviewer{reviewer}, nil
 			},
 			wantResp: admv1.AdmissionResponse{
 				UID:     "uid",
@@ -243,25 +248,6 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 				Result: &metav1.Status{
 					Status:  "Failure",
 					Message: "find reviewer: boom",
-				},
-			},
-		},
-		{
-			desc: "returns warning if CanReview fails but no ACP is defined",
-			req:  ingressWithoutACP,
-			reviewers: func(t *testing.T) []Reviewer {
-				t.Helper()
-
-				reviewer := newReviewerMock(t)
-				reviewer.OnCanReviewRaw(mock.Anything).TypedReturns(false, errors.New("boom")).Once()
-
-				return []Reviewer{reviewer}
-			},
-			wantResp: admv1.AdmissionResponse{
-				Allowed: true,
-				UID:     "uid",
-				Warnings: []string{
-					"boom",
 				},
 			},
 		},
@@ -279,7 +265,8 @@ func TestWebhook_ServeHTTP(t *testing.T) {
 			b, err := json.Marshal(ar)
 			require.NoError(t, err)
 
-			h := NewHandler(test.reviewers(t))
+			reviewers, defaultReviewer := test.reviewers(t)
+			h := NewHandler(reviewers, defaultReviewer)
 
 			rec := httptest.NewRecorder()
 			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))

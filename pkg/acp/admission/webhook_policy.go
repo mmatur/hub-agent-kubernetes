@@ -89,9 +89,25 @@ func (h ACPHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			err = errors.New("platform conflict: a more recent version of this resource is available")
 		}
 
-		setReviewErrorResponse(&ar, err)
+		ar.Response = &admv1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status:  "Failure",
+				Message: err.Error(),
+			},
+			UID: ar.Request.UID,
+		}
 	} else {
-		setReviewResponse(&ar, patches)
+		ar.Response = &admv1.AdmissionResponse{
+			Allowed: true,
+			UID:     ar.Request.UID,
+		}
+
+		if patches != nil {
+			t := admv1.PatchTypeJSONPatch
+			ar.Response.PatchType = &t
+			ar.Response.Patch = patches
+		}
 	}
 
 	if err = json.NewEncoder(rw).Encode(ar); err != nil {

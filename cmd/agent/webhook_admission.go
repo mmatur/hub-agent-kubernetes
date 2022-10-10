@@ -248,12 +248,14 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
 
+	traefikReviewer := reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs)
 	reviewers := []admission.Reviewer{
 		reviewer.NewNginxIngress(authServerAddr, ingClassWatcher, polGetter),
-		reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs),
+		reviewer.NewTraefikIngressRoute(fwdAuthMdlwrs),
+		traefikReviewer,
 	}
 
-	return admission.NewHandler(reviewers), edgeadmission.NewHandler(platformClient), nil
+	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), nil
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {

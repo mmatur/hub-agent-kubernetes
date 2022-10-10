@@ -1419,3 +1419,208 @@ func TestClient_SetVersionStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_ListPendingCommands(t *testing.T) {
+	tests := []struct {
+		desc         string
+		statusCode   int
+		body         []byte
+		wantCommands []Command
+		wantErr      error
+	}{
+		{
+			desc:       "get pending commands succeed",
+			statusCode: http.StatusOK,
+			body: []byte(`[
+				{"id": "cmd-1", "createdAt": "2000-10-31T01:30:00.000Z", "type": "command-type-1", "data": {"key": "value-1"}},
+				{"id": "cmd-2", "createdAt": "2000-10-31T01:31:00.000Z", "type": "command-type-2", "data": {"key": "value-2"}}
+			]`),
+			wantCommands: []Command{
+				{
+					ID:        "cmd-1",
+					CreatedAt: time.Date(2000, time.October, 31, 1, 30, 0, 0, time.UTC),
+					Type:      "command-type-1",
+					Data:      []byte(`{"key": "value-1"}`),
+				},
+				{
+					ID:        "cmd-2",
+					CreatedAt: time.Date(2000, time.October, 31, 1, 31, 0, 0, time.UTC),
+					Type:      "command-type-2",
+					Data:      []byte(`{"key": "value-2"}`),
+				},
+			},
+		},
+		{
+			desc:       "get pending commands unexpected error",
+			statusCode: http.StatusTeapot,
+			wantErr: &APIError{
+				StatusCode: http.StatusTeapot,
+				Message:    "error",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/commands", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodGet {
+					http.Error(rw, fmt.Sprintf("unsupported method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				rw.WriteHeader(test.statusCode)
+				_, _ = rw.Write(test.body)
+			})
+
+			srv := httptest.NewServer(mux)
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			gotCommands, err := c.ListPendingCommands(context.Background())
+			if test.wantErr != nil {
+				require.ErrorAs(t, err, test.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, 1, callCount)
+			assert.Equal(t, test.wantCommands, gotCommands)
+		})
+	}
+}
+
+type reportErrorData struct {
+	Value int `json:"value"`
+}
+
+func TestClient_SendCommandReports(t *testing.T) {
+	tests := []struct {
+		desc           string
+		statusCode     int
+		commandReports []CommandExecutionReport
+		wantBody       []byte
+		wantErr        error
+	}{
+		{
+			desc:       "send command reports succeed",
+			statusCode: http.StatusOK,
+			commandReports: []CommandExecutionReport{
+				{
+					ID:     "cmd-1",
+					Status: "success",
+				},
+				{
+					ID:     "cmd-2",
+					Status: "failure",
+					Error: &CommandExecutionReportError{
+						Type: "something-went-wrong",
+						Data: &reportErrorData{Value: 42},
+					},
+				},
+				{
+					ID:     "cmd-3",
+					Status: "failure",
+					Error: &CommandExecutionReportError{
+						Type: "something-went-wrong",
+					},
+				},
+				{
+					ID:     "cmd-4",
+					Status: "failure",
+				},
+			},
+			wantBody: []byte(`[
+				{"id":"cmd-1","status":"success"},
+				{"id":"cmd-2","status":"failure","error":{"type":"something-went-wrong","data":{"value":42}}},
+				{"id":"cmd-3","status":"failure","error":{"type":"something-went-wrong"}},
+				{"id":"cmd-4","status":"failure"}
+			]`),
+		},
+		{
+			desc:       "send command reports unexpected error",
+			statusCode: http.StatusTeapot,
+			commandReports: []CommandExecutionReport{
+				{
+					ID:     "cmd-1",
+					Status: "success",
+				},
+			},
+			wantBody: []byte(`[{"id":"cmd-1","status":"success"}]`),
+			wantErr: &APIError{
+				StatusCode: http.StatusTeapot,
+				Message:    "error",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/command-reports", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unsupported method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				gotBody, err := io.ReadAll(req.Body)
+				if err != nil {
+					http.Error(rw, "Read body", http.StatusBadRequest)
+					return
+				}
+
+				if !assert.JSONEq(t, string(test.wantBody), string(gotBody)) {
+					http.Error(rw, "Invalid body", http.StatusBadRequest)
+					return
+				}
+
+				rw.WriteHeader(test.statusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			err = c.SubmitCommandReports(context.Background(), test.commandReports)
+			if test.wantErr != nil {
+				require.ErrorAs(t, err, test.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, 1, callCount)
+		})
+	}
+}

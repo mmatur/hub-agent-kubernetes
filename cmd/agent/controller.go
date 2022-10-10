@@ -26,6 +26,7 @@ import (
 
 	"github.com/ettle/strcase"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/commands"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent-kubernetes/pkg/heartbeat"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
@@ -145,6 +146,8 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	checker := version.NewChecker(platformClient)
 
+	commandWatcher := commands.NewWatcher(platformClient, kubeClient, traefikClientSet)
+
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 
 	group.Go(func() error {
@@ -184,6 +187,11 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 			return err
 		}
 
+		return nil
+	})
+
+	group.Go(func() error {
+		commandWatcher.Start(ctx)
 		return nil
 	})
 

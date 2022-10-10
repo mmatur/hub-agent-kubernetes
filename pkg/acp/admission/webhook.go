@@ -27,6 +27,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	admv1 "k8s.io/api/admission/v1"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,27 +37,17 @@ type Reviewer interface {
 	Review(ctx context.Context, ar admv1.AdmissionReview) (map[string]interface{}, error)
 }
 
-type reviewerWarning struct {
-	err error
-}
-
-func (e reviewerWarning) Error() string {
-	if e.err == nil {
-		return "reviewer warning"
-	}
-
-	return e.err.Error()
-}
-
 // Handler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
 type Handler struct {
-	reviewers []Reviewer
+	reviewers       []Reviewer
+	defaultReviewer Reviewer
 }
 
 // NewHandler returns a new Handler that reviews incoming requests using the given reviewers.
-func NewHandler(reviewers []Reviewer) *Handler {
+func NewHandler(reviewers []Reviewer, defaultReviewer Reviewer) *Handler {
 	return &Handler{
-		reviewers: reviewers,
+		reviewers:       reviewers,
+		defaultReviewer: defaultReviewer,
 	}
 }
 
@@ -81,18 +72,40 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	ctx := l.WithContext(req.Context())
 
-	patch, err := h.review(ctx, ar)
+	resp, err := h.review(ctx, ar)
 	if err != nil {
-		var warn *reviewerWarning
-		if errors.As(err, &warn) {
-			log.Ctx(ctx).Debug().Err(warn).Msg("Reviewer warning")
-			setReviewWarningResponse(&ar, warn)
-		} else {
-			log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
-			setReviewErrorResponse(&ar, err)
+		log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
+
+		result := metav1.Status{
+			Status: "Failure",
+			Reason: metav1.StatusReasonUnknown,
+		}
+
+		// Propagate kubernetes status error in the reviewer response. A not found error
+		// during the review process will be returned as it is to the caller.
+		var statusErr *kerror.StatusError
+		if errors.As(err, &statusErr) {
+			result = statusErr.Status()
+		}
+
+		result.Message = err.Error()
+		ar.Response = &admv1.AdmissionResponse{
+			Allowed: false,
+			Result:  &result,
+			UID:     ar.Request.UID,
 		}
 	} else {
-		setReviewResponse(&ar, patch)
+		ar.Response = &admv1.AdmissionResponse{
+			Allowed:  true,
+			UID:      ar.Request.UID,
+			Warnings: resp.Warnings,
+		}
+
+		if resp.Patch != nil {
+			t := admv1.PatchTypeJSONPatch
+			ar.Response.PatchType = &t
+			ar.Response.Patch = resp.Patch
+		}
 	}
 
 	if err = json.NewEncoder(rw).Encode(ar); err != nil {
@@ -102,33 +115,36 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, error) {
+type reviewResponse struct {
+	Patch    []byte
+	Warnings []string
+}
+
+func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) (*reviewResponse, error) {
+	var resp reviewResponse
+
 	usesACP, err := isUsingACP(ar)
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine if resource uses ACP: %w", err)
 	}
+	if !usesACP {
+		return &resp, nil
+	}
 
 	rev, revErr := findReviewer(h.reviewers, ar)
 	if revErr != nil {
-		// We had an error looking for a reviewer for this resource, but it's not using ACPs,
-		// so just warn the user.
-		if !usesACP {
-			return nil, &reviewerWarning{err: revErr}
-		}
 		return nil, fmt.Errorf("find reviewer: %w", revErr)
 	}
 
 	if rev == nil {
-		// We could not find a reviewer for this resource, but it's not using ACPs, don't do anything.
-		if !usesACP {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("unsupported or ambiguous Ingress Controller for resource %q of kind %q in namespace %q. "+
-			"Supported Ingress Controller is Traefik; "+
-			`consider explicitly setting the "ingressClassName" property in your resource `+
-			`or the "kubernetes.io/ingress.class" annotation (deprecated) `+
-			"or setting a default Ingress Controller if none is set",
-			ar.Request.Name, ar.Request.Kind, ar.Request.Namespace)
+		rev = h.defaultReviewer
+		resp.Warnings = append(resp.Warnings, fmt.Sprintf(
+			"unsupported or ambiguous Ingress Controller for resource %q of kind %q in namespace %q. "+
+				"Falling back to Traefik; "+
+				`consider explicitly setting the "ingressClassName" property in your resource `+
+				`or the "kubernetes.io/ingress.class" annotation (deprecated) `+
+				"or setting a default Ingress Controller if none is set",
+			ar.Request.Name, ar.Request.Kind, ar.Request.Namespace))
 	}
 
 	resourcePatch, err := rev.Review(ctx, ar)
@@ -137,15 +153,15 @@ func (h Handler) review(ctx context.Context, ar admv1.AdmissionReview) ([]byte, 
 	}
 
 	if resourcePatch == nil {
-		return nil, nil
+		return &resp, nil
 	}
 
-	b, err := json.Marshal([]map[string]interface{}{resourcePatch})
+	resp.Patch, err = json.Marshal([]map[string]interface{}{resourcePatch})
 	if err != nil {
 		return nil, fmt.Errorf("serialize patches: %w", err)
 	}
 
-	return b, nil
+	return &resp, nil
 }
 
 func findReviewer(reviewers []Reviewer, ar admv1.AdmissionReview) (Reviewer, error) {
@@ -165,40 +181,8 @@ func findReviewer(reviewers []Reviewer, ar admv1.AdmissionReview) (Reviewer, err
 			rev = r
 		}
 	}
+
 	return rev, nil
-}
-
-func setReviewErrorResponse(ar *admv1.AdmissionReview, err error) {
-	ar.Response = &admv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: err.Error(),
-		},
-		UID: ar.Request.UID,
-	}
-}
-
-func setReviewWarningResponse(ar *admv1.AdmissionReview, err error) {
-	ar.Response = &admv1.AdmissionResponse{
-		Allowed: true,
-		UID:     ar.Request.UID,
-		Warnings: []string{
-			err.Error(),
-		},
-	}
-}
-
-func setReviewResponse(ar *admv1.AdmissionReview, patch []byte) {
-	ar.Response = &admv1.AdmissionResponse{
-		Allowed: true,
-		UID:     ar.Request.UID,
-	}
-	if patch != nil {
-		t := admv1.PatchTypeJSONPatch
-		ar.Response.PatchType = &t
-		ar.Response.Patch = patch
-	}
 }
 
 func isUsingACP(ar admv1.AdmissionReview) (bool, error) {
