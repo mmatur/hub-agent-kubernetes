@@ -413,6 +413,11 @@ func (in *EdgeIngressSpec) DeepCopy() *EdgeIngressSpec {
 func (in *EdgeIngressStatus) DeepCopyInto(out *EdgeIngressStatus) {
 	*out = *in
 	in.SyncedAt.DeepCopyInto(&out.SyncedAt)
+	if in.CustomDomains != nil {
+		in, out := &in.CustomDomains, &out.CustomDomains
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -129,7 +129,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				Version:    "version-1",
 				SyncedAt:   now,
 				Domain:     "majestic-beaver-123.hub-traefik.io",
-				URL:        "https://majestic-beaver-123.hub-traefik.io",
+				URLs:       "https://majestic-beaver-123.hub-traefik.io",
 				SpecHash:   "NexiGZBcal8NDre24JKd5LKyxF4=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
@@ -324,7 +324,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 			{Op: "replace", Path: "/status", Value: hubv1alpha1.EdgeIngressStatus{
 				Version:    "version-4",
 				Domain:     "majestic-beaver-123.hub-traefik.io",
-				URL:        "https://majestic-beaver-123.hub-traefik.io",
+				URLs:       "https://majestic-beaver-123.hub-traefik.io",
 				SyncedAt:   now,
 				SpecHash:   "1AI6Wssn12E2icVo1NMreqOJSNU=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,

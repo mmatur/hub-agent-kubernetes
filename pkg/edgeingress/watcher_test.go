@@ -55,7 +55,7 @@ var toUpdate = hubv1alpha1.EdgeIngress{
 	Status: hubv1alpha1.EdgeIngressStatus{
 		Version:    "version-1",
 		SyncedAt:   metav1.NewTime(time.Now().Add(-time.Hour)),
-		URL:        "https://sad-bat-456.hub-traefik.io",
+		URLs:       "https://sad-bat-456.hub-traefik.io",
 		SpecHash:   "yxjMx+3w4R4B4YPzoGkqi/g9rLs=",
 		Connection: hubv1alpha1.EdgeIngressConnectionDown,
 	},
@@ -78,7 +78,7 @@ var toDelete = hubv1alpha1.EdgeIngress{
 	Status: hubv1alpha1.EdgeIngressStatus{
 		Version:    "version-1",
 		SyncedAt:   metav1.NewTime(time.Now().Add(-time.Hour)),
-		URL:        "https://broken-cat-123.hub-traefik.io",
+		URLs:       "https://broken-cat-123.hub-traefik.io",
 		SpecHash:   "7kfh53DLsXumNEaO/nkeVYs/5CI=",
 		Connection: hubv1alpha1.EdgeIngressConnectionDown,
 	},
@@ -185,7 +185,7 @@ func Test_WatcherRun(t *testing.T) {
 			Version:    edgeIngress.Version,
 			SyncedAt:   metav1.Time{},
 			Domain:     edgeIngress.Domain,
-			URL:        "https://" + edgeIngress.Domain,
+			URLs:       "https://" + edgeIngress.Domain,
 			SpecHash:   hashes[edgeIngress.Name],
 			Connection: hubv1alpha1.EdgeIngressConnectionUp,
 		}, edgeIng.Status)
@@ -345,12 +345,13 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 	edgeIng.Status.SyncedAt = metav1.Time{}
 
 	assert.Equal(t, hubv1alpha1.EdgeIngressStatus{
-		Version:    wantEdgeIngress.Version,
-		SyncedAt:   metav1.Time{},
-		Domain:     wantEdgeIngress.Domain,
-		URL:        "https://" + wantEdgeIngress.Domain,
-		SpecHash:   "4vJBrpeDJLuGzikpIg0ZJTca9FQ=",
-		Connection: hubv1alpha1.EdgeIngressConnectionUp,
+		Version:       wantEdgeIngress.Version,
+		SyncedAt:      metav1.Time{},
+		Domain:        wantEdgeIngress.Domain,
+		CustomDomains: []string{"customDomain.com"},
+		URLs:          "https://customDomain.com,https://" + wantEdgeIngress.Domain,
+		SpecHash:      "4vJBrpeDJLuGzikpIg0ZJTca9FQ=",
+		Connection:    hubv1alpha1.EdgeIngressConnectionUp,
 	}, edgeIng.Status)
 
 	// Make sure secret related to the edgeIngress is created.

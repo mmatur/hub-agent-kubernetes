@@ -18,7 +18,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"crypto/sha1" //nolint:gosec // TODO need to be replaced by sh256?
+	"crypto/sha1" //nolint:gosec // Used for content diffing, no impact on security
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -33,8 +33,7 @@ import (
 // +kubebuilder:printcolumn:name="Service",type=string,JSONPath=`.spec.service.name`
 // +kubebuilder:printcolumn:name="Port",type=string,JSONPath=`.spec.service.port`
 // +kubebuilder:printcolumn:name="ACP",type=string,JSONPath=`.spec.acp.name`,priority=1
-// +kubebuilder:printcolumn:name="ACP Namespace",type=string,JSONPath=`.spec.acp.namespace`,priority=1
-// +kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.url`
+// +kubebuilder:printcolumn:name="URLs",type=string,JSONPath=`.status.urls`
 // +kubebuilder:printcolumn:name="Connection",type=string,JSONPath=`.status.connection`
 type EdgeIngress struct {
 	metav1.TypeMeta `json:",inline"`
@@ -62,7 +61,7 @@ func (in *EdgeIngressSpec) Hash() (string, error) {
 		return "", fmt.Errorf("encode ACP: %w", err)
 	}
 
-	hash := sha1.New() //nolint:gosec // TODO need to be replaced by sh256?
+	hash := sha1.New() //nolint:gosec // Used for content diffing, no impact on security
 	hash.Write(b)
 
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
@@ -96,8 +95,11 @@ type EdgeIngressStatus struct {
 	// Domain is the Domain for accessing the exposed service.
 	Domain string `json:"domain,omitempty"`
 
-	// URL is the URL for accessing the exposed service.
-	URL string `json:"url,omitempty"`
+	// CustomDomains are the custom domains for accessing the exposed service.
+	CustomDomains []string `json:"customDomains,omitempty"`
+
+	// URLs is the list of coma separated URL for accessing the exposed service.
+	URLs string `json:"urls,omitempty"`
 
 	// Connection is the status of the underlying connection to the edge.
 	Connection EdgeIngressConnectionStatus `json:"connection,omitempty"`

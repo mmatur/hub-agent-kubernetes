@@ -19,6 +19,7 @@ package edgeingress
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
@@ -86,6 +87,19 @@ func (e *EdgeIngress) Resource() (*hubv1alpha1.EdgeIngress, error) {
 		return nil, fmt.Errorf("compute spec hash: %w", err)
 	}
 
+	var urls []string
+	var verifiedCustomDomains []string
+	for _, customDomain := range e.CustomDomains {
+		if !customDomain.Verified {
+			continue
+		}
+
+		urls = append(urls, "https://"+customDomain.Name)
+		verifiedCustomDomains = append(verifiedCustomDomains, customDomain.Name)
+	}
+
+	urls = append(urls, "https://"+e.Domain)
+
 	return &hubv1alpha1.EdgeIngress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      e.Name,
@@ -93,12 +107,13 @@ func (e *EdgeIngress) Resource() (*hubv1alpha1.EdgeIngress, error) {
 		},
 		Spec: spec,
 		Status: hubv1alpha1.EdgeIngressStatus{
-			Version:    e.Version,
-			SyncedAt:   metav1.Now(),
-			Domain:     e.Domain,
-			URL:        "https://" + e.Domain,
-			Connection: hubv1alpha1.EdgeIngressConnectionDown,
-			SpecHash:   specHash,
+			Version:       e.Version,
+			SyncedAt:      metav1.Now(),
+			Domain:        e.Domain,
+			CustomDomains: verifiedCustomDomains,
+			URLs:          strings.Join(urls, ","),
+			Connection:    hubv1alpha1.EdgeIngressConnectionDown,
+			SpecHash:      specHash,
 		},
 	}, nil
 }
