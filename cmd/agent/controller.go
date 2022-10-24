@@ -146,7 +146,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 
 	checker := version.NewChecker(platformClient)
 
-	commandWatcher := commands.NewWatcher(platformClient, kubeClient, traefikClientSet)
+	commandWatcher := commands.NewWatcher(10*time.Second, platformClient, kubeClient, traefikClientSet)
 
 	group, ctx := errgroup.WithContext(cliCtx.Context)
 

@@ -110,16 +110,16 @@ func (_c *storeListPendingCommandsCall) OnListPendingCommands() *storeListPendin
 	return _c.Parent.OnListPendingCommands()
 }
 
-func (_c *storeListPendingCommandsCall) OnSendCommandReports(reports []platform.CommandExecutionReport) *storeSendCommandReportsCall {
-	return _c.Parent.OnSendCommandReports(reports)
+func (_c *storeListPendingCommandsCall) OnSubmitCommandReports(reports []platform.CommandExecutionReport) *storeSubmitCommandReportsCall {
+	return _c.Parent.OnSubmitCommandReports(reports)
 }
 
 func (_c *storeListPendingCommandsCall) OnListPendingCommandsRaw() *storeListPendingCommandsCall {
 	return _c.Parent.OnListPendingCommandsRaw()
 }
 
-func (_c *storeListPendingCommandsCall) OnSendCommandReportsRaw(reports interface{}) *storeSendCommandReportsCall {
-	return _c.Parent.OnSendCommandReportsRaw(reports)
+func (_c *storeListPendingCommandsCall) OnSubmitCommandReportsRaw(reports interface{}) *storeSubmitCommandReportsCall {
+	return _c.Parent.OnSubmitCommandReportsRaw(reports)
 }
 
 func (_m *storeMock) SubmitCommandReports(_ context.Context, reports []platform.CommandExecutionReport) error {
@@ -134,70 +134,70 @@ func (_m *storeMock) SubmitCommandReports(_ context.Context, reports []platform.
 	return _ra0
 }
 
-func (_m *storeMock) OnSendCommandReports(reports []platform.CommandExecutionReport) *storeSendCommandReportsCall {
-	return &storeSendCommandReportsCall{Call: _m.Mock.On("SubmitCommandReports", reports), Parent: _m}
+func (_m *storeMock) OnSubmitCommandReports(reports []platform.CommandExecutionReport) *storeSubmitCommandReportsCall {
+	return &storeSubmitCommandReportsCall{Call: _m.Mock.On("SubmitCommandReports", reports), Parent: _m}
 }
 
-func (_m *storeMock) OnSendCommandReportsRaw(reports interface{}) *storeSendCommandReportsCall {
-	return &storeSendCommandReportsCall{Call: _m.Mock.On("SubmitCommandReports", reports), Parent: _m}
+func (_m *storeMock) OnSubmitCommandReportsRaw(reports interface{}) *storeSubmitCommandReportsCall {
+	return &storeSubmitCommandReportsCall{Call: _m.Mock.On("SubmitCommandReports", reports), Parent: _m}
 }
 
-type storeSendCommandReportsCall struct {
+type storeSubmitCommandReportsCall struct {
 	*mock.Call
 	Parent *storeMock
 }
 
-func (_c *storeSendCommandReportsCall) Panic(msg string) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Panic(msg string) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) Once() *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Once() *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) Twice() *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Twice() *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) Times(i int) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Times(i int) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) WaitUntil(w <-chan time.Time) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) WaitUntil(w <-chan time.Time) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) After(d time.Duration) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) After(d time.Duration) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) Run(fn func(args mock.Arguments)) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Run(fn func(args mock.Arguments)) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) Maybe() *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) Maybe() *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) TypedReturns(a error) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) TypedReturns(a error) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Return(a)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) ReturnsFn(fn func([]platform.CommandExecutionReport) error) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) ReturnsFn(fn func([]platform.CommandExecutionReport) error) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) TypedRun(fn func([]platform.CommandExecutionReport)) *storeSendCommandReportsCall {
+func (_c *storeSubmitCommandReportsCall) TypedRun(fn func([]platform.CommandExecutionReport)) *storeSubmitCommandReportsCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
 		_reports, _ := args.Get(0).([]platform.CommandExecutionReport)
 		fn(_reports)
@@ -205,20 +205,20 @@ func (_c *storeSendCommandReportsCall) TypedRun(fn func([]platform.CommandExecut
 	return _c
 }
 
-func (_c *storeSendCommandReportsCall) OnListPendingCommands() *storeListPendingCommandsCall {
+func (_c *storeSubmitCommandReportsCall) OnListPendingCommands() *storeListPendingCommandsCall {
 	return _c.Parent.OnListPendingCommands()
 }
 
-func (_c *storeSendCommandReportsCall) OnSendCommandReports(reports []platform.CommandExecutionReport) *storeSendCommandReportsCall {
-	return _c.Parent.OnSendCommandReports(reports)
+func (_c *storeSubmitCommandReportsCall) OnSubmitCommandReports(reports []platform.CommandExecutionReport) *storeSubmitCommandReportsCall {
+	return _c.Parent.OnSubmitCommandReports(reports)
 }
 
-func (_c *storeSendCommandReportsCall) OnListPendingCommandsRaw() *storeListPendingCommandsCall {
+func (_c *storeSubmitCommandReportsCall) OnListPendingCommandsRaw() *storeListPendingCommandsCall {
 	return _c.Parent.OnListPendingCommandsRaw()
 }
 
-func (_c *storeSendCommandReportsCall) OnSendCommandReportsRaw(reports interface{}) *storeSendCommandReportsCall {
-	return _c.Parent.OnSendCommandReportsRaw(reports)
+func (_c *storeSubmitCommandReportsCall) OnSubmitCommandReportsRaw(reports interface{}) *storeSubmitCommandReportsCall {
+	return _c.Parent.OnSubmitCommandReportsRaw(reports)
 }
 
 // handlerMock mock of Handler.

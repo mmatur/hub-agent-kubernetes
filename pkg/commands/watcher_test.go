@@ -56,7 +56,7 @@ func TestWatcher_applyPendingCommands_skipsUnknownCommands(t *testing.T) {
 	store := newStoreMock(t)
 	store.OnListPendingCommands().TypedReturns(pendingCommands, nil).Once()
 
-	store.OnSendCommandReports([]platform.CommandExecutionReport{
+	store.OnSubmitCommandReports([]platform.CommandExecutionReport{
 		*platform.NewErrorCommandExecutionReport("command-1", platform.CommandExecutionReportError{
 			Type: string(reportErrorTypeUnsupportedCommand),
 		}),
@@ -65,7 +65,7 @@ func TestWatcher_applyPendingCommands_skipsUnknownCommands(t *testing.T) {
 		}),
 	}).TypedReturns(nil).Once()
 
-	w := NewWatcher(store, nil, nil)
+	w := NewWatcher(10*time.Second, store, nil, nil)
 	w.commands = map[string]Handler{
 		"do-something": doSomethingHandler,
 	}
@@ -118,12 +118,12 @@ func TestWatcher_applyPendingCommands_appliedByDate(t *testing.T) {
 	commands := newStoreMock(t)
 	commands.OnListPendingCommands().TypedReturns(pendingCommands, nil).Once()
 
-	commands.OnSendCommandReports([]platform.CommandExecutionReport{
+	commands.OnSubmitCommandReports([]platform.CommandExecutionReport{
 		*platform.NewSuccessCommandExecutionReport("command-1"),
 		*platform.NewSuccessCommandExecutionReport("command-2"),
 	}).TypedReturns(nil).Once()
 
-	w := NewWatcher(commands, nil, nil)
+	w := NewWatcher(10*time.Second, commands, nil, nil)
 	w.commands = map[string]Handler{
 		"do-something": doSomethingHandler,
 	}

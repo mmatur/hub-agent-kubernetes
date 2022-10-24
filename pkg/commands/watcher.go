@@ -46,14 +46,16 @@ type Handler interface {
 
 // Watcher watches and applies the patch commands from the platform.
 type Watcher struct {
+	interval time.Duration
 	store    Store
 	commands map[string]Handler
 }
 
 // NewWatcher creates a Watcher.
-func NewWatcher(store Store, k8sClientSet clientset.Interface, traefikClientSet traefikclientset.Interface) *Watcher {
+func NewWatcher(interval time.Duration, store Store, k8sClientSet clientset.Interface, traefikClientSet traefikclientset.Interface) *Watcher {
 	return &Watcher{
-		store: store,
+		interval: interval,
+		store:    store,
 		commands: map[string]Handler{
 			"set-ingress-acp":    NewSetIngressACPCommand(k8sClientSet, traefikClientSet),
 			"delete-ingress-acp": NewDeleteIngressACPCommand(k8sClientSet, traefikClientSet),
@@ -63,7 +65,7 @@ func NewWatcher(store Store, k8sClientSet clientset.Interface, traefikClientSet 
 
 // Start starts watching commands.
 func (w *Watcher) Start(ctx context.Context) {
-	tick := time.NewTicker(5 * time.Second)
+	tick := time.NewTicker(w.interval)
 	defer tick.Stop()
 
 	for {
