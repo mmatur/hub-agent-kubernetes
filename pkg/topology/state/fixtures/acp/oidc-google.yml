@@ -1,0 +1,26 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: my-acp
+spec:
+  oidcGoogle:
+    clientId: "client-id"
+    secret:
+      name: my-secret
+      namespace: default
+    redirectUrl: "https://foobar.com/callback"
+    logoutUrl: "https://foobar.com/logout"
+    scopes:
+      - scope
+    authParams:
+      hd: example.com
+    stateCookie:
+      path: /
+      domain: "example.com"
+      sameSite: lax
+      secure: true
+    emails:
+      - "powpow@example.com"
+status:
+  specHash: XxXlucqBGyqrssbsAR4BEUCWAc8=
+  version: L+5Nu3S2X9CPrAZ0pZt3oi9wSs8=

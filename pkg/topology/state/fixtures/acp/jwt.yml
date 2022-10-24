@@ -1,0 +1,16 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: my-acp
+spec:
+  jwt:
+    signingSecret: secret
+    signingSecretBase64Encoded: true
+    publicKey: public-key
+    stripAuthorizationHeader: true
+    tokenQueryKey: token
+    forwardUsernameHeader: Username
+    claims: "Equals(`group`,`dev`)"
+status:
+  specHash: XxXlucqBGyqrssbsAR4BEUCWAc8=
+  version: L+5Nu3S2X9CPrAZ0pZt3oi9wSs8=

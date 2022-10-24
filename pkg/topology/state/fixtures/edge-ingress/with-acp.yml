@@ -1,0 +1,18 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: EdgeIngress
+metadata:
+  name: my-edge-ingress
+  namespace: my-ns
+spec:
+  service:
+    name: my-service
+    port: 80
+  acp:
+    name: my-acp
+status:
+  connection: UP
+  domain: exact-monkey-to4ayb.q07yzgab.preview.traefikhub.dev
+  specHash: Miv0frdd+2G1zeygkvvdA5Vno2k=
+  syncedAt: "2022-10-18T09:33:32Z"
+  urls: https://exact-monkey-to4ayb.q07yzgab.preview.traefikhub.dev
+  version: XEDBkpEzjwVADYUzzXSdvFPHyXY=

@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -46,6 +47,9 @@ func TestFetcher_GetIngresses(t *testing.T) {
 			IngressMeta: IngressMeta{
 				Annotations: map[string]string{
 					"cert-manager.io/cluster-issuer": "foo",
+				},
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "traefik-hub",
 				},
 			},
 			IngressClassName: stringPtr("myIngressClass"),
@@ -86,8 +90,9 @@ func TestFetcher_GetIngresses(t *testing.T) {
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
 	traefikClient := traefikkubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
 
 	got, err := f.getIngresses()
@@ -166,8 +171,9 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 
 	kubeClient := kubemock.NewSimpleClientset(objects...)
 	traefikClient := traefikkubemock.NewSimpleClientset()
+	hubClient := hubkubemock.NewSimpleClientset()
 
-	f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.18")
+	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.18")
 	require.NoError(t, err)
 
 	got, err := f.fetchIngresses()

@@ -76,6 +76,7 @@ func (f *Fetcher) getIngressRoutes() (map[string]*IngressRoute, error) {
 			},
 			IngressMeta: IngressMeta{
 				Annotations: sanitizeAnnotations(ingressRoute.Annotations),
+				Labels:      ingressRoute.Labels,
 			},
 			TLS:      tls,
 			Routes:   routes,

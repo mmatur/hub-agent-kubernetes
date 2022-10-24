@@ -1,0 +1,13 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: my-acp
+spec:
+  basicAuth:
+    stripAuthorizationHeader: true
+    forwardUsernameHeader: Username
+    users:
+    - user:$2a$10$WxjFimBg0HrMgJu8Fse/6eXW.TjyDKxnAYIW29WjitF3U.15l6rMa
+status:
+  specHash: XxXlucqBGyqrssbsAR4BEUCWAc8=
+  version: L+5Nu3S2X9CPrAZ0pZt3oi9wSs8=

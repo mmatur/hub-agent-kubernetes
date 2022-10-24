@@ -26,6 +26,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
+	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
@@ -40,12 +42,13 @@ type Fetcher struct {
 	serverVersion string
 
 	k8s       informers.SharedInformerFactory
+	hub       hubinformer.SharedInformerFactory
 	traefik   traefikinformer.SharedInformerFactory
 	clientSet clientset.Interface
 }
 
 // NewFetcher creates a new Fetcher.
-func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface) (*Fetcher, error) {
+func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface) (*Fetcher, error) {
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
@@ -60,10 +63,10 @@ func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClien
 		return nil, fmt.Errorf("unsupported version: %s", serverSemVer)
 	}
 
-	return watchAll(ctx, clientSet, traefikClientSet, serverVersion.GitVersion)
+	return watchAll(ctx, clientSet, traefikClientSet, hubClientSet, serverVersion.GitVersion)
 }
 
-func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion string) (*Fetcher, error) {
+func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface, serverVersion string) (*Fetcher, error) {
 	kubernetesFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 
 	kubernetesFactory.Core().V1().Pods().Informer()
@@ -100,12 +103,23 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 		log.Info().Msg(msg)
 	}
 
+	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
+	hubFactory.Hub().V1alpha1().AccessControlPolicies().Informer()
+	hubFactory.Hub().V1alpha1().EdgeIngresses().Informer()
+
 	kubernetesFactory.Start(ctx.Done())
+	hubFactory.Start(ctx.Done())
 	traefikFactory.Start(ctx.Done())
 
 	for typ, ok := range kubernetesFactory.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			return nil, fmt.Errorf("timed out waiting for k8s object caches to sync %s", typ)
+		}
+	}
+
+	for typ, ok := range hubFactory.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return nil, fmt.Errorf("timed out waiting for Traefik Hub CRD caches to sync %s", typ)
 		}
 	}
 
@@ -118,6 +132,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 	return &Fetcher{
 		serverVersion: serverVersion,
 		k8s:           kubernetesFactory,
+		hub:           hubFactory,
 		traefik:       traefikFactory,
 		clientSet:     clientSet,
 	}, nil
@@ -140,6 +155,16 @@ func (f *Fetcher) FetchState() (*Cluster, error) {
 	}
 
 	cluster.IngressRoutes, err = f.getIngressRoutes()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.AccessControlPolicies, err = f.getAccessControlPolicies()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.EdgeIngresses, err = f.getEdgeIngresses()
 	if err != nil {
 		return nil, err
 	}

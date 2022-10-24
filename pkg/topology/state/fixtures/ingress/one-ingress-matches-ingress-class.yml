@@ -5,6 +5,8 @@ metadata:
   namespace: myns
   annotations:
     cert-manager.io/cluster-issuer: foo
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
 
 spec:
   ingressClassName: myIngressClass

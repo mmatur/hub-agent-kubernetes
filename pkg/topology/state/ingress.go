@@ -41,6 +41,7 @@ func (f *Fetcher) getIngresses() (map[string]*Ingress, error) {
 			},
 			IngressMeta: IngressMeta{
 				Annotations: sanitizeAnnotations(ingress.Annotations),
+				Labels:      ingress.Labels,
 			},
 			IngressClassName: ingress.Spec.IngressClassName,
 			TLS:              ingress.Spec.TLS,

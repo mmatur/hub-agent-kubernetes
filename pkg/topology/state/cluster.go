@@ -25,9 +25,11 @@ import (
 
 // Cluster describes a Cluster.
 type Cluster struct {
-	Ingresses     map[string]*Ingress      `json:"ingresses"`
-	IngressRoutes map[string]*IngressRoute `json:"ingressRoutes"`
-	Services      map[string]*Service      `json:"services"`
+	Ingresses             map[string]*Ingress             `json:"ingresses"`
+	IngressRoutes         map[string]*IngressRoute        `json:"ingressRoutes"`
+	Services              map[string]*Service             `json:"services"`
+	AccessControlPolicies map[string]*AccessControlPolicy `json:"accessControlPolicies"`
+	EdgeIngresses         map[string]*EdgeIngress         `json:"edgeIngresses"`
 }
 
 // ResourceMeta represents the metadata which identify a Kubernetes resource.
@@ -51,6 +53,7 @@ type Service struct {
 // IngressMeta represents the common Ingress metadata properties.
 type IngressMeta struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // Ingress describes an Kubernetes Ingress.
@@ -100,4 +103,120 @@ type RouteService struct {
 	Name       string `json:"name"`
 	PortName   string `json:"portName,omitempty"`
 	PortNumber int32  `json:"portNumber,omitempty"`
+}
+
+// AccessControlPolicy describes an Access Control Policy configured within a cluster.
+type AccessControlPolicy struct {
+	Name       string                         `json:"name"`
+	Method     string                         `json:"method"`
+	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
+	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
+	OIDC       *AccessControlPolicyOIDC       `json:"oidc,omitempty"`
+	OIDCGoogle *AccessControlPolicyOIDCGoogle `json:"oidcGoogle,omitempty"`
+}
+
+// AccessControlPolicyJWT describes the settings for JWT authentication within an access control policy.
+type AccessControlPolicyJWT struct {
+	SigningSecret              string            `json:"signingSecret,omitempty"`
+	SigningSecretBase64Encoded bool              `json:"signingSecretBase64Encoded"`
+	PublicKey                  string            `json:"publicKey,omitempty"`
+	JWKsFile                   string            `json:"jwksFile,omitempty"`
+	JWKsURL                    string            `json:"jwksUrl,omitempty"`
+	StripAuthorizationHeader   bool              `json:"stripAuthorizationHeader,omitempty"`
+	ForwardHeaders             map[string]string `json:"forwardHeaders,omitempty"`
+	TokenQueryKey              string            `json:"tokenQueryKey,omitempty"`
+	Claims                     string            `json:"claims,omitempty"`
+}
+
+// AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
+type AccessControlPolicyBasicAuth struct {
+	Users                    string `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
+}
+
+// AccessControlPolicyOIDC holds the OIDC configuration.
+type AccessControlPolicyOIDC struct {
+	Issuer   string           `json:"issuer,omitempty"`
+	ClientID string           `json:"clientId,omitempty"`
+	Secret   *SecretReference `json:"secret,omitempty"`
+
+	RedirectURL string            `json:"redirectUrl,omitempty"`
+	LogoutURL   string            `json:"logoutUrl,omitempty"`
+	Scopes      []string          `json:"scopes,omitempty"`
+	AuthParams  map[string]string `json:"authParams,omitempty"`
+	StateCookie *AuthStateCookie  `json:"stateCookie,omitempty"`
+	Session     *AuthSession      `json:"session,omitempty"`
+
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+	Claims         string            `json:"claims,omitempty"`
+}
+
+// AccessControlPolicyOIDCGoogle holds the Google OIDC configuration.
+type AccessControlPolicyOIDCGoogle struct {
+	ClientID string           `json:"clientId,omitempty"`
+	Secret   *SecretReference `json:"secret,omitempty"`
+
+	RedirectURL string            `json:"redirectUrl,omitempty"`
+	LogoutURL   string            `json:"logoutUrl,omitempty"`
+	AuthParams  map[string]string `json:"authParams,omitempty"`
+	StateCookie *AuthStateCookie  `json:"stateCookie,omitempty"`
+	Session     *AuthSession      `json:"session,omitempty"`
+
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+	Emails         []string          `json:"emails,omitempty"`
+}
+
+// SecretReference represents a Secret Reference.
+// It has enough information to retrieve secret in any namespace.
+type SecretReference struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// AuthStateCookie carries the state cookie configuration.
+type AuthStateCookie struct {
+	Path     string `json:"path,omitempty"`
+	Domain   string `json:"domain,omitempty"`
+	SameSite string `json:"sameSite,omitempty"`
+	Secure   bool   `json:"secure,omitempty"`
+}
+
+// AuthSession carries session and session cookie configuration.
+type AuthSession struct {
+	Path     string `json:"path,omitempty"`
+	Domain   string `json:"domain,omitempty"`
+	SameSite string `json:"sameSite,omitempty"`
+	Secure   bool   `json:"secure,omitempty"`
+	Refresh  *bool  `json:"refresh,omitempty"`
+}
+
+// EdgeIngress holds the definition of an EdgeIngress configuration.
+type EdgeIngress struct {
+	Name      string             `json:"name"`
+	Namespace string             `json:"namespace"`
+	Status    EdgeIngressStatus  `json:"status"`
+	Service   EdgeIngressService `json:"service"`
+	ACP       *EdgeIngressACP    `json:"acp,omitempty"`
+}
+
+// EdgeIngressStatus is the exposition status of an edge ingress.
+type EdgeIngressStatus string
+
+// Possible value of the EdgeIngressStatus.
+const (
+	EdgeIngressStatusUp   EdgeIngressStatus = "up"
+	EdgeIngressStatusDown EdgeIngressStatus = "down"
+)
+
+// EdgeIngressService configures the service to exposed on the edge.
+type EdgeIngressService struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+}
+
+// EdgeIngressACP configures the ACP to use on the Ingress.
+type EdgeIngressACP struct {
+	Name string `json:"name"`
 }

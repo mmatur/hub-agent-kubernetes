@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
+	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubemock "k8s.io/client-go/kubernetes/fake"
@@ -276,8 +277,9 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 			})
 
 			traefikClient := traefikkubemock.NewSimpleClientset(objects...)
+			hubClient := hubkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, traefikClient, "v1.20.1")
+			f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 			require.NoError(t, err)
 
 			got, err := f.getIngressRoutes()
