@@ -91,7 +91,6 @@ type AccessControlPolicyBasicAuth struct {
 type AccessControlOIDC struct {
 	Issuer   string `json:"issuer,omitempty"`
 	ClientID string `json:"clientId,omitempty"`
-	TLS      *TLS   `json:"tls,omitempty"`
 
 	Secret *corev1.SecretReference `json:"secret,omitempty"`
 
@@ -110,7 +109,6 @@ type AccessControlOIDC struct {
 // AccessControlOIDCGoogle holds the Google OIDC authentication configuration.
 type AccessControlOIDCGoogle struct {
 	ClientID string `json:"clientId,omitempty"`
-	TLS      *TLS   `json:"tls,omitempty"`
 
 	Secret *corev1.SecretReference `json:"secret,omitempty"`
 
@@ -124,12 +122,6 @@ type AccessControlOIDCGoogle struct {
 	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
 	// Emails are the allowed emails to connect.
 	Emails []string `json:"emails"`
-}
-
-// TLS holds the TLS configuration.
-type TLS struct {
-	CABundle           []byte `json:"caBundle"`
-	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
 }
 
 // StateCookie holds state cookie configuration.
