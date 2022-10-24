@@ -127,17 +127,36 @@ func (p TraefikParser) guessEdgeIngress(lbls []*dto.LabelPair, state ScrapeState
 		return ""
 	}
 	for ingressName := range state.Ingresses {
-		guess := strings.ReplaceAll(ingressName, "@", "-")
 		// Remove the `.kind.group` from the namespace.
-		guess = strings.SplitN(guess, ".", 2)[0]
-		// The name of ingresses follow this rule:
+		ingressName, _, _ = strings.Cut(ingressName, ".")
+
+		// Split on the @ sign to get the name and the namespace of the Ingress.
+		ingName, ingNamespace, ok := strings.Cut(ingressName, "@")
+		if !ok {
+			continue
+		}
+
+		// The name of ingresses follows the following rules:
+		// Traefik > 2.8+ (https://github.com/traefik/traefik/pull/9221):
+		//     [entrypointName-]ingressNamespace-ingressName-ingressHost-ingressPath[-hash]@kubernetes
+		// Otherwise:
 		//     [entrypointName-]ingressName-ingressNamespace-ingressHost-ingressPath[-hash]@kubernetes
 		// If the ingress uses an entry point that has TLS or middlewares enabled, its name is prefixed by the entry point name
 		// An optional hash is added in case of a name conflict
 		// Since an entry point name can contain "-", checking if ingressName-ingressNamespace is contained in `name` should be fine.
+
+		// First, try to match with a Traefik v2.8+ Ingress name.
+		guess := ingNamespace + "-" + ingName
 		if strings.Contains(name, guess) {
 			// The edge ingress name doesn't contain the ".kind.group"
-			return strings.SplitN(ingressName, ".", 2)[0]
+			return ingressName
+		}
+
+		// Then, try to match for older Traefik versions.
+		guess = ingName + "-" + ingNamespace
+		if strings.Contains(name, guess) {
+			// The edge ingress name doesn't contain the ".kind.group"
+			return ingressName
 		}
 	}
 	return ""

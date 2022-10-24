@@ -32,22 +32,53 @@ import (
 )
 
 func TestScraper_ScrapeTraefik(t *testing.T) {
-	srvURL := startServer(t, "testdata/traefik-metrics.txt")
+	tests := []struct {
+		desc    string
+		metrics string
+		want    []metrics.Metric
+	}{
+		{
+			desc:    "Traefik v2.8+",
+			metrics: "testdata/traefik-v2-8-metrics.txt",
+			want: []metrics.Metric{
+				&metrics.Histogram{Name: metrics.MetricRequestDuration, EdgeIngress: "myIngress@default", Sum: 0.0137623, Count: 1},
+				&metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "myIngress@default", Value: 2},
+				// edge cases, TLS/middleware enable on entrypoint
+				&metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "app-obe@whoami", Value: 38},
+			},
+		},
+		{
+			desc:    "Traefik older versions",
+			metrics: "testdata/traefik-metrics.txt",
+			want: []metrics.Metric{
+				&metrics.Histogram{Name: metrics.MetricRequestDuration, EdgeIngress: "myIngress@default", Sum: 0.0137623, Count: 1},
+				&metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "myIngress@default", Value: 2},
+				// edge cases, TLS/middleware enable on entrypoint
+				&metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "app-obe@whoami", Value: 38},
+			},
+		},
+	}
 
-	s := metrics.NewScraper(http.DefaultClient)
+	for _, test := range tests {
+		test := test
 
-	got, err := s.Scrape(context.Background(), metrics.ParserTraefik, srvURL, metrics.ScrapeState{
-		Ingresses: map[string]struct{}{"myIngress@default.ingress.networking.k8s.io": {}, "app-obe@whoami.ingress.networking.k8s.io": {}},
-	})
-	require.NoError(t, err)
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 
-	// router
-	assert.Contains(t, got, &metrics.Histogram{Name: metrics.MetricRequestDuration, EdgeIngress: "myIngress@default", Sum: 0.0137623, Count: 1})
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "myIngress@default", Value: 2})
-	// edge cases, TLS/middleware enable on entrypoint
-	assert.Contains(t, got, &metrics.Counter{Name: metrics.MetricRequests, EdgeIngress: "app-obe@whoami", Value: 38})
+			srvURL := startServer(t, test.metrics)
+			s := metrics.NewScraper(http.DefaultClient)
 
-	require.Len(t, got, 3)
+			got, err := s.Scrape(context.Background(), metrics.ParserTraefik, srvURL, metrics.ScrapeState{
+				Ingresses: map[string]struct{}{
+					"myIngress@default.ingress.networking.k8s.io": {},
+					"app-obe@whoami.ingress.networking.k8s.io":    {},
+				},
+			})
+			require.NoError(t, err)
+
+			assert.ElementsMatch(t, got, test.want)
+		})
+	}
 }
 
 func startServer(t *testing.T, file string) string {
