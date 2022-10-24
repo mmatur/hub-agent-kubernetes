@@ -18,11 +18,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package reviewer
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
 )
+
+// ErrPolicyNotFound indicates that the requested policy does not exist.
+var ErrPolicyNotFound = errors.New("policy not found")
 
 // PolicyGetter allow to get an access control policy configuration.
 type PolicyGetter interface {
@@ -43,6 +48,9 @@ func NewPolGetter(informer hubinformer.SharedInformerFactory) *PolGetter {
 func (p PolGetter) GetConfig(canonicalName string) (*acp.Config, error) {
 	policy, err := p.informer.Hub().V1alpha1().AccessControlPolicies().Lister().Get(canonicalName)
 	if err != nil {
+		if kerror.IsNotFound(err) {
+			return nil, ErrPolicyNotFound
+		}
 		return nil, fmt.Errorf("get ACP: %w", err)
 	}
 

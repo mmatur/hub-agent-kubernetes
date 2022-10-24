@@ -405,6 +405,22 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader", "Authorization", "Cookie"},
 		},
+		{
+			desc:       "adds middleware even if ACP doesn't exist yet",
+			config:     nil,
+			oldIngAnno: map[string]string{},
+			ingAnno: map[string]string{
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
+			},
+			wantPatch: map[string]string{
+				AnnotationHubAuth:   "my-policy@test",
+				"custom-annotation": "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"User", "Authorization"},
+		},
 	}
 
 	for _, test := range tests {
@@ -415,7 +431,11 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			traefikClientSet := traefikkubemock.NewSimpleClientset()
 
 			policies := newPolicyGetterMock(t)
-			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+			if test.config == nil {
+				policies.OnGetConfig("my-policy@test").TypedReturns(nil, ErrPolicyNotFound).Once()
+			} else {
+				policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+			}
 
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 
@@ -466,6 +486,10 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			assert.Equal(t, len(test.wantPatch), len(patch["value"].(map[string]string)))
 			for k := range test.wantPatch {
 				assert.Equal(t, test.wantPatch[k], patch["value"].(map[string]string)[k])
+			}
+
+			if test.config == nil {
+				return
 			}
 
 			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").

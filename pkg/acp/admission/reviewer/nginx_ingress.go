@@ -19,6 +19,7 @@ package reviewer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -133,11 +134,13 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (map
 
 		var polCfg *acp.Config
 		polCfg, err = r.policies.GetConfig(polName)
-		if err != nil {
-			return nil, err
+		switch {
+		case errors.Is(err, ErrPolicyNotFound):
+			nginxAnno, err = genNginxAnnotations(polName, nil, r.agentAddress)
+		case err == nil:
+			nginxAnno, err = genNginxAnnotations(polName, polCfg, r.agentAddress)
 		}
 
-		nginxAnno, err = genNginxAnnotations(polName, polCfg, r.agentAddress)
 		if err != nil {
 			return nil, err
 		}

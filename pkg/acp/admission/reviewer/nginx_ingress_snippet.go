@@ -38,6 +38,14 @@ const (
 )
 
 func genNginxAnnotations(polName string, polCfg *acp.Config, agentAddr string) (map[string]string, error) {
+	// If there's no policy given, force a 404 response. It allows to untie ACP creation from ACP reference and
+	// remove ordering constraints while still not exposing publicly a protected resource.
+	if polCfg == nil {
+		return map[string]string{
+			configurationSnippet: wrapHubSnippet("return 404;"),
+		}, nil
+	}
+
 	headerToFwd, err := headerToForward(polCfg)
 	if err != nil {
 		return nil, fmt.Errorf("get header to forward: %w", err)

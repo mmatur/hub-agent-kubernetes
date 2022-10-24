@@ -19,6 +19,7 @@ package reviewer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -46,13 +47,18 @@ func NewFwdAuthMiddlewares(agentAddr string, policies PolicyGetter, traefikClien
 	}
 }
 
-// Setup first checks if there is already a middleware for this policy.
-// If one is found, it makes sure it has the correct spec and if it's not the case, it updates it.
-// If no middleware is found, a new one is created for this policy.
+// Setup creates or updates the ACP middleware.
+// If there's no ACP matching the given policy name, the middleware won't be created but its name will be returned.
+// This will have the effect of disabling routers referencing this middleware and requesters will receive a 404. It
+// allows to untie ACP creation from ACP reference and remove ordering constraints while still not exposing publicly
+// a protected resource.
 // NOTE: forward auth middlewares deletion is to be done elsewhere, when ACPs are deleted.
 func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string) (string, error) {
+	name := middlewareName(polName)
+
 	logger := log.Ctx(ctx).With().
 		Str("acp_name", polName).
+		Str("middleware_name", name).
 		Logger()
 	ctx = logger.WithContext(ctx)
 
@@ -60,10 +66,13 @@ func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string
 
 	acpCfg, err := m.policies.GetConfig(polName)
 	if err != nil {
+		if errors.Is(err, ErrPolicyNotFound) {
+			return name, nil
+		}
+
 		return "", err
 	}
 
-	name := middlewareName(polName)
 	if err = m.setupMiddleware(ctx, name, namespace, polName, acpCfg); err != nil {
 		return "", fmt.Errorf("setup ForwardAuth middleware: %w", err)
 	}
@@ -72,8 +81,7 @@ func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string
 }
 
 func (m *FwdAuthMiddlewares) setupMiddleware(ctx context.Context, name, namespace, canonicalPolName string, cfg *acp.Config) error {
-	logger := log.Ctx(ctx).With().Str("middleware_name", name).Logger()
-	ctx = logger.WithContext(ctx)
+	logger := log.Ctx(ctx)
 
 	currentMiddleware, err := m.findMiddleware(ctx, name, namespace)
 	if err != nil {

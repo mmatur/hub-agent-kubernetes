@@ -232,7 +232,7 @@ func TestNginxIngress_CanReviewChecksIngressClass(t *testing.T) {
 func TestNginxIngress_Review(t *testing.T) {
 	tests := []struct {
 		desc            string
-		config          acp.Config
+		config          *acp.Config
 		prevAnnotations map[string]string
 		ingAnnotations  map[string]string
 		wantPatch       map[string]string
@@ -240,7 +240,7 @@ func TestNginxIngress_Review(t *testing.T) {
 	}{
 		{
 			desc: "adds authentication if ACP annotation is set",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					ForwardHeaders: map[string]string{
 						"X-Header": "claimsToForward",
@@ -260,7 +260,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "adds authentication and strip Authorization header",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
 				},
@@ -278,7 +278,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "removes authentication if ACP annotation is removed",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
 				},
@@ -301,7 +301,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "returns no patch if annotations are already correct",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
 				},
@@ -316,7 +316,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "preserves previous snippet annotations",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					SigningSecret: "secret",
 				},
@@ -335,7 +335,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "patches between existing snippets",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: false,
 				},
@@ -355,7 +355,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "removes hub authentication with custom snippets present",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					StripAuthorizationHeader: true,
 				},
@@ -378,7 +378,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "adds basic authentication with username and strip authorization",
-			config: acp.Config{
+			config: &acp.Config{
 				BasicAuth: &basicauth.Config{
 					Users:                    []string{"user:password"},
 					StripAuthorizationHeader: true,
@@ -398,7 +398,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "adds basic authentication with username and strip authorization",
-			config: acp.Config{
+			config: &acp.Config{
 				BasicAuth: &basicauth.Config{
 					Users:                    []string{"user:password"},
 					StripAuthorizationHeader: true,
@@ -418,7 +418,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "preserves previous snippet annotations",
-			config: acp.Config{
+			config: &acp.Config{
 				JWT: &jwt.Config{
 					SigningSecret: "secret",
 				},
@@ -437,7 +437,7 @@ func TestNginxIngress_Review(t *testing.T) {
 		},
 		{
 			desc: "oidc annotations with ForwardHeaders",
-			config: acp.Config{
+			config: &acp.Config{
 				OIDC: &oidc.Config{
 					ForwardHeaders: map[string]string{
 						"X-Forwarded-User": "user",
@@ -463,6 +463,19 @@ func TestNginxIngress_Review(t *testing.T) {
 			},
 		},
 		{
+			desc:   "fallback to forced 404 response snippet when ACP is not found",
+			config: nil,
+			ingAnnotations: map[string]string{
+				"custom-annotation":                    "foobar",
+				"hub.traefik.io/access-control-policy": "my-policy",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				"hub.traefik.io/access-control-policy":              "my-policy",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nreturn 404;\n##hub-snippet-end",
+			},
+		},
+		{
 			desc:    "no previous ACP and no current ACP returns an empty patch",
 			noPatch: true,
 		},
@@ -473,9 +486,13 @@ func TestNginxIngress_Review(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			policyGetter := newPolicyGetterMock(t).
-				OnGetConfig(mock.Anything).TypedReturns(&test.config, nil).Maybe().
-				Parent
+			policyGetter := newPolicyGetterMock(t)
+			if test.config == nil {
+				policyGetter.OnGetConfig(mock.Anything).TypedReturns(nil, ErrPolicyNotFound).Maybe()
+			} else {
+				policyGetter.OnGetConfig(mock.Anything).TypedReturns(test.config, nil).Maybe()
+			}
+
 			rev := NewNginxIngress("http://hub-agent.default.svc.cluster.local", nil, policyGetter)
 
 			ing := struct {
