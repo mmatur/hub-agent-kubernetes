@@ -13,14 +13,14 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hamba/avro v1.8.0
 	github.com/hashicorp/go-retryablehttp v0.7.1
-	github.com/hashicorp/go-version v1.5.0
+	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/pquerna/cachecontrol v0.1.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.35.0
-	github.com/rs/zerolog v1.27.0
-	github.com/stretchr/testify v1.7.5
+	github.com/rs/zerolog v1.28.0
+	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli/v2 v2.10.3
 	github.com/vulcand/predicate v1.2.0
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
@@ -66,7 +66,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.0 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
