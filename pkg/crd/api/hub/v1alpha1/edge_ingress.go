@@ -104,7 +104,7 @@ type EdgeIngressStatus struct {
 	// Connection is the status of the underlying connection to the edge.
 	Connection EdgeIngressConnectionStatus `json:"connection,omitempty"`
 
-	// SpecHash is a hash representing the the EdgeIngressSpec
+	// SpecHash is a hash representing the EdgeIngressSpec
 	SpecHash string `json:"specHash,omitempty"`
 }
 
