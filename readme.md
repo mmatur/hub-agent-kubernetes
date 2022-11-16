@@ -17,7 +17,10 @@ NAME:
    Traefik Hub agent for Kubernetes - Manages a Traefik Hub agent installation
 
 USAGE:
-   hub-agent-kubernetes [global options] command [command options] [arguments...]
+   Traefik Hub agent for Kubernetes [global options] command [command options] [arguments...]
+
+VERSION:
+   dev, build  on 
 
 COMMANDS:
    controller      Runs the Hub agent controller
@@ -36,63 +39,64 @@ GLOBAL OPTIONS:
 
 ```
 NAME:
-   hub-agent-kubernetes controller - Runs the Hub agent controller
+   Traefik Hub agent for Kubernetes controller - Runs the Hub agent controller
 
 USAGE:
-   hub-agent-kubernetes controller [command options] [arguments...]
+   Traefik Hub agent for Kubernetes controller [command options] [arguments...]
 
 OPTIONS:
-   --token value                        The token to use for Hub platform API calls [$TOKEN]
-   --log-level value                    Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
-   --acp-server.listen-addr value       Address on which the access control policy server listens for admission requests (default: "0.0.0.0:443") [$ACP_SERVER_LISTEN_ADDR]
+   --acp-server.auth-server-addr value  Address the ACP server can reach the auth server on (default: "http://hub-agent-auth-server.hub.svc.cluster.local") [$ACP_SERVER_AUTH_SERVER_ADDR]
    --acp-server.cert value              Certificate used for TLS by the ACP server (default: "/var/run/hub-agent-kubernetes/cert.pem") [$ACP_SERVER_CERT]
    --acp-server.key value               Key used for TLS by the ACP server (default: "/var/run/hub-agent-kubernetes/key.pem") [$ACP_SERVER_KEY]
-   --acp-server.auth-server-addr value  Address the ACP server can reach the auth server on (default: "http://hub-agent-auth-server.hub.svc.cluster.local") [$ACP_SERVER_AUTH_SERVER_ADDR]
-   --help, -h                           show help (default: false)
+   --acp-server.listen-addr value       Address on which the access control policy server listens for admission requests (default: "0.0.0.0:443") [$ACP_SERVER_LISTEN_ADDR]
+   --ingress-class-name value           The ingress class name used for ingresses managed by Hub [$INGRESS_CLASS_NAME]
+   --log-level value                    Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
+   --token value                        The token to use for Hub platform API calls [$TOKEN]
+   --traefik.entryPoint value           The entry point used by Traefik to expose tunnels (default: "traefikhub-tunl") [$TRAEFIK_ENTRY_POINT]
+   --traefik.metrics-url value          The url used by Traefik to expose metrics [$TRAEFIK_METRICS_URL]
 ```
 
 ### Auth Server
 
 ```
 NAME:
-   hub-agent-kubernetes auth-server - Runs the Hub agent authentication server
+   Traefik Hub agent for Kubernetes auth-server - Runs the Hub agent authentication server
 
 USAGE:
-   hub-agent-kubernetes auth-server [command options] [arguments...]
+   Traefik Hub agent for Kubernetes auth-server [command options] [arguments...]
 
 OPTIONS:
    --listen-addr value  Address on which the auth server listens for auth requests (default: "0.0.0.0:80") [$AUTH_SERVER_LISTEN_ADDR]
    --log-level value    Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
-   --help, -h           show help (default: false)
 ```
 
 ### Refresh Config
 
 ```
 NAME:
-   hub-agent-kubernetes refresh-config - Refresh agent configuration
+   Traefik Hub agent for Kubernetes refresh-config - Refresh agent configuration
 
 USAGE:
-   hub-agent-kubernetes refresh-config [command options] [arguments...]
+   Traefik Hub agent for Kubernetes refresh-config [command options] [arguments...]
 
 OPTIONS:
    --log-level value  Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
-   --help, -h         show help (default: false)
 ```
 
 ### Tunnel
 
 ```
 NAME:
-   hub-agent-kubernetes tunnel - Runs the Hub agent tunnel
+   Traefik Hub agent for Kubernetes tunnel - Runs the Hub agent tunnel
 
 USAGE:
-   hub-agent-kubernetes tunnel [command options] [arguments...]
+   Traefik Hub agent for Kubernetes tunnel [command options] [arguments...]
 
 OPTIONS:
-   --token value      The token to use for Hub platform API calls [$TOKEN]
-   --log-level value  Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
-   --help, -h         show help (default: false)
+   --log-level value            Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
+   --token value                The token to use for Hub platform API calls [$TOKEN]
+   --traefik.tunnel-host value  The Traefik tunnel host [$TRAEFIK_TUNNEL_HOST]
+   --traefik.tunnel-port value  The Traefik tunnel port (default: "9901") [$TRAEFIK_TUNNEL_PORT]
 ```
 
 ## Debugging the Agent
