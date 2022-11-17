@@ -219,7 +219,8 @@ func Test_WatcherRun(t *testing.T) {
 			IngressClassName: pointer.StringPtr("traefik-hub"),
 			TLS: []netv1.IngressTLS{
 				{
-					Hosts: []string{edgeIngress.Domain},
+					Hosts:      []string{edgeIngress.Domain},
+					SecretName: secretName,
 				},
 			},
 			Rules: []netv1.IngressRule{
@@ -247,6 +248,96 @@ func Test_WatcherRun(t *testing.T) {
 			},
 		}, ing.Spec)
 	}
+}
+
+func Test_WatcherRun_appends_owner_reference(t *testing.T) {
+	clientSetHub := hubkubemock.NewSimpleClientset()
+	clientSet := kubemock.NewSimpleClientset()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+
+	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
+
+	hubInformer.Start(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), edgeIngressInformer.HasSynced)
+
+	edgeIngresses := []EdgeIngress{
+		{
+			Name:      "toCreate",
+			Namespace: "default",
+			Domain:    "majestic-beaver-123.hub-traefik.io",
+			Version:   "version-1",
+			Service:   Service{Name: "service-1", Port: 8080},
+			ACP:       &ACP{Name: "acp-name"},
+		},
+		{
+			Name:      "toCreateAlso",
+			Namespace: "default",
+			Domain:    "sad-bat-123.hub-traefik.io",
+			Version:   "version-2",
+			Service:   Service{Name: "service-2", Port: 8082},
+			ACP:       &ACP{Name: "acp-name"},
+		},
+	}
+
+	client := newPlatformClientMock(t)
+	client.OnGetWildcardCertificate().TypedReturns(Certificate{
+		Certificate: []byte("cert"),
+		PrivateKey:  []byte("private"),
+	}, nil)
+
+	var callCount int
+	client.OnGetEdgeIngresses().
+		TypedReturns(edgeIngresses, nil).
+		Run(func(_ mock.Arguments) {
+			callCount++
+			if callCount > 1 {
+				cancel()
+			}
+		})
+
+	traefikClientSet := traefikkubemock.NewSimpleClientset()
+
+	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
+		IngressClassName:        "traefik-hub",
+		TraefikEntryPoint:       "traefikhub-tunl",
+		AgentNamespace:          "hub-agent",
+		EdgeIngressSyncInterval: time.Millisecond,
+		CertRetryInterval:       time.Millisecond,
+		CertSyncInterval:        time.Millisecond,
+	})
+
+	require.NoError(t, err)
+
+	stop := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(stop)
+	}()
+
+	<-stop
+
+	var wantOwner []metav1.OwnerReference
+	for _, edgeIngress := range edgeIngresses {
+		edgeIng, errL := clientSetHub.HubV1alpha1().
+			EdgeIngresses(edgeIngress.Namespace).
+			Get(ctx, edgeIngress.Name, metav1.GetOptions{})
+		require.NoError(t, errL)
+
+		wantOwner = append(wantOwner, metav1.OwnerReference{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "EdgeIngress",
+			Name:       edgeIng.Name,
+			UID:        edgeIng.UID,
+		})
+	}
+
+	secret, err := clientSet.CoreV1().Secrets("default").Get(ctx, secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.Len(t, secret.OwnerReferences, 2)
+	assert.Equal(t, wantOwner, secret.OwnerReferences)
 }
 
 func Test_WatcherRun_handle_custom_domains(t *testing.T) {
@@ -356,8 +447,17 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 
 	// Make sure secret related to the edgeIngress is created.
 	ctx = context.Background()
-	_, err = clientSet.CoreV1().Secrets(wantEdgeIngress.Namespace).Get(ctx, secretCustomDomainsName+"-"+wantEdgeIngress.Name, metav1.GetOptions{})
+	secret, err := clientSet.CoreV1().Secrets(wantEdgeIngress.Namespace).Get(ctx, secretCustomDomainsName+"-"+wantEdgeIngress.Name, metav1.GetOptions{})
 	require.NoError(t, err)
+
+	wantOwner := metav1.OwnerReference{
+		APIVersion: "hub.traefik.io/v1alpha1",
+		Kind:       "EdgeIngress",
+		Name:       edgeIng.Name,
+		UID:        edgeIng.UID,
+	}
+	assert.Len(t, secret.OwnerReferences, 1)
+	assert.Equal(t, wantOwner, secret.OwnerReferences[0])
 
 	// Make sure the ingress related to the edgeIngress is created.
 	ing, errL := clientSet.NetworkingV1().Ingresses(wantEdgeIngress.Namespace).Get(ctx, wantEdgeIngress.Name, metav1.GetOptions{})
@@ -387,7 +487,8 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 		IngressClassName: pointer.StringPtr("traefik-hub"),
 		TLS: []netv1.IngressTLS{
 			{
-				Hosts: []string{wantEdgeIngress.Domain},
+				Hosts:      []string{wantEdgeIngress.Domain},
+				SecretName: secretName,
 			},
 			{
 				SecretName: secretCustomDomainsName + "-" + wantEdgeIngress.Name,
@@ -439,4 +540,142 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 			},
 		},
 	}, ing.Spec)
+}
+
+func Test_WatcherRun_sync_certificates(t *testing.T) {
+	clientSetHub := hubkubemock.NewSimpleClientset()
+	clientSet := kubemock.NewSimpleClientset()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+
+	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
+
+	hubInformer.Start(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), edgeIngressInformer.HasSynced)
+
+	edgeIngresses := []EdgeIngress{
+		{
+			Name:      "toCreate",
+			Namespace: "service",
+			Domain:    "majestic-beaver-123.hub-traefik.io",
+			Version:   "version-1",
+			Service:   Service{Name: "service-1", Port: 8080},
+			ACP:       &ACP{Name: "acp-name"},
+		},
+		{
+			Name:      "toCreateAlso",
+			Namespace: "service",
+			Domain:    "sad-bat-123.hub-traefik.io",
+			Version:   "version-2",
+			CustomDomains: []CustomDomain{
+				{
+					Name:     "customdomain.com",
+					Verified: true,
+				},
+			},
+			Service: Service{Name: "service-2", Port: 8082},
+			ACP:     &ACP{Name: "acp-name"},
+		},
+	}
+
+	var callCountWildVard int
+	var callCountCustom int
+	client := newPlatformClientMock(t).
+		OnGetWildcardCertificate().
+		Run(
+			func(_ mock.Arguments) {
+				callCountWildVard++
+				if callCountWildVard > 2 {
+					cancel()
+				}
+			}).
+		ReturnsFn(func() (Certificate, error) {
+			if callCountWildVard == 0 {
+				return Certificate{
+					Certificate: []byte("cert"),
+					PrivateKey:  []byte("private"),
+				}, nil
+			}
+
+			return Certificate{
+				Certificate: []byte("certRefresh"),
+				PrivateKey:  []byte("private"),
+			}, nil
+		}).
+		OnGetCertificateByDomains([]string{"customdomain.com"}).
+		Run(
+			func(_ mock.Arguments) {
+				callCountCustom++
+			}).
+		ReturnsFn(
+			func(strings []string) (Certificate, error) {
+				if callCountCustom == 0 {
+					return Certificate{
+						Certificate: []byte("custom"),
+						PrivateKey:  []byte("private"),
+					}, nil
+				}
+
+				return Certificate{
+					Certificate: []byte("customRefresh"),
+					PrivateKey:  []byte("private"),
+				}, nil
+			}).
+		OnGetEdgeIngresses().
+		TypedReturns(edgeIngresses, nil).Parent
+
+	traefikClientSet := traefikkubemock.NewSimpleClientset()
+
+	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
+		IngressClassName:        "traefik-hub",
+		TraefikEntryPoint:       "traefikhub-tunl",
+		AgentNamespace:          "default",
+		EdgeIngressSyncInterval: time.Millisecond,
+		CertRetryInterval:       time.Millisecond,
+		CertSyncInterval:        time.Millisecond,
+	})
+
+	require.NoError(t, err)
+
+	stop := make(chan struct{})
+	go func() {
+		w.Run(ctx)
+		close(stop)
+	}()
+
+	<-stop
+
+	secret, err := clientSet.CoreV1().Secrets("default").Get(ctx, secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("certRefresh"), secret.Data["tls.crt"])
+
+	assert.Len(t, secret.OwnerReferences, 0)
+
+	secret, err = clientSet.CoreV1().Secrets("service").Get(ctx, secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("certRefresh"), secret.Data["tls.crt"])
+	assert.Len(t, secret.OwnerReferences, 2)
+
+	var wantOwner []metav1.OwnerReference
+	for _, edgeIngress := range edgeIngresses {
+		edgeIng, errL := clientSetHub.HubV1alpha1().
+			EdgeIngresses(edgeIngress.Namespace).
+			Get(ctx, edgeIngress.Name, metav1.GetOptions{})
+		require.NoError(t, errL)
+
+		wantOwner = append(wantOwner, metav1.OwnerReference{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "EdgeIngress",
+			Name:       edgeIng.Name,
+			UID:        edgeIng.UID,
+		})
+	}
+
+	assert.Equal(t, wantOwner, secret.OwnerReferences)
+
+	secret, err = clientSet.CoreV1().Secrets("service").Get(ctx, secretCustomDomainsName+"-toCreateAlso", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("customRefresh"), secret.Data["tls.crt"])
+	assert.Len(t, secret.OwnerReferences, 1)
 }

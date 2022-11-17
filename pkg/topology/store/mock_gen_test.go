@@ -29,6 +29,10 @@ func newPlatformClientMock(tb testing.TB) *platformClientMock {
 func (_m *platformClientMock) FetchTopology(_ context.Context) (state.Cluster, int64, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() (state.Cluster, int64, error)); ok {
+		return _rf()
+	}
+
 	topology, _ := _ret.Get(0).(state.Cluster)
 	version, _ := _ret.Get(1).(int64)
 	err := _ret.Error(2)

@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -68,6 +69,9 @@ type WatcherConfig struct {
 type Watcher struct {
 	config WatcherConfig
 
+	wildCardCert   Certificate
+	wildCardCertMu sync.RWMutex
+
 	client           PlatformClient
 	hubClientSet     hubclientset.Interface
 	hubInformer      hubinformer.SharedInformerFactory
@@ -95,7 +99,7 @@ func (w *Watcher) Run(ctx context.Context) {
 
 	certSyncInterval := time.After(w.config.CertSyncInterval)
 	ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
-	if err := w.syncCertificate(ctxSync); err != nil {
+	if err := w.syncCertificates(ctxSync); err != nil {
 		log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
 		certSyncInterval = time.After(w.config.CertRetryInterval)
 	}
@@ -114,7 +118,7 @@ func (w *Watcher) Run(ctx context.Context) {
 
 		case <-certSyncInterval:
 			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
-			if err := w.syncCertificate(ctxSync); err != nil {
+			if err := w.syncCertificates(ctxSync); err != nil {
 				log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
 				certSyncInterval = time.After(w.config.CertRetryInterval)
 				cancel()
@@ -126,14 +130,42 @@ func (w *Watcher) Run(ctx context.Context) {
 	}
 }
 
-func (w *Watcher) syncCertificate(ctx context.Context) error {
+func (w *Watcher) syncCertificates(ctx context.Context) error {
 	certificate, err := w.client.GetWildcardCertificate(ctx)
 	if err != nil {
 		return fmt.Errorf("get certificate: %w", err)
 	}
 
-	if err = w.upsertSecret(ctx, certificate, secretName, w.config.AgentNamespace); err != nil {
+	w.wildCardCertMu.RLock()
+	if bytes.Equal(certificate.Certificate, w.wildCardCert.Certificate) &&
+		bytes.Equal(certificate.PrivateKey, w.wildCardCert.PrivateKey) {
+		w.wildCardCertMu.RUnlock()
+
+		return nil
+	}
+	w.wildCardCertMu.RUnlock()
+
+	if err = w.upsertSecret(ctx, certificate, secretName, w.config.AgentNamespace, nil); err != nil {
 		return fmt.Errorf("upsert secret: %w", err)
+	}
+
+	w.wildCardCertMu.Lock()
+	w.wildCardCert = certificate
+	w.wildCardCertMu.Unlock()
+
+	platformEdgeIngresses, err := w.hubInformer.Hub().V1alpha1().EdgeIngresses().Lister().List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	for _, edgeIngress := range platformEdgeIngresses {
+		err := w.setupCertificates(ctx, edgeIngress, certificate, edgeIngress.Status.CustomDomains)
+		if err != nil {
+			log.Error().Err(err).
+				Str("name", edgeIngress.Name).
+				Str("namespace", edgeIngress.Namespace).
+				Msg("unable to setup certificates")
+		}
 	}
 
 	return w.createIngressCatchAll(ctx)
@@ -208,15 +240,12 @@ func (w *Watcher) syncChildAndUpdateConnectionStatus(ctx context.Context, edgeIn
 		}
 	}
 
-	if len(customDomainsName) > 0 {
-		cert, err := w.client.GetCertificateByDomains(ctx, customDomainsName)
-		if err != nil {
-			return fmt.Errorf("get certificate by domains %q: %w", strings.Join(customDomainsName, ","), err)
-		}
+	w.wildCardCertMu.RLock()
+	certificate := w.wildCardCert
+	w.wildCardCertMu.RUnlock()
 
-		if err := w.upsertSecret(ctx, cert, secretCustomDomainsName+"-"+edgeIngress.Name, edgeIngress.Namespace); err != nil {
-			return fmt.Errorf("upsert secret: %w", err)
-		}
+	if err := w.setupCertificates(ctx, edgeIngress, certificate, customDomainsName); err != nil {
+		return fmt.Errorf("unable to setup secrets: %w", err)
 	}
 
 	if err := w.upsertIngress(ctx, edgeIngress, customDomainsName); err != nil {
@@ -225,6 +254,27 @@ func (w *Watcher) syncChildAndUpdateConnectionStatus(ctx context.Context, edgeIn
 
 	if err := w.setEdgeIngressConnectionStatusUP(ctx, edgeIngress); err != nil {
 		return fmt.Errorf("update edge ingress status: %w", err)
+	}
+
+	return nil
+}
+
+func (w *Watcher) setupCertificates(ctx context.Context, edgeIngress *hubv1alpha1.EdgeIngress, certificate Certificate, customDomainsName []string) error {
+	if err := w.upsertSecret(ctx, certificate, secretName, edgeIngress.Namespace, edgeIngress); err != nil {
+		return fmt.Errorf("upsert secret: %w", err)
+	}
+
+	if len(customDomainsName) == 0 {
+		return nil
+	}
+
+	cert, err := w.client.GetCertificateByDomains(ctx, customDomainsName)
+	if err != nil {
+		return fmt.Errorf("get certificate by domains %q: %w", strings.Join(customDomainsName, ","), err)
+	}
+
+	if err := w.upsertSecret(ctx, cert, secretCustomDomainsName+"-"+edgeIngress.Name, edgeIngress.Namespace, edgeIngress); err != nil {
+		return fmt.Errorf("upsert secret: %w", err)
 	}
 
 	return nil
@@ -266,6 +316,10 @@ func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIn
 }
 
 func (w *Watcher) createIngressCatchAll(ctx context.Context) error {
+	if w.traefikClientSet == nil {
+		return nil
+	}
+
 	stripPrefix := &traefikv1alpha1.Middleware{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "strip-prefix-catch-all",
@@ -351,7 +405,7 @@ func (w *Watcher) createIngressCatchAll(ctx context.Context) error {
 	return nil
 }
 
-func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, namespace string) error {
+func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, namespace string, edgeIngress *hubv1alpha1.EdgeIngress) error {
 	secret, err := w.clientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get secret: %w", err)
@@ -372,6 +426,14 @@ func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, name
 				"tls.key": cert.PrivateKey,
 			},
 		}
+		if edgeIngress != nil {
+			secret.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: "hub.traefik.io/v1alpha1",
+				Kind:       "EdgeIngress",
+				Name:       edgeIngress.Name,
+				UID:        edgeIngress.UID,
+			}}
+		}
 
 		_, err = w.clientSet.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil {
@@ -386,7 +448,16 @@ func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, name
 		return nil
 	}
 
-	if bytes.Equal(secret.Data["tls.crt"], cert.Certificate) {
+	newOwners := secret.OwnerReferences
+	if edgeIngress != nil {
+		newOwners = appendOwnerReference(secret.OwnerReferences, metav1.OwnerReference{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "EdgeIngress",
+			Name:       edgeIngress.Name,
+			UID:        edgeIngress.UID,
+		})
+	}
+	if bytes.Equal(secret.Data["tls.crt"], cert.Certificate) && len(secret.OwnerReferences) == len(newOwners) {
 		return nil
 	}
 
@@ -394,6 +465,8 @@ func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, name
 		"tls.crt": cert.Certificate,
 		"tls.key": cert.PrivateKey,
 	}
+	secret.OwnerReferences = newOwners
+
 	_, err = w.clientSet.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("update secret: %w", err)
@@ -405,6 +478,16 @@ func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, name
 		Msg("Secret updated")
 
 	return nil
+}
+
+func appendOwnerReference(references []metav1.OwnerReference, ref metav1.OwnerReference) []metav1.OwnerReference {
+	for _, reference := range references {
+		if reference.String() == ref.String() {
+			return references
+		}
+	}
+
+	return append(references, ref)
 }
 
 func (w *Watcher) setEdgeIngressConnectionStatusUP(ctx context.Context, edgeIngress *hubv1alpha1.EdgeIngress) error {
@@ -557,7 +640,8 @@ func buildIngress(edgeIng *hubv1alpha1.EdgeIngress, ing *netv1.Ingress, ingressC
 		IngressClassName: pointer.StringPtr(ingressClassName),
 		TLS: []netv1.IngressTLS{
 			{
-				Hosts: []string{edgeIng.Status.Domain},
+				SecretName: secretName,
+				Hosts:      []string{edgeIng.Status.Domain},
 			},
 		},
 		Rules: []netv1.IngressRule{

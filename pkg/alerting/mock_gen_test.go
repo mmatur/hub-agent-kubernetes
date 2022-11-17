@@ -29,6 +29,10 @@ func newBackendMock(tb testing.TB) *backendMock {
 func (_m *backendMock) GetRules(_ context.Context) ([]Rule, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() ([]Rule, error)); ok {
+		return _rf()
+	}
+
 	_ra0, _ := _ret.Get(0).([]Rule)
 	_rb1 := _ret.Error(1)
 

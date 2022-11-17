@@ -28,6 +28,10 @@ func newClientMock(tb testing.TB) *clientMock {
 func (_m *clientMock) GetACPs(_ context.Context) ([]ACP, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() ([]ACP, error)); ok {
+		return _rf()
+	}
+
 	_ra0, _ := _ret.Get(0).([]ACP)
 	_rb1 := _ret.Error(1)
 

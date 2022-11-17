@@ -36,9 +36,11 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	edgeadmission "github.com/traefik/hub-agent-kubernetes/pkg/edgeingress/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
@@ -48,8 +50,10 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -223,7 +227,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		acpWatcher.Run(ctx)
 	}()
 
-	traefikClientSet, err := traefikclientset.NewForConfig(config)
+	traefik, err := traefikClient(clientSet, config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create Traefik client set: %w", err)
 	}
@@ -236,7 +240,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		CertRetryInterval:       time.Minute,
 		CertSyncInterval:        time.Hour,
 	}
-	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, watcherCfg)
+	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, clientSet, traefik, hubInformer, watcherCfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
@@ -246,7 +250,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
-	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet.TraefikV1alpha1())
+	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefik)
 
 	traefikReviewer := reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs)
 	reviewers := []admission.Reviewer{
@@ -256,6 +260,24 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	}
 
 	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), nil
+}
+
+func traefikClient(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
+	hasMiddlewareCRD, err := hasMiddlewareCRD(clientSet.Discovery())
+	if err != nil {
+		return nil, fmt.Errorf("check presence of Traefik Middleware CRD: %w", err)
+	}
+
+	if !hasMiddlewareCRD {
+		return nil, nil
+	}
+
+	traefikClientSet, errClientSet := traefikclientset.NewForConfig(config)
+	if errClientSet != nil {
+		return nil, fmt.Errorf("create Traefik client set: %w", errClientSet)
+	}
+
+	return traefikClientSet.TraefikV1alpha1(), nil
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
@@ -313,4 +335,24 @@ func currentNamespace() string {
 	}
 
 	return "default"
+}
+
+func hasMiddlewareCRD(clientSet discovery.DiscoveryInterface) (bool, error) {
+	crdList, err := clientSet.ServerResourcesForGroupVersion(traefikv1alpha1.SchemeGroupVersion.String())
+	if err != nil {
+		if kerror.IsNotFound(err) ||
+			// Because the fake client doesn't return the right error type.
+			strings.HasSuffix(err.Error(), " not found") {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, resource := range crdList.APIResources {
+		if resource.Kind == "Middleware" {
+			return true, nil
+		}
+	}
+
+	return true, nil
 }

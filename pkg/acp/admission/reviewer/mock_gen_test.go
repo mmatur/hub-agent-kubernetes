@@ -128,6 +128,10 @@ func (_c *ingressClassesGetControllerCall) OnGetDefaultControllerRaw() *ingressC
 func (_m *ingressClassesMock) GetDefaultController() (string, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() (string, error)); ok {
+		return _rf()
+	}
+
 	_ra0 := _ret.String(0)
 	_rb1 := _ret.Error(1)
 
@@ -189,6 +193,11 @@ func (_c *ingressClassesGetDefaultControllerCall) Maybe() *ingressClassesGetDefa
 
 func (_c *ingressClassesGetDefaultControllerCall) TypedReturns(a string, b error) *ingressClassesGetDefaultControllerCall {
 	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *ingressClassesGetDefaultControllerCall) ReturnsFn(fn func() (string, error)) *ingressClassesGetDefaultControllerCall {
+	_c.Call = _c.Return(fn)
 	return _c
 }
 

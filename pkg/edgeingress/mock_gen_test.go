@@ -136,6 +136,10 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificateRaw
 func (_m *platformClientMock) GetEdgeIngresses(_ context.Context) ([]EdgeIngress, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() ([]EdgeIngress, error)); ok {
+		return _rf()
+	}
+
 	_ra0, _ := _ret.Get(0).([]EdgeIngress)
 	_rb1 := _ret.Error(1)
 
@@ -238,6 +242,10 @@ func (_c *platformClientGetEdgeIngressesCall) OnGetWildcardCertificateRaw() *pla
 
 func (_m *platformClientMock) GetWildcardCertificate(_ context.Context) (Certificate, error) {
 	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() (Certificate, error)); ok {
+		return _rf()
+	}
 
 	_ra0, _ := _ret.Get(0).(Certificate)
 	_rb1 := _ret.Error(1)

@@ -30,6 +30,10 @@ func newStoreMock(tb testing.TB) *storeMock {
 func (_m *storeMock) ListPendingCommands(_ context.Context) ([]platform.Command, error) {
 	_ret := _m.Called()
 
+	if _rf, ok := _ret.Get(0).(func() ([]platform.Command, error)); ok {
+		return _rf()
+	}
+
 	_ra0, _ := _ret.Get(0).([]platform.Command)
 	_rb1 := _ret.Error(1)
 
