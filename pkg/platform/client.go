@@ -56,10 +56,11 @@ func (a APIError) Error() string {
 
 // CreateEdgeIngressReq is the request for creating an edge ingress.
 type CreateEdgeIngressReq struct {
-	Name      string  `json:"name"`
-	Namespace string  `json:"namespace"`
-	Service   Service `json:"service"`
-	ACP       *ACP    `json:"acp,omitempty"`
+	Name          string   `json:"name"`
+	Namespace     string   `json:"namespace"`
+	Service       Service  `json:"service"`
+	ACP           *ACP     `json:"acp,omitempty"`
+	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
 // Service defines the service being exposed by the edge ingress.
@@ -86,8 +87,9 @@ type MetricsConfig struct {
 
 // UpdateEdgeIngressReq is a request for updating an edge ingress.
 type UpdateEdgeIngressReq struct {
-	Service Service `json:"service"`
-	ACP     *ACP    `json:"acp,omitempty"`
+	Service       Service  `json:"service"`
+	ACP           *ACP     `json:"acp,omitempty"`
+	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
 // Command defines patch operation to apply on the cluster.

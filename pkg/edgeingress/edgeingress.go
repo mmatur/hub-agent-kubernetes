@@ -69,11 +69,17 @@ type ACP struct {
 
 // Resource builds the v1alpha1 EdgeIngress resource.
 func (e *EdgeIngress) Resource() (*hubv1alpha1.EdgeIngress, error) {
+	var customDomain []string
+	for _, domain := range e.CustomDomains {
+		customDomain = append(customDomain, domain.Name)
+	}
+
 	spec := hubv1alpha1.EdgeIngressSpec{
 		Service: hubv1alpha1.EdgeIngressService{
 			Name: e.Service.Name,
 			Port: e.Service.Port,
 		},
+		CustomDomains: customDomain,
 	}
 
 	if e.ACP != nil {

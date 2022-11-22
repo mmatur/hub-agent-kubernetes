@@ -48,10 +48,12 @@ type EdgeIngress struct {
 	Status EdgeIngressStatus `json:"status,omitempty"`
 }
 
-// EdgeIngressSpec configures an access control policy.
+// EdgeIngressSpec configures an edgeIngress policy.
 type EdgeIngressSpec struct {
 	Service EdgeIngressService `json:"service"`
 	ACP     *EdgeIngressACP    `json:"acp,omitempty"`
+	// CustomDomains are the custom domains for accessing the exposed service.
+	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
 // Hash generates the hash of the spec.

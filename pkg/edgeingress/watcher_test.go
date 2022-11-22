@@ -430,6 +430,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 		ACP: &hubv1alpha1.EdgeIngressACP{
 			Name: wantEdgeIngress.ACP.Name,
 		},
+		CustomDomains: []string{"customDomain.com", "unverified.com"},
 	}, edgeIng.Spec)
 
 	assert.WithinDuration(t, time.Now(), edgeIng.Status.SyncedAt.Time, 100*time.Millisecond)
@@ -441,7 +442,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 		Domain:        wantEdgeIngress.Domain,
 		CustomDomains: []string{"customDomain.com"},
 		URLs:          "https://customDomain.com,https://" + wantEdgeIngress.Domain,
-		SpecHash:      "4vJBrpeDJLuGzikpIg0ZJTca9FQ=",
+		SpecHash:      "OxYSOU0yEUcLM1RnjLL83wymkUU=",
 		Connection:    hubv1alpha1.EdgeIngressConnectionUp,
 	}, edgeIng.Status)
 

@@ -386,6 +386,11 @@ func (in *EdgeIngressSpec) DeepCopyInto(out *EdgeIngressSpec) {
 		*out = new(EdgeIngressACP)
 		**out = **in
 	}
+	if in.CustomDomains != nil {
+		in, out := &in.CustomDomains, &out.CustomDomains
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

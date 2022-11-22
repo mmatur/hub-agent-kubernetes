@@ -57,6 +57,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 			ACP: &hubv1alpha1.EdgeIngressACP{
 				Name: "acp",
 			},
+			CustomDomains: []string{"foo.com"},
 		},
 		Status: hubv1alpha1.EdgeIngressStatus{},
 	}
@@ -87,6 +88,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		ACP: &platform.ACP{
 			Name: "acp",
 		},
+		CustomDomains: []string{"foo.com"},
 	}
 	createdEdgeIngress := &edgeingress.EdgeIngress{
 		WorkspaceID: "workspace-id",
@@ -231,6 +233,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 			ACP: &hubv1alpha1.EdgeIngressACP{
 				Name: "acp",
 			},
+			CustomDomains: []string{"foo.com"},
 		},
 		Status: hubv1alpha1.EdgeIngressStatus{},
 	}
@@ -280,8 +283,9 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 	wantUpdateReq := &platform.UpdateEdgeIngressReq{
-		Service: platform.Service{Name: "whoami", Port: 8082},
-		ACP:     &platform.ACP{Name: "acp"},
+		Service:       platform.Service{Name: "whoami", Port: 8082},
+		ACP:           &platform.ACP{Name: "acp"},
+		CustomDomains: []string{"foo.com"},
 	}
 	updatedEdgeIngress := &edgeingress.EdgeIngress{
 		WorkspaceID: "workspace-id",
@@ -292,8 +296,14 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Version:     "version-4",
 		Service:     edgeingress.Service{Name: "whoami", Port: 8082},
 		ACP:         &edgeingress.ACP{Name: "acp"},
-		CreatedAt:   time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
+		CustomDomains: []edgeingress.CustomDomain{
+			{
+				Name:     "foo.com",
+				Verified: false,
+			},
+		},
+		CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+		UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := newBackendMock(t)
@@ -326,7 +336,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Domain:     "majestic-beaver-123.hub-traefik.io",
 				URLs:       "https://majestic-beaver-123.hub-traefik.io",
 				SyncedAt:   now,
-				SpecHash:   "1AI6Wssn12E2icVo1NMreqOJSNU=",
+				SpecHash:   "ckcEOKdkROXWIZnEXuMt/1PRQSc=",
 				Connection: hubv1alpha1.EdgeIngressConnectionDown,
 			}},
 		}),

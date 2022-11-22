@@ -152,6 +152,7 @@ func (h Handler) reviewCreateOperation(ctx context.Context, edgeIng *hubv1alpha1
 			Name: edgeIng.Spec.Service.Name,
 			Port: edgeIng.Spec.Service.Port,
 		},
+		CustomDomains: edgeIng.Spec.CustomDomains,
 	}
 	if edgeIng.Spec.ACP != nil {
 		createReq.ACP = &platform.ACP{Name: edgeIng.Spec.ACP.Name}
@@ -173,6 +174,7 @@ func (h Handler) reviewUpdateOperation(ctx context.Context, oldEdgeIng, newEdgeI
 			Name: newEdgeIng.Spec.Service.Name,
 			Port: newEdgeIng.Spec.Service.Port,
 		},
+		CustomDomains: newEdgeIng.Spec.CustomDomains,
 	}
 	if newEdgeIng.Spec.ACP != nil {
 		updateReq.ACP = &platform.ACP{
