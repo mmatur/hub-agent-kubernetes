@@ -31,6 +31,17 @@ import (
 func Setup(level, format string) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
+	logLevel := zerolog.InfoLevel
+	if level != "" {
+		var err error
+		logLevel, err = zerolog.ParseLevel(strings.ToLower(level))
+		if err != nil {
+			log.Error().Err(err).Str("LOG_LEVEL", level).Msg("Unspecified or invalid log level, setting the level to default (INFO)...")
+
+			logLevel = zerolog.InfoLevel
+		}
+	}
+
 	var w io.Writer
 	switch format {
 	case "json":
@@ -44,19 +55,13 @@ func Setup(level, format string) {
 		w = os.Stderr
 	}
 
-	log.Logger = zerolog.New(w).With().Timestamp().Logger()
-	zerolog.DefaultContextLogger = &log.Logger
-
-	logLevel := zerolog.InfoLevel
-	if level != "" {
-		var err error
-		logLevel, err = zerolog.ParseLevel(strings.ToLower(level))
-		if err != nil {
-			log.Error().Err(err).Str("LOG_LEVEL", level).Msg("Unspecified or invalid log level, setting the level to default (INFO)...")
-
-			logLevel = zerolog.InfoLevel
-		}
+	logCtx := zerolog.New(w).With().Timestamp()
+	if logLevel <= zerolog.DebugLevel {
+		logCtx = logCtx.Caller()
 	}
+
+	log.Logger = logCtx.Logger()
+	zerolog.DefaultContextLogger = &log.Logger
 
 	zerolog.SetGlobalLevel(logLevel)
 
