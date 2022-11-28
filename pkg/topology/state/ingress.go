@@ -90,6 +90,10 @@ func getIngressServices(ingress *netv1.Ingress) []string {
 	}
 
 	for _, r := range ingress.Spec.Rules {
+		if r.HTTP == nil {
+			continue
+		}
+
 		for _, p := range r.HTTP.Paths {
 			if p.Backend.Service == nil {
 				continue
