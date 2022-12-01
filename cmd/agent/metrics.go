@@ -18,6 +18,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package main
 
 import (
+	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
@@ -40,6 +42,14 @@ func newMetrics(watch *topology.Watcher, token, platformURL, traefikURL string, 
 	client, err := metrics.NewClient(httpClient, platformURL, token)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	u, err := url.ParseRequestURI(traefikURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse traefik metrics url: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, nil, fmt.Errorf("only http and https is supported, %s found", u.Scheme)
 	}
 
 	store := metrics.NewStore()
