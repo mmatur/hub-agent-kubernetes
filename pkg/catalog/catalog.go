@@ -19,6 +19,7 @@ package catalog
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
@@ -76,7 +77,7 @@ func (e *Catalog) Resource() (*hubv1alpha1.Catalog, error) {
 			Version:  e.Version,
 			SyncedAt: metav1.Now(),
 			Domains:  domains,
-			URLs:     urls,
+			URLs:     strings.Join(urls, ","),
 			SpecHash: specHash,
 		},
 	}, nil

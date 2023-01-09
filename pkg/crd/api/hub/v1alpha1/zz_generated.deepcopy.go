@@ -391,11 +391,6 @@ func (in *CatalogSpec) DeepCopy() *CatalogSpec {
 func (in *CatalogStatus) DeepCopyInto(out *CatalogStatus) {
 	*out = *in
 	in.SyncedAt.DeepCopyInto(&out.SyncedAt)
-	if in.URLs != nil {
-		in, out := &in.URLs, &out.URLs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.Domains != nil {
 		in, out := &in.Domains, &out.Domains
 		*out = make([]string, len(*in))

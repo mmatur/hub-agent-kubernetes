@@ -31,7 +31,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Catalog defines a catalog.
-// +kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.url`
+// +kubebuilder:printcolumn:name="URLs",type=string,JSONPath=`.status.urls`
 // +kubebuilder:resource:scope=Cluster
 type Catalog struct {
 	metav1.TypeMeta `json:",inline"`
@@ -80,8 +80,8 @@ type CatalogStatus struct {
 	Version  string      `json:"version,omitempty"`
 	SyncedAt metav1.Time `json:"syncedAt,omitempty"`
 
-	// URLs are the URL for accessing the Catalog API.
-	URLs []string `json:"urls"`
+	// URLs are the URLs for accessing the Catalog API.
+	URLs string `json:"urls"`
 
 	// Domains are the domains of the Catalog API.
 	Domains []string `json:"domains"`
