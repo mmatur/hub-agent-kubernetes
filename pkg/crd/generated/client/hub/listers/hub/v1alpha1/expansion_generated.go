@@ -22,6 +22,10 @@ package v1alpha1
 // AccessControlPolicyLister.
 type AccessControlPolicyListerExpansion interface{}
 
+// CatalogListerExpansion allows custom methods to be added to
+// CatalogLister.
+type CatalogListerExpansion interface{}
+
 // EdgeIngressListerExpansion allows custom methods to be added to
 // EdgeIngressLister.
 type EdgeIngressListerExpansion interface{}

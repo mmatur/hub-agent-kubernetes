@@ -60,7 +60,7 @@ type EdgeIngressSpec struct {
 func (in *EdgeIngressSpec) Hash() (string, error) {
 	b, err := json.Marshal(in)
 	if err != nil {
-		return "", fmt.Errorf("encode ACP: %w", err)
+		return "", fmt.Errorf("encode EdgeIngress: %w", err)
 	}
 
 	hash := sha1.New() //nolint:gosec // Used for content diffing, no impact on security

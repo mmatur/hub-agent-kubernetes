@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// AccessControlPolicies returns a AccessControlPolicyInformer.
 	AccessControlPolicies() AccessControlPolicyInformer
+	// Catalogs returns a CatalogInformer.
+	Catalogs() CatalogInformer
 	// EdgeIngresses returns a EdgeIngressInformer.
 	EdgeIngresses() EdgeIngressInformer
 	// IngressClasses returns a IngressClassInformer.
@@ -46,6 +48,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // AccessControlPolicies returns a AccessControlPolicyInformer.
 func (v *version) AccessControlPolicies() AccessControlPolicyInformer {
 	return &accessControlPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// Catalogs returns a CatalogInformer.
+func (v *version) Catalogs() CatalogInformer {
+	return &catalogInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // EdgeIngresses returns a EdgeIngressInformer.

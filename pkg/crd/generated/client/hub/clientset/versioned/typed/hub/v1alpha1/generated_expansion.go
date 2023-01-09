@@ -20,6 +20,8 @@ package v1alpha1
 
 type AccessControlPolicyExpansion interface{}
 
+type CatalogExpansion interface{}
+
 type EdgeIngressExpansion interface{}
 
 type IngressClassExpansion interface{}

@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
@@ -76,7 +77,7 @@ func TestClient_Link(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPost {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -156,7 +157,7 @@ func TestClient_GetConfig(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodGet {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -222,7 +223,7 @@ func TestClient_Ping(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPost {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -284,7 +285,7 @@ func TestClient_ListVerifiedDomains(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodGet {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -384,7 +385,7 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPost {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -419,26 +420,6 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 }
 
 func TestClient_UpdateEdgeIngress(t *testing.T) {
-	edgeIngress := hubv1alpha1.EdgeIngress{
-		TypeMeta: metav1.TypeMeta{Kind: "EdgeIngress"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
-		Spec: hubv1alpha1.EdgeIngressSpec{
-			Service: hubv1alpha1.EdgeIngressService{
-				Name: "service-name",
-				Port: 8080,
-			},
-			ACP: &hubv1alpha1.EdgeIngressACP{
-				Name: "acp-name",
-			},
-		},
-	}
-	edgeIngressWithStatus := edgeIngress
-	edgeIngressWithStatus.Status.Version = "version-2"
-	edgeIngressWithStatus.Status.Domain = "majestic-beaver-123.hub-traefik.io"
-
 	tests := []struct {
 		desc             string
 		name             string
@@ -501,7 +482,7 @@ func TestClient_UpdateEdgeIngress(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPut {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -580,7 +561,7 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodDelete {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -605,6 +586,357 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 			c.httpClient = srv.Client()
 
 			err = c.DeleteEdgeIngress(context.Background(), test.namespace, test.name, test.version)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func TestClient_GetCatalogs(t *testing.T) {
+	wantCatalogs := []catalog.Catalog{
+		{
+			WorkspaceID:   "workspace-id",
+			ClusterID:     "cluster-id",
+			Name:          "name",
+			Version:       "version",
+			CustomDomains: []string{"hello.example.com"},
+			Services: []catalog.Service{
+				{
+					Name:       "user",
+					Namespace:  "default",
+					Port:       8080,
+					PathPrefix: "/users",
+				},
+			},
+			CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+			UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+		},
+	}
+
+	var callCount int
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/catalogs", func(rw http.ResponseWriter, req *http.Request) {
+		callCount++
+
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantCatalogs)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
+	c.httpClient = srv.Client()
+
+	gotCatalogs, err := c.GetCatalogs(context.Background())
+	require.NoError(t, err)
+
+	require.Equal(t, 1, callCount)
+	assert.Equal(t, wantCatalogs, gotCatalogs)
+}
+
+func TestClient_CreateCatalog(t *testing.T) {
+	tests := []struct {
+		desc             string
+		createReq        *CreateCatalogReq
+		catalog          *catalog.Catalog
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create catalog",
+			createReq: &CreateCatalogReq{
+				Name:          "name",
+				CustomDomains: []string{"hello.example.com"},
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+			},
+			returnStatusCode: http.StatusCreated,
+			wantErr:          assert.NoError,
+			catalog: &catalog.Catalog{
+				WorkspaceID:   "workspace-id",
+				ClusterID:     "cluster-id",
+				Name:          "name",
+				Version:       "version-1",
+				CustomDomains: []string{"hello.example.com"},
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc: "conflict",
+			createReq: &CreateCatalogReq{
+				Name: "name",
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/catalogs", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.catalog)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			createCatalog, err := c.CreateCatalog(context.Background(), test.createReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.catalog, createCatalog)
+		})
+	}
+}
+
+func TestClient_UpdateCatalog(t *testing.T) {
+	tests := []struct {
+		desc             string
+		name             string
+		version          string
+		updateReq        *UpdateCatalogReq
+		catalog          *catalog.Catalog
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:    "update catalog",
+			name:    "name",
+			version: "version-1",
+			updateReq: &UpdateCatalogReq{
+				CustomDomains: []string{"hello.example.com"},
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			catalog: &catalog.Catalog{
+				WorkspaceID: "workspace-id",
+				ClusterID:   "cluster-id",
+				Name:        "name",
+				Version:     "version-1",
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc:    "conflict",
+			version: "version-1",
+			name:    "name",
+			updateReq: &UpdateCatalogReq{
+				Services: []catalog.Service{
+					{
+						Name:       "user",
+						Namespace:  "default",
+						Port:       8080,
+						PathPrefix: "/users",
+					},
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			mux := http.NewServeMux()
+
+			mux.HandleFunc("/catalogs/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.catalog)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			updatedCatalog, err := c.UpdateCatalog(context.Background(), test.name, test.version, test.updateReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.catalog, updatedCatalog)
+		})
+	}
+}
+
+func TestClient_DeleteCatalog(t *testing.T) {
+	tests := []struct {
+		desc             string
+		version          string
+		name             string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "delete catalog",
+			version:          "version-1",
+			name:             "name",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "conflict",
+			version:          "version-1",
+			name:             "name",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assertErrorIs(ErrVersionConflict),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/catalogs/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			err = c.DeleteCatalog(context.Background(), test.name, test.version)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
@@ -678,7 +1010,7 @@ func TestClient_CreateACP(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPost {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -784,7 +1116,7 @@ func TestClient_UpdateACP(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodPut {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -865,7 +1197,7 @@ func TestClient_DeleteACP(t *testing.T) {
 				callCount++
 
 				if req.Method != http.MethodDelete {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 
@@ -897,7 +1229,7 @@ func TestClient_DeleteACP(t *testing.T) {
 	}
 }
 
-func TestClient_GetEdgeIngress(t *testing.T) {
+func TestClient_GetEdgeIngresses(t *testing.T) {
 	wantEdgeIngresses := []edgeingress.EdgeIngress{
 		{
 			WorkspaceID: "workspace-id",
@@ -920,7 +1252,7 @@ func TestClient_GetEdgeIngress(t *testing.T) {
 		callCount++
 
 		if req.Method != http.MethodGet {
-			http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -1384,7 +1716,7 @@ func TestClient_SetVersionStatus(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/version-status", func(rw http.ResponseWriter, req *http.Request) {
 				if req.Method != http.MethodPost {
-					http.Error(rw, fmt.Sprintf("unsupported to method: %s", req.Method), http.StatusMethodNotAllowed)
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
 					return
 				}
 

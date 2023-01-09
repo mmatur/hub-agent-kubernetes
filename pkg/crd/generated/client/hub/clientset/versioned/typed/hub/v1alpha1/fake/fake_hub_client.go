@@ -32,6 +32,10 @@ func (c *FakeHubV1alpha1) AccessControlPolicies() v1alpha1.AccessControlPolicyIn
 	return &FakeAccessControlPolicies{c}
 }
 
+func (c *FakeHubV1alpha1) Catalogs() v1alpha1.CatalogInterface {
+	return &FakeCatalogs{c}
+}
+
 func (c *FakeHubV1alpha1) EdgeIngresses(namespace string) v1alpha1.EdgeIngressInterface {
 	return &FakeEdgeIngresses{c, namespace}
 }

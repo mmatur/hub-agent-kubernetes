@@ -34,6 +34,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
@@ -90,6 +91,19 @@ type UpdateEdgeIngressReq struct {
 	Service       Service  `json:"service"`
 	ACP           *ACP     `json:"acp,omitempty"`
 	CustomDomains []string `json:"customDomains,omitempty"`
+}
+
+// CreateCatalogReq is the request for creating a catalog.
+type CreateCatalogReq struct {
+	Name          string            `json:"name"`
+	CustomDomains []string          `json:"customDomains"`
+	Services      []catalog.Service `json:"services"`
+}
+
+// UpdateCatalogReq is a request for updating a catalog.
+type UpdateCatalogReq struct {
+	CustomDomains []string          `json:"customDomains"`
+	Services      []catalog.Service `json:"services"`
 }
 
 // Command defines patch operation to apply on the cluster.
@@ -686,6 +700,182 @@ func (c *Client) DeleteACP(ctx context.Context, oldVersion, name string) error {
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Last-Known-Version", oldVersion)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return ErrVersionConflict
+	case http.StatusNoContent:
+		return nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+}
+
+// CreateCatalog creates a catalog.
+func (c *Client) CreateCatalog(ctx context.Context, createReq *CreateCatalogReq) (*catalog.Catalog, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal catalog request: %w", err)
+	}
+
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs"))
+	if err != nil {
+		return nil, fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusCreated:
+		var c catalog.Catalog
+
+		if err = json.NewDecoder(resp.Body).Decode(&c); err != nil {
+			return nil, fmt.Errorf("failed to decode catalog: %w", err)
+		}
+		return &c, nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return nil, apiErr
+	}
+}
+
+// GetCatalogs fetches the Catalogs available for this agent.
+func (c *Client) GetCatalogs(ctx context.Context) ([]catalog.Catalog, error) {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs"))
+	if err != nil {
+		return nil, fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return nil, apiErr
+	}
+
+	var catalogs []catalog.Catalog
+	if err = json.NewDecoder(resp.Body).Decode(&catalogs); err != nil {
+		return nil, fmt.Errorf("decode config: %w", err)
+	}
+
+	return catalogs, nil
+}
+
+// UpdateCatalog updates a catalog.
+func (c *Client) UpdateCatalog(ctx context.Context, name, lastKnownVersion string, updateReq *UpdateCatalogReq) (*catalog.Catalog, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal catalog request: %w", err)
+	}
+
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs", name))
+	if err != nil {
+		return nil, fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		return nil, ErrVersionConflict
+	case http.StatusOK:
+		var c catalog.Catalog
+
+		if err = json.NewDecoder(resp.Body).Decode(&c); err != nil {
+			return nil, fmt.Errorf("failed to decode catalog: %w", err)
+		}
+		return &c, nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return nil, apiErr
+	}
+}
+
+// DeleteCatalog deletes a catalog.
+func (c *Client) DeleteCatalog(ctx context.Context, name, lastKnownVersion string) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs", name))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
 	version.SetUserAgent(req)
 
 	resp, err := c.httpClient.Do(req)

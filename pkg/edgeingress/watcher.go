@@ -100,7 +100,7 @@ func (w *Watcher) Run(ctx context.Context) {
 	certSyncInterval := time.After(w.config.CertSyncInterval)
 	ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
 	if err := w.syncCertificates(ctxSync); err != nil {
-		log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
+		log.Error().Err(err).Msg("Unable to synchronize certificates with platform")
 		certSyncInterval = time.After(w.config.CertRetryInterval)
 	}
 	cancel()
@@ -119,7 +119,7 @@ func (w *Watcher) Run(ctx context.Context) {
 		case <-certSyncInterval:
 			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
 			if err := w.syncCertificates(ctxSync); err != nil {
-				log.Error().Err(err).Msg("Unable to synchronize certificate with platform")
+				log.Error().Err(err).Msg("Unable to synchronize certificates with platform")
 				certSyncInterval = time.After(w.config.CertRetryInterval)
 				cancel()
 				continue
@@ -164,7 +164,7 @@ func (w *Watcher) syncCertificates(ctx context.Context) error {
 			log.Error().Err(err).
 				Str("name", edgeIngress.Name).
 				Str("namespace", edgeIngress.Namespace).
-				Msg("unable to setup certificates")
+				Msg("unable to setup edge ingress certificates")
 		}
 	}
 
@@ -193,7 +193,7 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 		platformEdgeIng := p
 
 		clusterEdgeIng, found := clusterEdgeIngressByID[platformEdgeIng.Name+"@"+platformEdgeIng.Namespace]
-		// We delete the policy from the map, since we use this map to delete unused policies.
+		// We delete the edge ingress from the map, since we use this map to delete unused edge ingresses.
 		delete(clusterEdgeIngressByID, platformEdgeIng.Name+"@"+platformEdgeIng.Namespace)
 
 		if !found {
@@ -220,7 +220,6 @@ func (w *Watcher) syncEdgeIngresses(ctx context.Context) {
 			continue
 		}
 
-		clusterEdgeIng.Spec = buildResourceSpec(&platformEdgeIng)
 		if err := w.updateEdgeIngress(ctx, clusterEdgeIng, &platformEdgeIng); err != nil {
 			log.Error().Err(err).
 				Str("name", clusterEdgeIng.Name).
@@ -570,23 +569,6 @@ func (w *Watcher) cleanEdgeIngresses(ctx context.Context, edgeIngs map[string]*h
 			Str("namespace", edgeIng.Namespace).
 			Msg("EdgeIngress deleted")
 	}
-}
-
-func buildResourceSpec(edgeIng *EdgeIngress) hubv1alpha1.EdgeIngressSpec {
-	spec := hubv1alpha1.EdgeIngressSpec{
-		Service: hubv1alpha1.EdgeIngressService{
-			Name: edgeIng.Service.Name,
-			Port: edgeIng.Service.Port,
-		},
-	}
-
-	if edgeIng.ACP != nil {
-		spec.ACP = &hubv1alpha1.EdgeIngressACP{
-			Name: edgeIng.ACP.Name,
-		}
-	}
-
-	return spec
 }
 
 func buildIngress(edgeIng *hubv1alpha1.EdgeIngress, ing *netv1.Ingress, ingressClassName, entryPoint string, customDomains []string) *netv1.Ingress {
