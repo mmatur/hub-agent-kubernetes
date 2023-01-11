@@ -122,7 +122,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				SyncedAt: now,
 				URLs:     "https://foo.example.com,https://bar.example.com",
 				Domains:  []string{"foo.example.com", "bar.example.com"},
-				SpecHash: "Sz6cVxZ70Qm0el1CHhSpsbou92U=",
+				SpecHash: "7RDLrkkT4VPe3mWOfUmSx+/icAc=",
 			}},
 		}),
 	}
@@ -287,7 +287,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				SyncedAt: now,
 				Domains:  []string{"foo.example.com"},
 				URLs:     "https://foo.example.com",
-				SpecHash: "rOG0fFXyK3/sUYGqjggW/ix7rFc=",
+				SpecHash: "+epobWzPegUonFCkszAwKygewGk=",
 			}},
 		}),
 	}

@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	flagLogLevel  = "log-level"
-	flagLogFormat = "log-format"
+	flagLogLevel   = "log-level"
+	flagLogFormat  = "log-format"
+	flagListenAddr = "listen-addr"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func run() error {
 			newRefreshConfigCmd().build(),
 			newTunnelCmd().build(),
 			newVersionCmd().build(),
+			newDevPortalCmd().build(),
 		},
 	}
 

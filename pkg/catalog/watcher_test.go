@@ -143,7 +143,7 @@ func Test_WatcherRun(t *testing.T) {
 				Version:  "version-1",
 				URLs:     "https://hello.example.com",
 				Domains:  []string{"hello.example.com"},
-				SpecHash: "+MBiHj7QfVFo+CKOe2AdHrOqatM=",
+				SpecHash: "sgWOWyiDAbIOGyXnZHF3JnYuWBk=",
 			},
 		},
 		{
@@ -155,7 +155,7 @@ func Test_WatcherRun(t *testing.T) {
 				Version:  "version-2",
 				URLs:     "https://majestic-beaver-123.hub-traefik.io",
 				Domains:  []string{"majestic-beaver-123.hub-traefik.io"},
-				SpecHash: "W1ABIs7KjEa8fb1ErTuS9SK0z6E=",
+				SpecHash: "2+eev05bFhgq5v/Vajcl1KJvBaE=",
 			},
 		},
 	}

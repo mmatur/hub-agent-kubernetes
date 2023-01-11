@@ -73,6 +73,8 @@ type CatalogService struct {
 	Namespace  string `json:"namespace"`
 	Port       int    `json:"port"`
 	PathPrefix string `json:"pathPrefix"`
+
+	OpenAPISpecURL string `json:"openAPISpecURL"`
 }
 
 // CatalogStatus is the status of a Catalog.

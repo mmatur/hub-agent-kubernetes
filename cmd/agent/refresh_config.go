@@ -47,7 +47,7 @@ func (c refreshConfigCmd) build() *cli.Command {
 }
 
 func (c refreshConfigCmd) run(cliCtx *cli.Context) error {
-	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
+	logger.Setup(cliCtx.String(flagLogLevel), cliCtx.String(flagLogFormat))
 
 	data, err := os.ReadFile(pidFilePath)
 	if err != nil {

@@ -19,7 +19,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	stdlog "log"
@@ -28,49 +27,46 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/auth"
+	"github.com/traefik/hub-agent-kubernetes/pkg/catalog/devportal"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 )
 
-type authServerCmd struct {
+type devPortalCmd struct {
 	flags []cli.Flag
 }
 
-func newAuthServerCmd() authServerCmd {
+func newDevPortalCmd() devPortalCmd {
 	flgs := []cli.Flag{
 		&cli.StringFlag{
 			Name:    flagListenAddr,
-			Usage:   "Address on which the auth server listens for auth requests",
-			EnvVars: []string{"AUTH_SERVER_LISTEN_ADDR"},
+			Usage:   "Address on which the dev portal listens",
+			EnvVars: []string{"DEV_PORTAL_LISTEN_ADDR"},
 			Value:   "0.0.0.0:80",
 		},
 	}
 
 	flgs = append(flgs, globalFlags()...)
 
-	return authServerCmd{
+	return devPortalCmd{
 		flags: flgs,
 	}
 }
 
-func (c authServerCmd) build() *cli.Command {
+func (c devPortalCmd) build() *cli.Command {
 	return &cli.Command{
-		Name:   "auth-server",
-		Usage:  "Runs the Hub agent authentication server",
+		Name:   "dev-portal",
+		Usage:  "Runs the Hub agent dev portal",
 		Flags:  c.flags,
 		Action: c.run,
 	}
 }
 
-func (c authServerCmd) run(cliCtx *cli.Context) error {
+func (c devPortalCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String(flagLogLevel), cliCtx.String(flagLogFormat))
 
 	version.Log()
@@ -85,21 +81,11 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Hub client set: %w", err)
 	}
 
-	kubeClientSet, err := clientset.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("create Kube client set: %w", err)
-	}
-
-	key, err := readKey(cliCtx, kubeClientSet)
-	if err != nil {
-		return fmt.Errorf("read key: %w", err)
-	}
-
-	switcher := auth.NewHandlerSwitcher()
-	acpWatcher := auth.NewWatcher(switcher, key)
+	switcher := devportal.NewHandlerSwitcher()
+	catalogWatcher := devportal.NewWatcher(switcher)
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher)
+	hubInformer.Hub().V1alpha1().Catalogs().Informer().AddEventHandler(catalogWatcher)
 	hubInformer.Start(cliCtx.Context.Done())
 
 	for t, ok := range hubInformer.WaitForCacheSync(cliCtx.Context.Done()) {
@@ -108,17 +94,7 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		}
 	}
 
-	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
-	kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(acpWatcher)
-	kubeInformer.Start(cliCtx.Context.Done())
-
-	for t, ok := range kubeInformer.WaitForCacheSync(cliCtx.Context.Done()) {
-		if !ok {
-			return fmt.Errorf("wait for cache Kubernetes sync: %s: %w", t, cliCtx.Context.Err())
-		}
-	}
-
-	go acpWatcher.Run(cliCtx.Context)
+	go catalogWatcher.Run(cliCtx.Context)
 
 	listenAddr := cliCtx.String(flagListenAddr)
 
@@ -143,9 +119,9 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 	srvDone := make(chan struct{})
 
 	go func() {
-		log.Info().Str("addr", listenAddr).Msg("Starting auth server")
+		log.Info().Str("addr", listenAddr).Msg("Starting dev portal server")
 		if err = server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			log.Err(err).Msg("Unable to listen and serve auth requests")
+			log.Err(err).Msg("Unable to listen and serve dev portal requests")
 		}
 		close(srvDone)
 	}()
@@ -156,31 +132,14 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		defer cancel()
 
 		if err = server.Shutdown(gracefulCtx); err != nil {
-			log.Error().Err(err).Msg("Failed to shutdown auth server gracefully")
+			log.Error().Err(err).Msg("Failed to shutdown dev portal gracefully")
 			if err = server.Close(); err != nil {
-				return fmt.Errorf("close auth server: %w", err)
+				return fmt.Errorf("close dev portal: %w", err)
 			}
 		}
 	case <-srvDone:
-		return errors.New("auth server stopped")
+		return errors.New("dev portal stopped")
 	}
 
 	return nil
-}
-
-func readKey(cliCtx *cli.Context, client clientset.Interface) (string, error) {
-	ctx, cancel := context.WithTimeout(cliCtx.Context, 5*time.Second)
-	defer cancel()
-
-	secret, err := client.CoreV1().Secrets(currentNamespace()).Get(ctx, "hub-secret", metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("get secret: %w", err)
-	}
-
-	key, found := secret.Data["key"]
-	if !found {
-		return "", errors.New("key not found")
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256(key))[:32], nil
 }

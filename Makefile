@@ -44,9 +44,11 @@ dev: image-dev
 	kubectl patch deployment -n hub-agent hub-agent-controller -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-controller","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
 	kubectl patch deployment -n hub-agent hub-agent-auth-server -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-auth-server","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
 	kubectl patch deployment -n hub-agent hub-agent-tunnel -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-tunnel","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
+	kubectl patch deployment -n hub-agent hub-agent-dev-portal -p '{"spec":{"template":{"spec":{"containers":[{"name":"hub-agent-dev-portal","image":"$(BIN_NAME):dev","imagePullPolicy":"Never"}]}}}}'
 	kubectl rollout restart deployment -n hub-agent hub-agent-controller
 	kubectl rollout restart deployment -n hub-agent hub-agent-auth-server
 	kubectl rollout restart deployment -n hub-agent hub-agent-tunnel
+	kubectl rollout restart deployment -n hub-agent hub-agent-dev-portal
 
 ## Build Multi archs Docker image
 multi-arch-image-%:

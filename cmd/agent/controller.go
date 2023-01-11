@@ -96,7 +96,7 @@ func (c controllerCmd) build() *cli.Command {
 }
 
 func (c controllerCmd) run(cliCtx *cli.Context) error {
-	logger.Setup(cliCtx.String("log-level"), cliCtx.String("log-format"))
+	logger.Setup(cliCtx.String(flagLogLevel), cliCtx.String(flagLogFormat))
 
 	version.Log()
 
