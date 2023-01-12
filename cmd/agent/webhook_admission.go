@@ -66,7 +66,26 @@ const (
 	flagACPServerAuthServerAddr = "acp-server.auth-server-addr"
 	flagIngressClassName        = "ingress-class-name"
 	flagTraefikEntryPoint       = "traefik.entryPoint"
+	flagDevPortalServiceName    = "dev-portal.service-name"
+	flagDevPortalPort           = "dev-portal.port"
 )
+
+func devPortalFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    flagDevPortalServiceName,
+			Usage:   "Service name of the Dev Portal",
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerAuthServerAddr)},
+			Value:   "dev-portal",
+		},
+		&cli.IntFlag{
+			Name:    flagDevPortalPort,
+			Usage:   "Port used by the Dev Portal service",
+			EnvVars: []string{strcase.ToSNAKE(flagACPServerAuthServerAddr)},
+			Value:   80,
+		},
+	}
+}
 
 func acpFlags() []cli.Flag {
 	return []cli.Flag{
@@ -121,10 +140,23 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
-	ingressClassName := cliCtx.String(flagIngressClassName)
-	traefikEntryPoint := cliCtx.String(flagTraefikEntryPoint)
+	edgeIngressWatcherCfg := edgeingress.WatcherConfig{
+		IngressClassName:        cliCtx.String(flagIngressClassName),
+		TraefikEntryPoint:       cliCtx.String(flagTraefikEntryPoint),
+		AgentNamespace:          currentNamespace(),
+		EdgeIngressSyncInterval: time.Minute,
+		CertRetryInterval:       time.Minute,
+		CertSyncInterval:        time.Hour,
+	}
 
-	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, ingressClassName, traefikEntryPoint)
+	catalogWatcherCfg := catalog.WatcherConfig{
+		CatalogSyncInterval:  time.Minute,
+		AgentNamespace:       currentNamespace(),
+		DevPortalServiceName: cliCtx.String(flagDevPortalServiceName),
+		DevPortalPort:        cliCtx.Int(flagDevPortalPort),
+	}
+
+	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -172,7 +204,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr, ingressClassName, traefikEntryPoint string) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -183,7 +215,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
-	if err = initIngressClass(ctx, clientSet, ingressClassName); err != nil {
+	if err = initIngressClass(ctx, clientSet, edgeIngressWatcherCfg.IngressClassName); err != nil {
 		return nil, nil, nil, fmt.Errorf("initialize ingressClass: %w", err)
 	}
 
@@ -233,21 +265,12 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("create Traefik client set: %w", err)
 	}
 
-	edgeIngressWatcherCfg := edgeingress.WatcherConfig{
-		IngressClassName:        ingressClassName,
-		TraefikEntryPoint:       traefikEntryPoint,
-		AgentNamespace:          currentNamespace(),
-		EdgeIngressSyncInterval: time.Minute,
-		CertRetryInterval:       time.Minute,
-		CertSyncInterval:        time.Hour,
-	}
 	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, clientSet, traefik, hubInformer, edgeIngressWatcherCfg)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
 	go edgeIngressWatcher.Run(ctx)
 
-	catalogWatcherCfg := catalog.WatcherConfig{CatalogSyncInterval: time.Minute}
 	catalogWatcher := catalog.NewWatcher(platformClient, hubClientSet, hubInformer, catalogWatcherCfg)
 	go catalogWatcher.Run(ctx)
 

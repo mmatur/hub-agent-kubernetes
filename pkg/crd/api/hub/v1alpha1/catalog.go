@@ -73,8 +73,8 @@ type CatalogService struct {
 	Namespace  string `json:"namespace"`
 	Port       int    `json:"port"`
 	PathPrefix string `json:"pathPrefix"`
-
-	OpenAPISpecURL string `json:"openAPISpecURL"`
+	// +optional
+	OpenAPISpecURL string `json:"openApiSpecUrl,omitempty"`
 }
 
 // CatalogStatus is the status of a Catalog.
@@ -87,6 +87,9 @@ type CatalogStatus struct {
 
 	// Domains are the domains of the Catalog API.
 	Domains []string `json:"domains"`
+
+	// DevPortalDomain is the domain for accessing the dev portal.
+	DevPortalDomain string `json:"devPortalDomain"`
 
 	// SpecHash is a hash representing the CatalogSpec
 	SpecHash string `json:"specHash,omitempty"`

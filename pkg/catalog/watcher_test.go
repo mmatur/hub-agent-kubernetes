@@ -143,7 +143,7 @@ func Test_WatcherRun(t *testing.T) {
 				Version:  "version-1",
 				URLs:     "https://hello.example.com",
 				Domains:  []string{"hello.example.com"},
-				SpecHash: "sgWOWyiDAbIOGyXnZHF3JnYuWBk=",
+				SpecHash: "+MBiHj7QfVFo+CKOe2AdHrOqatM=",
 			},
 		},
 		{
@@ -155,15 +155,21 @@ func Test_WatcherRun(t *testing.T) {
 				Version:  "version-2",
 				URLs:     "https://majestic-beaver-123.hub-traefik.io",
 				Domains:  []string{"majestic-beaver-123.hub-traefik.io"},
-				SpecHash: "2+eev05bFhgq5v/Vajcl1KJvBaE=",
+				SpecHash: "W1ABIs7KjEa8fb1ErTuS9SK0z6E=",
 			},
 		},
 	}
 
 	client := newPlatformClientMock(t)
 
-	// Cancel the context as soon as the first catalog synchronization occurred.
-	client.OnGetCatalogs().TypedReturns(catalogs, nil).Run(func(_ mock.Arguments) { cancel() })
+	getCatalogCount := 0
+	// Cancel the context on the second catalog synchronization occurred.
+	client.OnGetCatalogs().TypedReturns(catalogs, nil).Run(func(_ mock.Arguments) {
+		getCatalogCount++
+		if getCatalogCount == 2 {
+			cancel()
+		}
+	})
 
 	w := NewWatcher(client, clientSetHub, hubInformer, WatcherConfig{
 		CatalogSyncInterval: time.Millisecond,
@@ -189,4 +195,108 @@ func Test_WatcherRun(t *testing.T) {
 		wantClusterCatalog.Status.SyncedAt = clusterCatalog.Status.SyncedAt
 		assert.Equal(t, wantClusterCatalog.Status, clusterCatalog.Status)
 	}
+}
+
+func Test_WatcherRun_syncChild(t *testing.T) {
+	clientSetHub := hubkubemock.NewSimpleClientset()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+
+	catalogInformer := hubInformer.Hub().V1alpha1().Catalogs().Informer()
+
+	hubInformer.Start(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), catalogInformer.HasSynced)
+
+	catalogs := []Catalog{
+		{
+			Name:          "toCreate",
+			Version:       "version-1",
+			CustomDomains: []string{"hello.example.com"},
+			Domain:        "majestic-beaver-123.hub-traefik.io",
+			Services: []hubv1alpha1.CatalogService{
+				{
+					Name:       "views",
+					Namespace:  "default",
+					Port:       8080,
+					PathPrefix: "/views",
+				},
+			},
+		},
+	}
+
+	wantClusterCatalog := hubv1alpha1.Catalog{
+		ObjectMeta: metav1.ObjectMeta{Name: "toCreate"},
+		Spec: hubv1alpha1.CatalogSpec{
+			CustomDomains: []string{"hello.example.com"},
+			Services:      catalogs[0].Services,
+		},
+		Status: hubv1alpha1.CatalogStatus{
+			Version:  "version-1",
+			URLs:     "https://hello.example.com",
+			Domains:  []string{"hello.example.com"},
+			SpecHash: "+MBiHj7QfVFo+CKOe2AdHrOqatM=",
+		},
+	}
+
+	client := newPlatformClientMock(t)
+
+	getCatalogCount := 0
+	// Cancel the context on the second catalog synchronization occurred.
+	client.OnGetCatalogs().TypedReturns(catalogs, nil).Run(func(_ mock.Arguments) {
+		getCatalogCount++
+		if getCatalogCount == 2 {
+			cancel()
+		}
+	})
+
+	w := NewWatcher(client, clientSetHub, hubInformer, WatcherConfig{
+		CatalogSyncInterval:  time.Millisecond,
+		AgentNamespace:       "agent-ns",
+		DevPortalServiceName: "dev-portal-service-name",
+		DevPortalPort:        8080,
+	})
+
+	w.Run(ctx)
+
+	// Make sure the remaining catalogs have the correct shape.
+	clusterCatalog, errL := clientSetHub.HubV1alpha1().Catalogs().Get(ctx, "toCreate", metav1.GetOptions{})
+	require.NoError(t, errL)
+
+	assert.Equal(t, wantClusterCatalog.Spec, clusterCatalog.Spec)
+	assert.WithinDuration(t, time.Now(), clusterCatalog.Status.SyncedAt.Time, time.Second)
+
+	wantClusterCatalog.Status.SyncedAt = clusterCatalog.Status.SyncedAt
+	assert.Equal(t, wantClusterCatalog.Status, clusterCatalog.Status)
+
+	name, err := getEdgeIngressName("toCreate")
+	require.NoError(t, err)
+
+	wantClusterEdgeIngress := hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "agent-ns",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "hub.traefik.io/v1alpha1",
+					Kind:       "Catalog",
+					Name:       clusterCatalog.Name,
+					UID:        clusterCatalog.UID,
+				},
+			},
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: "dev-portal-service-name",
+				Port: 8080,
+			},
+		},
+		Status: hubv1alpha1.EdgeIngressStatus{},
+	}
+
+	edgeIngress, err := clientSetHub.HubV1alpha1().EdgeIngresses("agent-ns").Get(ctx, name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, wantClusterEdgeIngress.Spec, edgeIngress.Spec)
 }
