@@ -353,7 +353,7 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 	}
 }
 
-func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
+func TestWebhookPolicy_ServeHTTP_UpdateWithSameHash(t *testing.T) {
 	spec := hubv1alpha1.AccessControlPolicySpec{
 		JWT: &hubv1alpha1.AccessControlPolicyJWT{
 			PublicKey: "secret",
@@ -373,7 +373,20 @@ func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
 			},
 			Name:      "acp",
 			Namespace: "default",
-			Operation: admv1.Create,
+			Operation: admv1.Update,
+			OldObject: runtime.RawExtension{
+				Raw: mustMarshal(t, hubv1alpha1.AccessControlPolicy{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "AccessControlPolicy",
+						APIVersion: "hub.traefik.io/v1alpha1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "acp",
+						Namespace: "default",
+					},
+					Spec: spec,
+				}),
+			},
 			Object: runtime.RawExtension{
 				Raw: mustMarshal(t, hubv1alpha1.AccessControlPolicy{
 					TypeMeta: metav1.TypeMeta{
@@ -386,7 +399,7 @@ func TestWebhookPolicy_ServeHTTP_NotApplyPatch(t *testing.T) {
 					},
 					Spec: spec,
 					Status: hubv1alpha1.AccessControlPolicyStatus{
-						Version:  "oldVersion",
+						Version:  "newVersion",
 						SyncedAt: metav1.Time{},
 						SpecHash: hash,
 					},

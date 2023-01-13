@@ -46,7 +46,23 @@ type Catalog struct {
 type Service = hubv1alpha1.CatalogService
 
 // Resource builds the v1alpha1 EdgeIngress resource.
-func (e *Catalog) Resource() (*hubv1alpha1.Catalog, error) {
+func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error) {
+	var serviceStatuses []hubv1alpha1.CatalogServiceStatus
+	for _, svc := range e.Services {
+		svc := svc
+
+		openAPISpecURL := svc.OpenAPISpecURL
+		if openAPISpecURL == "" {
+			openAPISpecURL = oasRegistry.GetURL(svc.Name, svc.Namespace)
+		}
+
+		serviceStatuses = append(serviceStatuses, hubv1alpha1.CatalogServiceStatus{
+			Name:           svc.Name,
+			Namespace:      svc.Namespace,
+			OpenAPISpecURL: openAPISpecURL,
+		})
+	}
+
 	spec := hubv1alpha1.CatalogSpec{
 		CustomDomains: e.CustomDomains,
 		Services:      e.Services,
@@ -79,6 +95,7 @@ func (e *Catalog) Resource() (*hubv1alpha1.Catalog, error) {
 			Domains:  domains,
 			URLs:     strings.Join(urls, ","),
 			SpecHash: specHash,
+			Services: serviceStatuses,
 		},
 	}, nil
 }

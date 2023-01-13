@@ -50,7 +50,7 @@ func TestWatcher_OnAdd(t *testing.T) {
 	go watcher.Run(ctx)
 	watcher.OnAdd(createCatalog("my-catalog", srv.URL))
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	testCases := []struct {
 		desc   string

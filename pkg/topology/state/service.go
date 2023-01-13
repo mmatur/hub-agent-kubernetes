@@ -26,11 +26,16 @@ import (
 	"io"
 	"net/url"
 	"sort"
+	"strconv"
 
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/openapi"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	annotationOpenAPIPath = "hub.traefik.io/openapi-path"
+	annotationOpenAPIPort = "hub.traefik.io/openapi-port"
 )
 
 func (f *Fetcher) getServices(ctx context.Context) (map[string]*Service, error) {
@@ -86,8 +91,8 @@ func (f *Fetcher) getServices(ctx context.Context) (map[string]*Service, error) 
 	return svcs, nil
 }
 
-func (f *Fetcher) getOpenAPISpecLocation(ctx context.Context, service *corev1.Service) (*openapi.Location, error) {
-	location, err := openapi.GetLocationFromService(service)
+func (f *Fetcher) getOpenAPISpecLocation(ctx context.Context, service *corev1.Service) (*OpenAPISpecLocation, error) {
+	location, err := getLocationFromService(service)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +167,40 @@ func (f *Fetcher) GetServiceLogs(ctx context.Context, namespace, name string, li
 	}
 
 	return buf.Bytes(), nil
+}
+
+func getLocationFromService(service *corev1.Service) (*OpenAPISpecLocation, error) {
+	oasPath, ok := service.Annotations[annotationOpenAPIPath]
+	if !ok {
+		return nil, nil
+	}
+
+	var portStr string
+	portStr, ok = service.Annotations[annotationOpenAPIPort]
+	if !ok {
+		return nil, nil
+	}
+
+	aosPort, err := strconv.ParseInt(portStr, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("%q must be a valid port", annotationOpenAPIPort)
+	}
+
+	var portFound bool
+	for _, servicePort := range service.Spec.Ports {
+		if int64(servicePort.Port) == aosPort {
+			portFound = true
+			break
+		}
+	}
+	if !portFound {
+		return nil, fmt.Errorf("%q contains a port which is not defined on the service", annotationOpenAPIPort)
+	}
+
+	return &OpenAPISpecLocation{
+		Path: oasPath,
+		Port: int(aosPort),
+	}, nil
 }
 
 func writeBytes(buf *bytes.Buffer, b []byte, maxLen int) {

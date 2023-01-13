@@ -93,10 +93,16 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnCreateCatalog(wantCreateReq).TypedReturns(createdCatalog, nil).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+	oasRegistry.
+		OnGetURL("whoami", "default").
+		TypedReturns("http://whoami.default.svc:8080/spec.json").
+		Once()
+
+	h := NewHandler(client, oasRegistry)
 	h.now = func() time.Time { return now.Time }
 
 	b := mustMarshal(t, admissionRev)
@@ -123,6 +129,13 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				URLs:     "https://foo.example.com,https://bar.example.com",
 				Domains:  []string{"foo.example.com", "bar.example.com"},
 				SpecHash: "Sz6cVxZ70Qm0el1CHhSpsbou92U=",
+				Services: []hubv1alpha1.CatalogServiceStatus{
+					{
+						Name:           "whoami",
+						Namespace:      "default",
+						OpenAPISpecURL: "http://whoami.default.svc:8080/spec.json",
+					},
+				},
 			}},
 		}),
 	}
@@ -157,10 +170,12 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnCreateCatalogRaw(mock.Anything).TypedReturns(nil, platform.ErrVersionConflict).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+
+	h := NewHandler(client, oasRegistry)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -257,11 +272,17 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnUpdateCatalog(catalogName, version, wantUpdateReq).
 		TypedReturns(updatedCatalog, nil).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+	oasRegistry.
+		OnGetURL("new-whoami", "default").
+		TypedReturns("http://new-whoami.default.svc:8080/spec.json").
+		Once()
+
+	h := NewHandler(client, oasRegistry)
 	h.now = func() time.Time { return now.Time }
 
 	b := mustMarshal(t, admissionRev)
@@ -288,6 +309,13 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				Domains:  []string{"foo.example.com"},
 				URLs:     "https://foo.example.com",
 				SpecHash: "rOG0fFXyK3/sUYGqjggW/ix7rFc=",
+				Services: []hubv1alpha1.CatalogServiceStatus{
+					{
+						Name:           "new-whoami",
+						Namespace:      "default",
+						OpenAPISpecURL: "http://new-whoami.default.svc:8080/spec.json",
+					},
+				},
 			}},
 		}),
 	}
@@ -349,11 +377,13 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnUpdateCatalogRaw(mock.Anything, mock.Anything, mock.Anything).
 		TypedReturns(nil, platform.ErrVersionConflict).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+
+	h := NewHandler(client, oasRegistry)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -412,10 +442,12 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnDeleteCatalog(catalogName, version).TypedReturns(nil).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+
+	h := NewHandler(client, oasRegistry)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -470,10 +502,12 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 
-	client := newBackendMock(t)
+	client := newPlatformClientMock(t)
 	client.OnDeleteCatalogRaw(mock.Anything, mock.Anything).TypedReturns(platform.ErrVersionConflict).Once()
 
-	h := NewHandler(client)
+	oasRegistry := newOasRegistryMock(t)
+
+	h := NewHandler(client, oasRegistry)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -517,7 +551,7 @@ func TestHandler_ServeHTTP_notACatalog(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	})
 
-	h := NewHandler(nil)
+	h := NewHandler(nil, nil)
 
 	rec := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
@@ -560,7 +594,7 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	})
 
-	h := NewHandler(nil)
+	h := NewHandler(nil, nil)
 
 	rec := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))

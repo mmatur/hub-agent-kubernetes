@@ -48,6 +48,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
+	"github.com/traefik/hub-agent-kubernetes/pkg/topology"
 	"github.com/urfave/cli/v2"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
@@ -128,7 +129,7 @@ func acpFlags() []cli.Flag {
 	}
 }
 
-func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client) error {
+func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client, topoWatch *topology.Watcher) error {
 	var (
 		listenAddr     = cliCtx.String(flagACPServerListenAddr)
 		certFile       = cliCtx.String(flagACPServerCertificate)
@@ -156,7 +157,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		DevPortalPort:        cliCtx.Int(flagDevPortalPort),
 	}
 
-	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
+	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, topoWatch, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -204,7 +205,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, topoWatch *topology.Watcher, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -244,17 +245,9 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher)
-	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
-	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
-	hubInformer.Hub().V1alpha1().Catalogs().Informer()
-
-	hubInformer.Start(ctx.Done())
-
-	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("wait for Hub informer cache sync: %s: %w", t, ctx.Err())
-		}
+	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
 	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
@@ -271,7 +264,10 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	}
 	go edgeIngressWatcher.Run(ctx)
 
-	catalogWatcher := catalog.NewWatcher(platformClient, hubClientSet, hubInformer, catalogWatcherCfg)
+	oasRegistry := catalog.NewServiceRegistry()
+	topoWatch.AddListener(oasRegistry.TopologyStateChanged)
+	catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, hubClientSet, hubInformer, catalogWatcherCfg)
+
 	go catalogWatcher.Run(ctx)
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
@@ -285,16 +281,16 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		traefikReviewer,
 	}
 
-	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogadmission.NewHandler(platformClient), nil
+	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogadmission.NewHandler(platformClient, oasRegistry), nil
 }
 
 func traefikClient(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
-	hasMiddlewareCRD, err := hasMiddlewareCRD(clientSet.Discovery())
+	crd, err := hasMiddlewareCRD(clientSet.Discovery())
 	if err != nil {
 		return nil, fmt.Errorf("check presence of Traefik Middleware CRD: %w", err)
 	}
 
-	if !hasMiddlewareCRD {
+	if !crd {
 		return nil, nil
 	}
 
@@ -304,6 +300,23 @@ func traefikClient(clientSet *clientset.Clientset, config *rest.Config) (v1alpha
 	}
 
 	return traefikClientSet.TraefikV1alpha1(), nil
+}
+
+func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler) error {
+	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher)
+	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
+	hubInformer.Hub().V1alpha1().Catalogs().Informer()
+	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
+
+	hubInformer.Start(ctx.Done())
+
+	for t, ok := range hubInformer.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return fmt.Errorf("wait for Hub informer cache sync: %s: %w", t, ctx.Err())
+		}
+	}
+
+	return nil
 }
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {

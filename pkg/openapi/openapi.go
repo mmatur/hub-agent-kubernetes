@@ -22,59 +22,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
 )
-
-const (
-	annotationOpenAPIPath = "hub.traefik.io/openapi-path"
-	annotationOpenAPIPort = "hub.traefik.io/openapi-port"
-)
-
-// Location describes the location of an OpenAPI specification.
-type Location struct {
-	Path string `json:"path"`
-	Port int    `json:"port"`
-}
-
-// GetLocationFromService retrieves the location of an OpenAPI specification on the given service.
-func GetLocationFromService(service *corev1.Service) (*Location, error) {
-	oasPath, ok := service.Annotations[annotationOpenAPIPath]
-	if !ok {
-		return nil, nil
-	}
-
-	var portStr string
-	portStr, ok = service.Annotations[annotationOpenAPIPort]
-	if !ok {
-		return nil, nil
-	}
-
-	aosPort, err := strconv.ParseInt(portStr, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("%q must be a valid port", annotationOpenAPIPort)
-	}
-
-	var portFound bool
-	for _, servicePort := range service.Spec.Ports {
-		if int64(servicePort.Port) == aosPort {
-			portFound = true
-			break
-		}
-	}
-	if !portFound {
-		return nil, fmt.Errorf("%q contains a port which is not defined on the service", annotationOpenAPIPort)
-	}
-
-	return &Location{
-		Path: oasPath,
-		Port: int(aosPort),
-	}, nil
-}
 
 // Loader loads OpenAPI Specifications.
 type Loader struct {

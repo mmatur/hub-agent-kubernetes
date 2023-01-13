@@ -49,6 +49,7 @@ type Catalog struct {
 // CatalogSpec configures a Catalog.
 type CatalogSpec struct {
 	// CustomDomains are the custom domains under which the API will be exposed.
+	// +optional
 	CustomDomains []string `json:"customDomains,omitempty"`
 	// Services are the list of Services available in the Catalog.
 	Services []CatalogService `json:"services,omitempty"`
@@ -93,6 +94,15 @@ type CatalogStatus struct {
 
 	// SpecHash is a hash representing the CatalogSpec
 	SpecHash string `json:"specHash,omitempty"`
+
+	Services []CatalogServiceStatus `json:"services,omitempty"`
+}
+
+// CatalogServiceStatus is the status of a Service within a Catalog.
+type CatalogServiceStatus struct {
+	Name           string `json:"name"`
+	Namespace      string `json:"namespace"`
+	OpenAPISpecURL string `json:"openApiSpecUrl,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

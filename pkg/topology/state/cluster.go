@@ -19,7 +19,6 @@ package state
 
 import (
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/openapi"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 )
@@ -43,13 +42,19 @@ type ResourceMeta struct {
 
 // Service describes a Service.
 type Service struct {
-	Name                string             `json:"name"`
-	Namespace           string             `json:"namespace"`
-	Type                corev1.ServiceType `json:"type"`
-	Annotations         map[string]string  `json:"annotations,omitempty"`
-	ExternalIPs         []string           `json:"externalIPs,omitempty"`
-	ExternalPorts       []int              `json:"externalPorts,omitempty"`
-	OpenAPISpecLocation *openapi.Location  `json:"openApiSpecLocation,omitempty"`
+	Name                string               `json:"name"`
+	Namespace           string               `json:"namespace"`
+	Type                corev1.ServiceType   `json:"type"`
+	Annotations         map[string]string    `json:"annotations,omitempty"`
+	ExternalIPs         []string             `json:"externalIPs,omitempty"`
+	ExternalPorts       []int                `json:"externalPorts,omitempty"`
+	OpenAPISpecLocation *OpenAPISpecLocation `json:"openApiSpecLocation,omitempty"`
+}
+
+// OpenAPISpecLocation describes the location of an OpenAPI specification.
+type OpenAPISpecLocation struct {
+	Path string `json:"path"`
+	Port int    `json:"port"`
 }
 
 // IngressMeta represents the common Ingress metadata properties.

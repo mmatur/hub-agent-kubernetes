@@ -12,14 +12,14 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
 
-// backendMock mock of Backend.
-type backendMock struct{ mock.Mock }
+// platformClientMock mock of PlatformClient.
+type platformClientMock struct{ mock.Mock }
 
-// newBackendMock creates a new backendMock.
-func newBackendMock(tb testing.TB) *backendMock {
+// newPlatformClientMock creates a new platformClientMock.
+func newPlatformClientMock(tb testing.TB) *platformClientMock {
 	tb.Helper()
 
-	m := &backendMock{}
+	m := &platformClientMock{}
 	m.Mock.Test(tb)
 
 	tb.Cleanup(func() { m.AssertExpectations(tb) })
@@ -27,7 +27,7 @@ func newBackendMock(tb testing.TB) *backendMock {
 	return m
 }
 
-func (_m *backendMock) CreateCatalog(_ context.Context, req *platform.CreateCatalogReq) (*catalog.Catalog, error) {
+func (_m *platformClientMock) CreateCatalog(_ context.Context, req *platform.CreateCatalogReq) (*catalog.Catalog, error) {
 	_ret := _m.Called(req)
 
 	if _rf, ok := _ret.Get(0).(func(*platform.CreateCatalogReq) (*catalog.Catalog, error)); ok {
@@ -40,70 +40,70 @@ func (_m *backendMock) CreateCatalog(_ context.Context, req *platform.CreateCata
 	return _ra0, _rb1
 }
 
-func (_m *backendMock) OnCreateCatalog(req *platform.CreateCatalogReq) *backendCreateCatalogCall {
-	return &backendCreateCatalogCall{Call: _m.Mock.On("CreateCatalog", req), Parent: _m}
+func (_m *platformClientMock) OnCreateCatalog(req *platform.CreateCatalogReq) *platformClientCreateCatalogCall {
+	return &platformClientCreateCatalogCall{Call: _m.Mock.On("CreateCatalog", req), Parent: _m}
 }
 
-func (_m *backendMock) OnCreateCatalogRaw(req interface{}) *backendCreateCatalogCall {
-	return &backendCreateCatalogCall{Call: _m.Mock.On("CreateCatalog", req), Parent: _m}
+func (_m *platformClientMock) OnCreateCatalogRaw(req interface{}) *platformClientCreateCatalogCall {
+	return &platformClientCreateCatalogCall{Call: _m.Mock.On("CreateCatalog", req), Parent: _m}
 }
 
-type backendCreateCatalogCall struct {
+type platformClientCreateCatalogCall struct {
 	*mock.Call
-	Parent *backendMock
+	Parent *platformClientMock
 }
 
-func (_c *backendCreateCatalogCall) Panic(msg string) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Panic(msg string) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) Once() *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Once() *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) Twice() *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Twice() *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) Times(i int) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Times(i int) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) WaitUntil(w <-chan time.Time) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) WaitUntil(w <-chan time.Time) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) After(d time.Duration) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) After(d time.Duration) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) Run(fn func(args mock.Arguments)) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Run(fn func(args mock.Arguments)) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) Maybe() *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) Maybe() *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) TypedReturns(a *catalog.Catalog, b error) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) TypedReturns(a *catalog.Catalog, b error) *platformClientCreateCatalogCall {
 	_c.Call = _c.Return(a, b)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) ReturnsFn(fn func(*platform.CreateCatalogReq) (*catalog.Catalog, error)) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) ReturnsFn(fn func(*platform.CreateCatalogReq) (*catalog.Catalog, error)) *platformClientCreateCatalogCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) TypedRun(fn func(*platform.CreateCatalogReq)) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) TypedRun(fn func(*platform.CreateCatalogReq)) *platformClientCreateCatalogCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
 		_req, _ := args.Get(0).(*platform.CreateCatalogReq)
 		fn(_req)
@@ -111,31 +111,31 @@ func (_c *backendCreateCatalogCall) TypedRun(fn func(*platform.CreateCatalogReq)
 	return _c
 }
 
-func (_c *backendCreateCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalog(req)
 }
 
-func (_c *backendCreateCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *backendDeleteCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalog(name, lastKnownVersion)
 }
 
-func (_c *backendCreateCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *backendUpdateCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalog(name, lastKnownVersion, req)
 }
 
-func (_c *backendCreateCatalogCall) OnCreateCatalogRaw(req interface{}) *backendCreateCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnCreateCatalogRaw(req interface{}) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalogRaw(req)
 }
 
-func (_c *backendCreateCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *backendDeleteCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalogRaw(name, lastKnownVersion)
 }
 
-func (_c *backendCreateCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *backendUpdateCatalogCall {
+func (_c *platformClientCreateCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalogRaw(name, lastKnownVersion, req)
 }
 
-func (_m *backendMock) DeleteCatalog(_ context.Context, name string, lastKnownVersion string) error {
+func (_m *platformClientMock) DeleteCatalog(_ context.Context, name string, lastKnownVersion string) error {
 	_ret := _m.Called(name, lastKnownVersion)
 
 	if _rf, ok := _ret.Get(0).(func(string, string) error); ok {
@@ -147,70 +147,70 @@ func (_m *backendMock) DeleteCatalog(_ context.Context, name string, lastKnownVe
 	return _ra0
 }
 
-func (_m *backendMock) OnDeleteCatalog(name string, lastKnownVersion string) *backendDeleteCatalogCall {
-	return &backendDeleteCatalogCall{Call: _m.Mock.On("DeleteCatalog", name, lastKnownVersion), Parent: _m}
+func (_m *platformClientMock) OnDeleteCatalog(name string, lastKnownVersion string) *platformClientDeleteCatalogCall {
+	return &platformClientDeleteCatalogCall{Call: _m.Mock.On("DeleteCatalog", name, lastKnownVersion), Parent: _m}
 }
 
-func (_m *backendMock) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *backendDeleteCatalogCall {
-	return &backendDeleteCatalogCall{Call: _m.Mock.On("DeleteCatalog", name, lastKnownVersion), Parent: _m}
+func (_m *platformClientMock) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteCatalogCall {
+	return &platformClientDeleteCatalogCall{Call: _m.Mock.On("DeleteCatalog", name, lastKnownVersion), Parent: _m}
 }
 
-type backendDeleteCatalogCall struct {
+type platformClientDeleteCatalogCall struct {
 	*mock.Call
-	Parent *backendMock
+	Parent *platformClientMock
 }
 
-func (_c *backendDeleteCatalogCall) Panic(msg string) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Panic(msg string) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) Once() *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Once() *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) Twice() *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Twice() *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) Times(i int) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Times(i int) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) WaitUntil(w <-chan time.Time) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) WaitUntil(w <-chan time.Time) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) After(d time.Duration) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) After(d time.Duration) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) Run(fn func(args mock.Arguments)) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Run(fn func(args mock.Arguments)) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) Maybe() *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) Maybe() *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) TypedReturns(a error) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) TypedReturns(a error) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Return(a)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) ReturnsFn(fn func(string, string) error) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) ReturnsFn(fn func(string, string) error) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) TypedRun(fn func(string, string)) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) TypedRun(fn func(string, string)) *platformClientDeleteCatalogCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
 		_name := args.String(0)
 		_lastKnownVersion := args.String(1)
@@ -219,31 +219,31 @@ func (_c *backendDeleteCatalogCall) TypedRun(fn func(string, string)) *backendDe
 	return _c
 }
 
-func (_c *backendDeleteCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *backendCreateCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalog(req)
 }
 
-func (_c *backendDeleteCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalog(name, lastKnownVersion)
 }
 
-func (_c *backendDeleteCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *backendUpdateCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalog(name, lastKnownVersion, req)
 }
 
-func (_c *backendDeleteCatalogCall) OnCreateCatalogRaw(req interface{}) *backendCreateCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnCreateCatalogRaw(req interface{}) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalogRaw(req)
 }
 
-func (_c *backendDeleteCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *backendDeleteCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalogRaw(name, lastKnownVersion)
 }
 
-func (_c *backendDeleteCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *backendUpdateCatalogCall {
+func (_c *platformClientDeleteCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalogRaw(name, lastKnownVersion, req)
 }
 
-func (_m *backendMock) UpdateCatalog(_ context.Context, name string, lastKnownVersion string, req *platform.UpdateCatalogReq) (*catalog.Catalog, error) {
+func (_m *platformClientMock) UpdateCatalog(_ context.Context, name string, lastKnownVersion string, req *platform.UpdateCatalogReq) (*catalog.Catalog, error) {
 	_ret := _m.Called(name, lastKnownVersion, req)
 
 	if _rf, ok := _ret.Get(0).(func(string, string, *platform.UpdateCatalogReq) (*catalog.Catalog, error)); ok {
@@ -256,70 +256,70 @@ func (_m *backendMock) UpdateCatalog(_ context.Context, name string, lastKnownVe
 	return _ra0, _rb1
 }
 
-func (_m *backendMock) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *backendUpdateCatalogCall {
-	return &backendUpdateCatalogCall{Call: _m.Mock.On("UpdateCatalog", name, lastKnownVersion, req), Parent: _m}
+func (_m *platformClientMock) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *platformClientUpdateCatalogCall {
+	return &platformClientUpdateCatalogCall{Call: _m.Mock.On("UpdateCatalog", name, lastKnownVersion, req), Parent: _m}
 }
 
-func (_m *backendMock) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *backendUpdateCatalogCall {
-	return &backendUpdateCatalogCall{Call: _m.Mock.On("UpdateCatalog", name, lastKnownVersion, req), Parent: _m}
+func (_m *platformClientMock) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdateCatalogCall {
+	return &platformClientUpdateCatalogCall{Call: _m.Mock.On("UpdateCatalog", name, lastKnownVersion, req), Parent: _m}
 }
 
-type backendUpdateCatalogCall struct {
+type platformClientUpdateCatalogCall struct {
 	*mock.Call
-	Parent *backendMock
+	Parent *platformClientMock
 }
 
-func (_c *backendUpdateCatalogCall) Panic(msg string) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Panic(msg string) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) Once() *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Once() *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) Twice() *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Twice() *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) Times(i int) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Times(i int) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) WaitUntil(w <-chan time.Time) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) WaitUntil(w <-chan time.Time) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) After(d time.Duration) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) After(d time.Duration) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) Run(fn func(args mock.Arguments)) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Run(fn func(args mock.Arguments)) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) Maybe() *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) Maybe() *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) TypedReturns(a *catalog.Catalog, b error) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) TypedReturns(a *catalog.Catalog, b error) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Return(a, b)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) ReturnsFn(fn func(string, string, *platform.UpdateCatalogReq) (*catalog.Catalog, error)) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) ReturnsFn(fn func(string, string, *platform.UpdateCatalogReq) (*catalog.Catalog, error)) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) TypedRun(fn func(string, string, *platform.UpdateCatalogReq)) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) TypedRun(fn func(string, string, *platform.UpdateCatalogReq)) *platformClientUpdateCatalogCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
 		_name := args.String(0)
 		_lastKnownVersion := args.String(1)
@@ -329,26 +329,239 @@ func (_c *backendUpdateCatalogCall) TypedRun(fn func(string, string, *platform.U
 	return _c
 }
 
-func (_c *backendUpdateCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *backendCreateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnCreateCatalog(req *platform.CreateCatalogReq) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalog(req)
 }
 
-func (_c *backendUpdateCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *backendDeleteCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnDeleteCatalog(name string, lastKnownVersion string) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalog(name, lastKnownVersion)
 }
 
-func (_c *backendUpdateCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnUpdateCatalog(name string, lastKnownVersion string, req *platform.UpdateCatalogReq) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalog(name, lastKnownVersion, req)
 }
 
-func (_c *backendUpdateCatalogCall) OnCreateCatalogRaw(req interface{}) *backendCreateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnCreateCatalogRaw(req interface{}) *platformClientCreateCatalogCall {
 	return _c.Parent.OnCreateCatalogRaw(req)
 }
 
-func (_c *backendUpdateCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *backendDeleteCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnDeleteCatalogRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteCatalogCall {
 	return _c.Parent.OnDeleteCatalogRaw(name, lastKnownVersion)
 }
 
-func (_c *backendUpdateCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *backendUpdateCatalogCall {
+func (_c *platformClientUpdateCatalogCall) OnUpdateCatalogRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdateCatalogCall {
 	return _c.Parent.OnUpdateCatalogRaw(name, lastKnownVersion, req)
+}
+
+// oasRegistryMock mock of OASRegistry.
+type oasRegistryMock struct{ mock.Mock }
+
+// newOasRegistryMock creates a new oasRegistryMock.
+func newOasRegistryMock(tb testing.TB) *oasRegistryMock {
+	tb.Helper()
+
+	m := &oasRegistryMock{}
+	m.Mock.Test(tb)
+
+	tb.Cleanup(func() { m.AssertExpectations(tb) })
+
+	return m
+}
+
+func (_m *oasRegistryMock) GetURL(name string, namespace string) string {
+	_ret := _m.Called(name, namespace)
+
+	if _rf, ok := _ret.Get(0).(func(string, string) string); ok {
+		return _rf(name, namespace)
+	}
+
+	_ra0 := _ret.String(0)
+
+	return _ra0
+}
+
+func (_m *oasRegistryMock) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return &oasRegistryGetURLCall{Call: _m.Mock.On("GetURL", name, namespace), Parent: _m}
+}
+
+func (_m *oasRegistryMock) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return &oasRegistryGetURLCall{Call: _m.Mock.On("GetURL", name, namespace), Parent: _m}
+}
+
+type oasRegistryGetURLCall struct {
+	*mock.Call
+	Parent *oasRegistryMock
+}
+
+func (_c *oasRegistryGetURLCall) Panic(msg string) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Once() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Twice() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Times(i int) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) WaitUntil(w <-chan time.Time) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) After(d time.Duration) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Run(fn func(args mock.Arguments)) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Maybe() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) TypedReturns(a string) *oasRegistryGetURLCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) ReturnsFn(fn func(string, string) string) *oasRegistryGetURLCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) TypedRun(fn func(string, string)) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_name := args.String(0)
+		_namespace := args.String(1)
+		fn(_name, _namespace)
+	})
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURL(name, namespace)
+}
+
+func (_c *oasRegistryGetURLCall) OnUpdated() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdated()
+}
+
+func (_c *oasRegistryGetURLCall) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURLRaw(name, namespace)
+}
+
+func (_c *oasRegistryGetURLCall) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdatedRaw()
+}
+
+func (_m *oasRegistryMock) Updated() <-chan struct{} {
+	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() <-chan struct{}); ok {
+		return _rf()
+	}
+
+	_ra0, _ := _ret.Get(0).(<-chan struct{})
+
+	return _ra0
+}
+
+func (_m *oasRegistryMock) OnUpdated() *oasRegistryUpdatedCall {
+	return &oasRegistryUpdatedCall{Call: _m.Mock.On("Updated"), Parent: _m}
+}
+
+func (_m *oasRegistryMock) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return &oasRegistryUpdatedCall{Call: _m.Mock.On("Updated"), Parent: _m}
+}
+
+type oasRegistryUpdatedCall struct {
+	*mock.Call
+	Parent *oasRegistryMock
+}
+
+func (_c *oasRegistryUpdatedCall) Panic(msg string) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Once() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Twice() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Times(i int) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) WaitUntil(w <-chan time.Time) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) After(d time.Duration) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Run(fn func(args mock.Arguments)) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Maybe() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) TypedReturns(a <-chan struct{}) *oasRegistryUpdatedCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) ReturnsFn(fn func() <-chan struct{}) *oasRegistryUpdatedCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) TypedRun(fn func()) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURL(name, namespace)
+}
+
+func (_c *oasRegistryUpdatedCall) OnUpdated() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdated()
+}
+
+func (_c *oasRegistryUpdatedCall) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURLRaw(name, namespace)
+}
+
+func (_c *oasRegistryUpdatedCall) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdatedRaw()
 }

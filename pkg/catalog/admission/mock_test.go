@@ -17,4 +17,5 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 package admission
 
-// mocktail:Backend
+// mocktail:PlatformClient
+// mocktail:OASRegistry

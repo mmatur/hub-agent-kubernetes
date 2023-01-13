@@ -115,3 +115,216 @@ func (_c *platformClientGetCatalogsCall) OnGetCatalogs() *platformClientGetCatal
 func (_c *platformClientGetCatalogsCall) OnGetCatalogsRaw() *platformClientGetCatalogsCall {
 	return _c.Parent.OnGetCatalogsRaw()
 }
+
+// oasRegistryMock mock of OASRegistry.
+type oasRegistryMock struct{ mock.Mock }
+
+// newOasRegistryMock creates a new oasRegistryMock.
+func newOasRegistryMock(tb testing.TB) *oasRegistryMock {
+	tb.Helper()
+
+	m := &oasRegistryMock{}
+	m.Mock.Test(tb)
+
+	tb.Cleanup(func() { m.AssertExpectations(tb) })
+
+	return m
+}
+
+func (_m *oasRegistryMock) GetURL(name string, namespace string) string {
+	_ret := _m.Called(name, namespace)
+
+	if _rf, ok := _ret.Get(0).(func(string, string) string); ok {
+		return _rf(name, namespace)
+	}
+
+	_ra0 := _ret.String(0)
+
+	return _ra0
+}
+
+func (_m *oasRegistryMock) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return &oasRegistryGetURLCall{Call: _m.Mock.On("GetURL", name, namespace), Parent: _m}
+}
+
+func (_m *oasRegistryMock) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return &oasRegistryGetURLCall{Call: _m.Mock.On("GetURL", name, namespace), Parent: _m}
+}
+
+type oasRegistryGetURLCall struct {
+	*mock.Call
+	Parent *oasRegistryMock
+}
+
+func (_c *oasRegistryGetURLCall) Panic(msg string) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Once() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Twice() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Times(i int) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) WaitUntil(w <-chan time.Time) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) After(d time.Duration) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Run(fn func(args mock.Arguments)) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) Maybe() *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) TypedReturns(a string) *oasRegistryGetURLCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) ReturnsFn(fn func(string, string) string) *oasRegistryGetURLCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) TypedRun(fn func(string, string)) *oasRegistryGetURLCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_name := args.String(0)
+		_namespace := args.String(1)
+		fn(_name, _namespace)
+	})
+	return _c
+}
+
+func (_c *oasRegistryGetURLCall) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURL(name, namespace)
+}
+
+func (_c *oasRegistryGetURLCall) OnUpdated() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdated()
+}
+
+func (_c *oasRegistryGetURLCall) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURLRaw(name, namespace)
+}
+
+func (_c *oasRegistryGetURLCall) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdatedRaw()
+}
+
+func (_m *oasRegistryMock) Updated() <-chan struct{} {
+	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() <-chan struct{}); ok {
+		return _rf()
+	}
+
+	_ra0, _ := _ret.Get(0).(<-chan struct{})
+
+	return _ra0
+}
+
+func (_m *oasRegistryMock) OnUpdated() *oasRegistryUpdatedCall {
+	return &oasRegistryUpdatedCall{Call: _m.Mock.On("Updated"), Parent: _m}
+}
+
+func (_m *oasRegistryMock) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return &oasRegistryUpdatedCall{Call: _m.Mock.On("Updated"), Parent: _m}
+}
+
+type oasRegistryUpdatedCall struct {
+	*mock.Call
+	Parent *oasRegistryMock
+}
+
+func (_c *oasRegistryUpdatedCall) Panic(msg string) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Once() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Twice() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Times(i int) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) WaitUntil(w <-chan time.Time) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) After(d time.Duration) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Run(fn func(args mock.Arguments)) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) Maybe() *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) TypedReturns(a <-chan struct{}) *oasRegistryUpdatedCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) ReturnsFn(fn func() <-chan struct{}) *oasRegistryUpdatedCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) TypedRun(fn func()) *oasRegistryUpdatedCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *oasRegistryUpdatedCall) OnGetURL(name string, namespace string) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURL(name, namespace)
+}
+
+func (_c *oasRegistryUpdatedCall) OnUpdated() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdated()
+}
+
+func (_c *oasRegistryUpdatedCall) OnGetURLRaw(name interface{}, namespace interface{}) *oasRegistryGetURLCall {
+	return _c.Parent.OnGetURLRaw(name, namespace)
+}
+
+func (_c *oasRegistryUpdatedCall) OnUpdatedRaw() *oasRegistryUpdatedCall {
+	return _c.Parent.OnUpdatedRaw()
+}

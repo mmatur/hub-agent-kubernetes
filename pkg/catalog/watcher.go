@@ -37,6 +37,12 @@ type PlatformClient interface {
 	GetCatalogs(ctx context.Context) ([]Catalog, error)
 }
 
+// OASRegistry is a registry of OpenAPI Spec URLs.
+type OASRegistry interface {
+	GetURL(name, namespace string) string
+	Updated() <-chan struct{}
+}
+
 // WatcherConfig holds the watcher configuration.
 type WatcherConfig struct {
 	CatalogSyncInterval  time.Duration
@@ -49,17 +55,21 @@ type WatcherConfig struct {
 type Watcher struct {
 	config WatcherConfig
 
-	client       PlatformClient
+	platform    PlatformClient
+	oasRegistry OASRegistry
+
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformer.SharedInformerFactory
 }
 
 // NewWatcher returns a new Watcher.
-func NewWatcher(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config WatcherConfig) *Watcher {
+func NewWatcher(client PlatformClient, oasRegistry OASRegistry, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config WatcherConfig) *Watcher {
 	return &Watcher{
 		config: config,
 
-		client:       client,
+		platform:    client,
+		oasRegistry: oasRegistry,
+
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
 	}
@@ -70,6 +80,10 @@ func (w *Watcher) Run(ctx context.Context) {
 	t := time.NewTicker(w.config.CatalogSyncInterval)
 	defer t.Stop()
 
+	ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
+	w.syncCatalogs(ctxSync)
+	cancel()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -77,7 +91,12 @@ func (w *Watcher) Run(ctx context.Context) {
 			return
 
 		case <-t.C:
-			ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
+			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
+			w.syncCatalogs(ctxSync)
+			cancel()
+
+		case <-w.oasRegistry.Updated():
+			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
 			w.syncCatalogs(ctxSync)
 			cancel()
 		}
@@ -85,7 +104,7 @@ func (w *Watcher) Run(ctx context.Context) {
 }
 
 func (w *Watcher) syncCatalogs(ctx context.Context) {
-	platformCatalogs, err := w.client.GetCatalogs(ctx)
+	platformCatalogs, err := w.platform.GetCatalogs(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to fetch Catalogs")
 		return
@@ -143,7 +162,7 @@ func (w *Watcher) syncCatalogs(ctx context.Context) {
 }
 
 func (w *Watcher) createCatalog(ctx context.Context, catalog *Catalog) error {
-	obj, err := catalog.Resource()
+	obj, err := catalog.Resource(w.oasRegistry)
 	if err != nil {
 		return fmt.Errorf("build Catalog resource: %w", err)
 	}
@@ -161,7 +180,7 @@ func (w *Watcher) createCatalog(ctx context.Context, catalog *Catalog) error {
 }
 
 func (w *Watcher) updateCatalog(ctx context.Context, oldCatalog *hubv1alpha1.Catalog, newCatalog *Catalog) error {
-	obj, err := newCatalog.Resource()
+	obj, err := newCatalog.Resource(w.oasRegistry)
 	if err != nil {
 		return fmt.Errorf("build Catalog resource: %w", err)
 	}

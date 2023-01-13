@@ -138,6 +138,7 @@ func (h ACPHandler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]
 		return nil, fmt.Errorf("parse raw objects: %w", err)
 	}
 
+	// Skip the review if the ACP hasn't changed since the last platform sync.
 	if newACP != nil {
 		var hash string
 		hash, err = newACP.Spec.Hash()

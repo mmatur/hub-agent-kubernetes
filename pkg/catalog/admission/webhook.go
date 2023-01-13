@@ -33,29 +33,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Backend manages Catalogs.
-type Backend interface {
+// PlatformClient for the Catalog service.
+type PlatformClient interface {
 	CreateCatalog(ctx context.Context, req *platform.CreateCatalogReq) (*catalog.Catalog, error)
 	UpdateCatalog(ctx context.Context, name, lastKnownVersion string, req *platform.UpdateCatalogReq) (*catalog.Catalog, error)
 	DeleteCatalog(ctx context.Context, name, lastKnownVersion string) error
 }
 
+// OASRegistry is a registry of OpenAPI Spec URLs.
+type OASRegistry interface {
+	GetURL(name, namespace string) string
+	Updated() <-chan struct{}
+}
+
 // Handler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
 type Handler struct {
-	backend Backend
-	now     func() time.Time
+	platform    PlatformClient
+	oasRegistry OASRegistry
+
+	now func() time.Time
 }
 
 // NewHandler returns a new Handler.
-func NewHandler(backend Backend) *Handler {
+func NewHandler(client PlatformClient, oasRegistry OASRegistry) *Handler {
 	return &Handler{
-		backend: backend,
-		now:     time.Now,
+		platform:    client,
+		oasRegistry: oasRegistry,
+		now:         time.Now,
 	}
 }
 
 // ServeHTTP implements http.Handler.
-func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// We always decode the admission request in an admv1 object regardless
 	// of the request version as it is strictly identical to the admv1beta1 object.
 	var ar admv1.AdmissionReview
@@ -96,7 +105,7 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // review reviews a CREATE/UPDATE/DELETE operation on a Catalog. It makes sure the operation is not based on
 // an outdated version of the resource. As the backend is the source of truth, we cannot permit that.
-func (h Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, error) {
+func (h *Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, error) {
 	logger := log.Ctx(ctx)
 
 	if !isCatalogRequest(req.Kind) {
@@ -117,7 +126,7 @@ func (h Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byt
 	}
 
 	// Skip the review if the Catalog hasn't changed since the last platform sync.
-	if newCatalog != nil && newCatalog.Status.SpecHash != "" {
+	if newCatalog != nil {
 		var specHash string
 		specHash, err = newCatalog.Spec.Hash()
 		if err != nil {
@@ -141,7 +150,7 @@ func (h Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]byt
 	}
 }
 
-func (h Handler) reviewCreateOperation(ctx context.Context, c *hubv1alpha1.Catalog) ([]byte, error) {
+func (h *Handler) reviewCreateOperation(ctx context.Context, c *hubv1alpha1.Catalog) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Creating Catalog resource")
 
 	createReq := &platform.CreateCatalogReq{
@@ -150,7 +159,7 @@ func (h Handler) reviewCreateOperation(ctx context.Context, c *hubv1alpha1.Catal
 		Services:      c.Spec.Services,
 	}
 
-	createdCatalog, err := h.backend.CreateCatalog(ctx, createReq)
+	createdCatalog, err := h.platform.CreateCatalog(ctx, createReq)
 	if err != nil {
 		return nil, fmt.Errorf("create catalog: %w", err)
 	}
@@ -158,7 +167,7 @@ func (h Handler) reviewCreateOperation(ctx context.Context, c *hubv1alpha1.Catal
 	return h.buildPatches(createdCatalog)
 }
 
-func (h Handler) reviewUpdateOperation(ctx context.Context, oldCatalog, newCatalog *hubv1alpha1.Catalog) ([]byte, error) {
+func (h *Handler) reviewUpdateOperation(ctx context.Context, oldCatalog, newCatalog *hubv1alpha1.Catalog) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Updating Catalog resource")
 
 	updateReq := &platform.UpdateCatalogReq{
@@ -166,7 +175,7 @@ func (h Handler) reviewUpdateOperation(ctx context.Context, oldCatalog, newCatal
 		Services:      newCatalog.Spec.Services,
 	}
 
-	updatedCatalog, err := h.backend.UpdateCatalog(ctx, oldCatalog.Name, oldCatalog.Status.Version, updateReq)
+	updatedCatalog, err := h.platform.UpdateCatalog(ctx, oldCatalog.Name, oldCatalog.Status.Version, updateReq)
 	if err != nil {
 		return nil, fmt.Errorf("update catalog: %w", err)
 	}
@@ -174,10 +183,10 @@ func (h Handler) reviewUpdateOperation(ctx context.Context, oldCatalog, newCatal
 	return h.buildPatches(updatedCatalog)
 }
 
-func (h Handler) reviewDeleteOperation(ctx context.Context, oldCatalog *hubv1alpha1.Catalog) ([]byte, error) {
+func (h *Handler) reviewDeleteOperation(ctx context.Context, oldCatalog *hubv1alpha1.Catalog) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Deleting Catalog resource")
 
-	if err := h.backend.DeleteCatalog(ctx, oldCatalog.Name, oldCatalog.Status.Version); err != nil {
+	if err := h.platform.DeleteCatalog(ctx, oldCatalog.Name, oldCatalog.Status.Version); err != nil {
 		return nil, fmt.Errorf("delete catalog: %w", err)
 	}
 	return nil, nil
@@ -189,8 +198,8 @@ type patch struct {
 	Value interface{} `json:"value,omitempty"`
 }
 
-func (h Handler) buildPatches(c *catalog.Catalog) ([]byte, error) {
-	res, err := c.Resource()
+func (h *Handler) buildPatches(c *catalog.Catalog) ([]byte, error) {
+	res, err := c.Resource(h.oasRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("build resource: %w", err)
 	}

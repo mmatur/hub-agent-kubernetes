@@ -186,7 +186,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	group.Go(func() error {
-		return webhookAdmission(ctx, cliCtx, platformClient)
+		return webhookAdmission(ctx, cliCtx, platformClient, topoWatch)
 	})
 
 	group.Go(func() error {

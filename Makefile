@@ -6,7 +6,7 @@ MAIN_DIRECTORY := ./cmd/agent
 
 TAG_NAME := $(shell git tag -l --contains HEAD)
 SHA := $(shell git rev-parse --short HEAD)
-VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
+VERSION := $(if $(TAG_NAME),$(TAG_NAME),v0.0.0-$(SHA))
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
 export DOCKER_BUILDKIT=1
 

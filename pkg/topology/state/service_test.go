@@ -315,7 +315,7 @@ func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 						"hub.traefik.io/openapi-port": "8080",
 					},
 					Type: corev1.ServiceTypeClusterIP,
-					OpenAPISpecLocation: &openapi.Location{
+					OpenAPISpecLocation: &OpenAPISpecLocation{
 						Path: "/spec.json",
 						Port: 8080,
 					},
