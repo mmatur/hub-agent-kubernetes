@@ -56,9 +56,9 @@ type PlatformClient interface {
 
 // WatcherConfig holds the watcher configuration.
 type WatcherConfig struct {
-	IngressClassName  string
-	TraefikEntryPoint string
-	AgentNamespace    string
+	IngressClassName        string
+	TraefikTunnelEntryPoint string
+	AgentNamespace          string
 
 	EdgeIngressSyncInterval time.Duration
 	CertRetryInterval       time.Duration
@@ -286,7 +286,7 @@ func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIn
 	}
 
 	if kerror.IsNotFound(err) {
-		ing = buildIngress(edgeIng, &netv1.Ingress{}, w.config.IngressClassName, w.config.TraefikEntryPoint, customDomains)
+		ing = buildIngress(edgeIng, &netv1.Ingress{}, w.config.IngressClassName, w.config.TraefikTunnelEntryPoint, customDomains)
 		_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Create(ctx, ing, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create ingress: %w", err)
@@ -300,7 +300,7 @@ func (w *Watcher) upsertIngress(ctx context.Context, edgeIng *hubv1alpha1.EdgeIn
 		return nil
 	}
 
-	ing = buildIngress(edgeIng, ing, w.config.IngressClassName, w.config.TraefikEntryPoint, customDomains)
+	ing = buildIngress(edgeIng, ing, w.config.IngressClassName, w.config.TraefikTunnelEntryPoint, customDomains)
 	_, err = w.clientSet.NetworkingV1().Ingresses(edgeIng.Namespace).Update(ctx, ing, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("update ingress: %w", err)
@@ -360,7 +360,7 @@ func (w *Watcher) createIngressCatchAll(ctx context.Context) error {
 			Namespace: w.config.AgentNamespace,
 			Annotations: map[string]string{
 				"traefik.ingress.kubernetes.io/router.tls":         "true",
-				"traefik.ingress.kubernetes.io/router.entrypoints": w.config.TraefikEntryPoint,
+				"traefik.ingress.kubernetes.io/router.entrypoints": w.config.TraefikTunnelEntryPoint,
 				"traefik.ingress.kubernetes.io/router.middlewares": middlewares,
 				"traefik.ingress.kubernetes.io/router.priority":    "1",
 			},

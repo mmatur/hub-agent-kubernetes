@@ -140,7 +140,7 @@ func Test_WatcherRun(t *testing.T) {
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
-		TraefikEntryPoint:       "traefikhub-tunl",
+		TraefikTunnelEntryPoint: "traefikhub-tunl",
 		AgentNamespace:          "hub-agent",
 		EdgeIngressSyncInterval: time.Millisecond,
 		CertRetryInterval:       time.Millisecond,
@@ -301,7 +301,7 @@ func Test_WatcherRun_appends_owner_reference(t *testing.T) {
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
-		TraefikEntryPoint:       "traefikhub-tunl",
+		TraefikTunnelEntryPoint: "traefikhub-tunl",
 		AgentNamespace:          "hub-agent",
 		EdgeIngressSyncInterval: time.Millisecond,
 		CertRetryInterval:       time.Millisecond,
@@ -399,7 +399,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
-		TraefikEntryPoint:       "traefikhub-tunl",
+		TraefikTunnelEntryPoint: "traefikhub-tunl",
 		AgentNamespace:          "hub-agent",
 		EdgeIngressSyncInterval: time.Millisecond,
 		CertRetryInterval:       time.Millisecond,
@@ -630,7 +630,7 @@ func Test_WatcherRun_sync_certificates(t *testing.T) {
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
-		TraefikEntryPoint:       "traefikhub-tunl",
+		TraefikTunnelEntryPoint: "traefikhub-tunl",
 		AgentNamespace:          "default",
 		EdgeIngressSyncInterval: time.Millisecond,
 		CertRetryInterval:       time.Millisecond,

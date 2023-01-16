@@ -28,18 +28,41 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/informers"
+	kubemock "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 )
 
 func Test_WatcherRun(t *testing.T) {
+	services := []runtime.Object{
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "whoami-2",
+				Namespace: "default",
+				Annotations: map[string]string{
+					"hub.traefik.io/openapi-path": "/spec.json",
+					"hub.traefik.io/openapi-port": "8080",
+				},
+			},
+		},
+	}
+
+	pathType := netv1.PathTypePrefix
+	namespaces := []string{"default", "my-ns"}
+
 	tests := []struct {
 		desc             string
 		platformCatalogs []Catalog
 		clusterCatalogs  []runtime.Object
+		clusterIngresses []runtime.Object
 
-		wantCatalogs []hubv1alpha1.Catalog
+		wantCatalogs      []hubv1alpha1.Catalog
+		wantIngresses     []netv1.Ingress
+		wantEdgeIngresses []hubv1alpha1.EdgeIngress
 	}{
 		{
 			desc: "new catalog present on the platform",
@@ -57,6 +80,10 @@ func Test_WatcherRun(t *testing.T) {
 			},
 			wantCatalogs: []hubv1alpha1.Catalog{
 				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "hub.traefik.io/v1alpha1",
+						Kind:       "Catalog",
+					},
 					ObjectMeta: metav1.ObjectMeta{Name: "new-catalog"},
 					Spec: hubv1alpha1.CatalogSpec{
 						CustomDomains: []string{"hello.example.com", "welcome.example.com"},
@@ -79,6 +106,172 @@ func Test_WatcherRun(t *testing.T) {
 					},
 				},
 			},
+			wantEdgeIngresses: []hubv1alpha1.EdgeIngress{
+				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "hub.traefik.io/v1alpha1",
+						Kind:       "EdgeIngress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "new-catalog-portal-4277033999",
+						Namespace: "agent-ns",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "new-catalog",
+						}},
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+					},
+					Spec: hubv1alpha1.EdgeIngressSpec{
+						Service: hubv1alpha1.EdgeIngressService{
+							Name: "dev-portal-service-name",
+							Port: 8080,
+						},
+					},
+				},
+			},
+			wantIngresses: []netv1.Ingress{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "networking.k8s.io/v1",
+						APIVersion: "Ingress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "new-catalog-4277033999",
+						Namespace: "default",
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+						Annotations: map[string]string{
+							"traefik.ingress.kubernetes.io/router.entrypoints": "entrypoint",
+						},
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "new-catalog",
+						}},
+					},
+					Spec: netv1.IngressSpec{
+						IngressClassName: pointer.StringPtr("ingress-class"),
+						Rules: []netv1.IngressRule{
+							{
+								Host: "hello.example.com",
+								IngressRuleValue: netv1.IngressRuleValue{
+									HTTP: &netv1.HTTPIngressRuleValue{
+										Paths: []netv1.HTTPIngressPath{{
+											Path:     "/whoami-1",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-1",
+													Port: netv1.ServiceBackendPort{Number: 80},
+												},
+											},
+										}, {
+											Path:     "/whoami-2",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-2",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										}},
+									},
+								},
+							},
+							{
+								Host: "welcome.example.com",
+								IngressRuleValue: netv1.IngressRuleValue{
+									HTTP: &netv1.HTTPIngressRuleValue{
+										Paths: []netv1.HTTPIngressPath{{
+											Path:     "/whoami-1",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-1",
+													Port: netv1.ServiceBackendPort{Number: 80},
+												},
+											},
+										}, {
+											Path:     "/whoami-2",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-2",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "networking.k8s.io/v1",
+						APIVersion: "Ingress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "new-catalog-4277033999",
+						Namespace: "my-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+						Annotations: map[string]string{
+							"traefik.ingress.kubernetes.io/router.entrypoints": "entrypoint",
+						},
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "new-catalog",
+						}},
+					},
+					Spec: netv1.IngressSpec{
+						IngressClassName: pointer.StringPtr("ingress-class"),
+						Rules: []netv1.IngressRule{
+							{
+								Host: "hello.example.com",
+								IngressRuleValue: netv1.IngressRuleValue{
+									HTTP: &netv1.HTTPIngressRuleValue{
+										Paths: []netv1.HTTPIngressPath{{
+											Path:     "/whoami-3",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-3",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										}},
+									},
+								},
+							},
+							{
+								Host: "welcome.example.com",
+								IngressRuleValue: netv1.IngressRuleValue{
+									HTTP: &netv1.HTTPIngressRuleValue{
+										Paths: []netv1.HTTPIngressPath{{
+											Path:     "/whoami-3",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-3",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			desc: "catalog updated",
@@ -95,6 +288,10 @@ func Test_WatcherRun(t *testing.T) {
 			},
 			clusterCatalogs: []runtime.Object{
 				&hubv1alpha1.Catalog{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "hub.traefik.io/v1alpha1",
+						Kind:       "Catalog",
+					},
 					ObjectMeta: metav1.ObjectMeta{Name: "catalog"},
 					Spec: hubv1alpha1.CatalogSpec{
 						CustomDomains: []string{"hello.example.com"},
@@ -117,8 +314,56 @@ func Test_WatcherRun(t *testing.T) {
 					},
 				},
 			},
+			clusterIngresses: []runtime.Object{
+				&netv1.Ingress{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "networking.k8s.io/v1",
+						APIVersion: "Ingress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "catalog-1680030486",
+						Namespace: "default",
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+						Annotations: map[string]string{
+							"traefik.ingress.kubernetes.io/router.entrypoints": "entrypoint",
+						},
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "catalog",
+						}},
+					},
+				},
+				&netv1.Ingress{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "networking.k8s.io/v1",
+						APIVersion: "Ingress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "catalog-1680030486",
+						Namespace: "my-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+						Annotations: map[string]string{
+							"traefik.ingress.kubernetes.io/router.entrypoints": "entrypoint",
+						},
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "catalog",
+						}},
+					},
+				},
+			},
 			wantCatalogs: []hubv1alpha1.Catalog{
 				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "hub.traefik.io/v1alpha1",
+						Kind:       "Catalog",
+					},
 					ObjectMeta: metav1.ObjectMeta{Name: "catalog"},
 					Spec: hubv1alpha1.CatalogSpec{
 						CustomDomains: []string{"hello.example.com"},
@@ -139,6 +384,87 @@ func Test_WatcherRun(t *testing.T) {
 					},
 				},
 			},
+			wantEdgeIngresses: []hubv1alpha1.EdgeIngress{
+				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "hub.traefik.io/v1alpha1",
+						Kind:       "EdgeIngress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "catalog-portal-1680030486",
+						Namespace: "agent-ns",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "catalog",
+						}},
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+					},
+					Spec: hubv1alpha1.EdgeIngressSpec{
+						Service: hubv1alpha1.EdgeIngressService{
+							Name: "dev-portal-service-name",
+							Port: 8080,
+						},
+					},
+				},
+			},
+			wantIngresses: []netv1.Ingress{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "networking.k8s.io/v1",
+						APIVersion: "Ingress",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "catalog-1680030486",
+						Namespace: "default",
+						Labels: map[string]string{
+							"app.kubernetes.io/managed-by": "traefik-hub",
+						},
+						Annotations: map[string]string{
+							"traefik.ingress.kubernetes.io/router.entrypoints": "entrypoint",
+						},
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "hub.traefik.io/v1alpha1",
+							Kind:       "Catalog",
+							Name:       "catalog",
+						}},
+					},
+					Spec: netv1.IngressSpec{
+						IngressClassName: pointer.StringPtr("ingress-class"),
+						Rules: []netv1.IngressRule{{
+							Host: "hello.example.com",
+							IngressRuleValue: netv1.IngressRuleValue{
+								HTTP: &netv1.HTTPIngressRuleValue{
+									Paths: []netv1.HTTPIngressPath{
+										{
+											Path:     "/whoami-1",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-1",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										},
+										{
+											Path:     "/whoami-2",
+											PathType: &pathType,
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "whoami-2",
+													Port: netv1.ServiceBackendPort{Number: 8080},
+												},
+											},
+										},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
 		},
 	}
 
@@ -146,16 +472,25 @@ func Test_WatcherRun(t *testing.T) {
 		test := test
 
 		t.Run(test.desc, func(t *testing.T) {
+			kubeObjects := test.clusterIngresses
+			kubeObjects = append(kubeObjects, services...)
+
+			kubeClientSet := kubemock.NewSimpleClientset(kubeObjects...)
 			hubClientSet := hubkubemock.NewSimpleClientset(test.clusterCatalogs...)
-
-			hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
-
-			hubInformer.Hub().V1alpha1().Catalogs().Informer()
 
 			ctx, cancel := context.WithCancel(context.Background())
 
+			kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 0)
+			hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
+
+			hubInformer.Hub().V1alpha1().Catalogs().Informer()
+			kubeInformer.Networking().V1().Ingresses().Informer()
+
 			hubInformer.Start(ctx.Done())
 			hubInformer.WaitForCacheSync(ctx.Done())
+
+			kubeInformer.Start(ctx.Done())
+			kubeInformer.WaitForCacheSync(ctx.Done())
 
 			client := newPlatformClientMock(t)
 
@@ -173,6 +508,7 @@ func Test_WatcherRun(t *testing.T) {
 			oasRegistry.OnUpdated().TypedReturns(oasCh)
 
 			// We are not interested in the output of this function.
+
 			oasRegistry.
 				OnGetURL("whoami-2", "default").
 				TypedReturns("http://whoami-2.default.svc:8080/spec.json").
@@ -182,11 +518,13 @@ func Test_WatcherRun(t *testing.T) {
 				TypedReturns("").
 				Maybe()
 
-			w := NewWatcher(client, oasRegistry, hubClientSet, hubInformer, WatcherConfig{
-				CatalogSyncInterval:  time.Millisecond,
-				AgentNamespace:       "agent-ns",
-				DevPortalServiceName: "dev-portal-service-name",
-				DevPortalPort:        8080,
+			w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, WatcherConfig{
+				CatalogSyncInterval:      time.Millisecond,
+				AgentNamespace:           "agent-ns",
+				DevPortalServiceName:     "dev-portal-service-name",
+				IngressClassName:         "ingress-class",
+				TraefikCatalogEntryPoint: "entrypoint",
+				DevPortalPort:            8080,
 			})
 
 			w.Run(ctx)
@@ -196,144 +534,39 @@ func Test_WatcherRun(t *testing.T) {
 
 			var catalogs []hubv1alpha1.Catalog
 			for _, catalog := range catalogList.Items {
-				catalog.TypeMeta = metav1.TypeMeta{}
 				catalog.Status.SyncedAt = metav1.Time{}
 
 				catalogs = append(catalogs, catalog)
 			}
 
+			var ingresses []netv1.Ingress
+			for _, namespace := range namespaces {
+				var namespaceIngressList *netv1.IngressList
+				namespaceIngressList, err = kubeClientSet.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
+				require.NoError(t, err)
+
+				for _, ingress := range namespaceIngressList.Items {
+					ingress.Status = netv1.IngressStatus{}
+
+					ingresses = append(ingresses, ingress)
+				}
+			}
+
+			edgeIngresses, err := hubClientSet.HubV1alpha1().EdgeIngresses("agent-ns").List(ctx, metav1.ListOptions{})
+			require.NoError(t, err)
+
 			assert.ElementsMatch(t, test.wantCatalogs, catalogs)
+			assert.ElementsMatch(t, test.wantIngresses, ingresses)
+			assert.ElementsMatch(t, test.wantEdgeIngresses, edgeIngresses.Items)
 		})
 	}
 }
 
-func Test_WatcherRun_syncChild(t *testing.T) {
-	hubClientSet := hubkubemock.NewSimpleClientset()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
-
-	catalogInformer := hubInformer.Hub().V1alpha1().Catalogs().Informer()
-
-	hubInformer.Start(ctx.Done())
-	cache.WaitForCacheSync(ctx.Done(), catalogInformer.HasSynced)
-
-	catalogs := []Catalog{
-		{
-			Name:          "toCreate",
-			Version:       "version-1",
-			CustomDomains: []string{"hello.example.com"},
-			Domain:        "majestic-beaver-123.hub-traefik.io",
-			Services: []hubv1alpha1.CatalogService{
-				{
-					Name:       "views",
-					Namespace:  "default",
-					Port:       8080,
-					PathPrefix: "/views",
-				},
-			},
-		},
-	}
-
-	wantClusterCatalog := hubv1alpha1.Catalog{
-		ObjectMeta: metav1.ObjectMeta{Name: "toCreate"},
-		Spec: hubv1alpha1.CatalogSpec{
-			CustomDomains: []string{"hello.example.com"},
-			Services:      catalogs[0].Services,
-		},
-		Status: hubv1alpha1.CatalogStatus{
-			Version:  "version-1",
-			URLs:     "https://hello.example.com",
-			Domains:  []string{"hello.example.com"},
-			SpecHash: "+MBiHj7QfVFo+CKOe2AdHrOqatM=",
-			Services: []hubv1alpha1.CatalogServiceStatus{
-				{
-					Name:      "views",
-					Namespace: "default",
-				},
-			},
-		},
-	}
-
-	client := newPlatformClientMock(t)
-
-	getCatalogCount := 0
-	// Cancel the context on the second catalog synchronization occurred.
-	client.OnGetCatalogs().TypedReturns(catalogs, nil).Run(func(_ mock.Arguments) {
-		getCatalogCount++
-		if getCatalogCount == 2 {
-			cancel()
-		}
-	})
-
-	oasCh := make(chan struct{})
-	oasRegistry := newOasRegistryMock(t)
-	oasRegistry.OnUpdated().TypedReturns(oasCh)
-
-	// We are not interested in the output of this function.
-	oasRegistry.
-		OnGetURL("whoami-2", "default").
-		TypedReturns("http://whoami-2.default.svc:8080/spec.json").
-		Maybe()
-	oasRegistry.
-		OnGetURL(mock.Anything, mock.Anything).
-		TypedReturns("").
-		Maybe()
-
-	w := NewWatcher(client, oasRegistry, hubClientSet, hubInformer, WatcherConfig{
-		CatalogSyncInterval:  time.Millisecond,
-		AgentNamespace:       "agent-ns",
-		DevPortalServiceName: "dev-portal-service-name",
-		DevPortalPort:        8080,
-	})
-
-	w.Run(ctx)
-
-	// Make sure the remaining catalogs have the correct shape.
-	clusterCatalog, errL := hubClientSet.HubV1alpha1().Catalogs().Get(ctx, "toCreate", metav1.GetOptions{})
-	require.NoError(t, errL)
-
-	assert.Equal(t, wantClusterCatalog.Spec, clusterCatalog.Spec)
-	assert.WithinDuration(t, time.Now(), clusterCatalog.Status.SyncedAt.Time, time.Second)
-
-	wantClusterCatalog.Status.SyncedAt = clusterCatalog.Status.SyncedAt
-	assert.Equal(t, wantClusterCatalog.Status, clusterCatalog.Status)
-
-	name, err := getEdgeIngressName("toCreate")
-	require.NoError(t, err)
-
-	wantClusterEdgeIngress := hubv1alpha1.EdgeIngress{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "agent-ns",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "hub.traefik.io/v1alpha1",
-					Kind:       "Catalog",
-					Name:       clusterCatalog.Name,
-					UID:        clusterCatalog.UID,
-				},
-			},
-		},
-		Spec: hubv1alpha1.EdgeIngressSpec{
-			Service: hubv1alpha1.EdgeIngressService{
-				Name: "dev-portal-service-name",
-				Port: 8080,
-			},
-		},
-		Status: hubv1alpha1.EdgeIngressStatus{},
-	}
-
-	edgeIngress, err := hubClientSet.HubV1alpha1().EdgeIngresses("agent-ns").Get(ctx, name, metav1.GetOptions{})
-	require.NoError(t, err)
-
-	assert.Equal(t, wantClusterEdgeIngress.Spec, edgeIngress.Spec)
-}
-
 func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
-	hubClientSet := hubkubemock.NewSimpleClientset()
+	kubeClientSet := kubemock.NewSimpleClientset()
+	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 0)
 
+	hubClientSet := hubkubemock.NewSimpleClientset()
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
 
 	hubInformer.Hub().V1alpha1().Catalogs().Informer()
@@ -342,6 +575,9 @@ func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
 
 	hubInformer.Start(ctx.Done())
 	hubInformer.WaitForCacheSync(ctx.Done())
+
+	kubeInformer.Start(ctx.Done())
+	kubeInformer.WaitForCacheSync(ctx.Done())
 
 	client := newPlatformClientMock(t)
 
@@ -362,7 +598,9 @@ func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
 	oasRegistry := newOasRegistryMock(t)
 	oasRegistry.OnUpdated().TypedReturns(oasCh)
 
-	w := NewWatcher(client, oasRegistry, hubClientSet, hubInformer, WatcherConfig{
+	w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, WatcherConfig{
+		IngressClassName:         "ingress-class",
+		TraefikCatalogEntryPoint: "entrypoint",
 		// Very high interval to prevent the ticker from firing.
 		CatalogSyncInterval: time.Hour,
 	})

@@ -61,14 +61,16 @@ import (
 )
 
 const (
-	flagACPServerListenAddr     = "acp-server.listen-addr"
-	flagACPServerCertificate    = "acp-server.cert"
-	flagACPServerKey            = "acp-server.key"
-	flagACPServerAuthServerAddr = "acp-server.auth-server-addr"
-	flagIngressClassName        = "ingress-class-name"
-	flagTraefikEntryPoint       = "traefik.entryPoint"
-	flagDevPortalServiceName    = "dev-portal.service-name"
-	flagDevPortalPort           = "dev-portal.port"
+	flagACPServerListenAddr               = "acp-server.listen-addr"
+	flagACPServerCertificate              = "acp-server.cert"
+	flagACPServerKey                      = "acp-server.key"
+	flagACPServerAuthServerAddr           = "acp-server.auth-server-addr"
+	flagIngressClassName                  = "ingress-class-name"
+	flagTraefikCatalogEntryPoint          = "traefik.catalog.entryPoint"
+	flagTraefikTunnelEntryPoint           = "traefik.tunnel.entryPoint"
+	flagTraefikTunnelEntryPointDeprecated = "traefik.entryPoint"
+	flagDevPortalServiceName              = "dev-portal.service-name"
+	flagDevPortalPort                     = "dev-portal.port"
 )
 
 func devPortalFlags() []cli.Flag {
@@ -77,7 +79,7 @@ func devPortalFlags() []cli.Flag {
 			Name:    flagDevPortalServiceName,
 			Usage:   "Service name of the Dev Portal",
 			EnvVars: []string{strcase.ToSNAKE(flagACPServerAuthServerAddr)},
-			Value:   "dev-portal",
+			Value:   "hub-agent-dev-portal",
 		},
 		&cli.IntFlag{
 			Name:    flagDevPortalPort,
@@ -88,7 +90,7 @@ func devPortalFlags() []cli.Flag {
 	}
 }
 
-func acpFlags() []cli.Flag {
+func admissionFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:    flagACPServerListenAddr,
@@ -121,9 +123,21 @@ func acpFlags() []cli.Flag {
 			Value:   "traefik-hub",
 		},
 		&cli.StringFlag{
-			Name:    flagTraefikEntryPoint,
+			Name:    flagTraefikCatalogEntryPoint,
+			Usage:   "The entry point used by Traefik to expose catalog APIs",
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikCatalogEntryPoint)},
+			Value:   "traefikhub-catalog",
+		},
+		&cli.StringFlag{
+			Name:    flagTraefikTunnelEntryPoint,
 			Usage:   "The entry point used by Traefik to expose tunnels",
-			EnvVars: []string{strcase.ToSNAKE(flagTraefikEntryPoint)},
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikTunnelEntryPoint)},
+			Value:   "traefikhub-tunl",
+		},
+		&cli.StringFlag{
+			Name:    flagTraefikTunnelEntryPointDeprecated,
+			Usage:   fmt.Sprintf("Deprecated - Please use --%s instead", flagTraefikTunnelEntryPoint),
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikTunnelEntryPointDeprecated)},
 			Value:   "traefikhub-tunl",
 		},
 	}
@@ -137,13 +151,19 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		authServerAddr = cliCtx.String(flagACPServerAuthServerAddr)
 	)
 
+	// Handle --traefik.entryPoint deprecation.
+	traefikTunnelEntrypoint := cliCtx.String(flagTraefikTunnelEntryPoint)
+	if traefikTunnelEntrypoint == "" {
+		traefikTunnelEntrypoint = cliCtx.String(flagTraefikTunnelEntryPointDeprecated)
+	}
+
 	if _, err := url.Parse(authServerAddr); err != nil {
 		return fmt.Errorf("invalid auth server address: %w", err)
 	}
 
 	edgeIngressWatcherCfg := edgeingress.WatcherConfig{
 		IngressClassName:        cliCtx.String(flagIngressClassName),
-		TraefikEntryPoint:       cliCtx.String(flagTraefikEntryPoint),
+		TraefikTunnelEntryPoint: traefikTunnelEntrypoint,
 		AgentNamespace:          currentNamespace(),
 		EdgeIngressSyncInterval: time.Minute,
 		CertRetryInterval:       time.Minute,
@@ -151,10 +171,12 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	}
 
 	catalogWatcherCfg := catalog.WatcherConfig{
-		CatalogSyncInterval:  time.Minute,
-		AgentNamespace:       currentNamespace(),
-		DevPortalServiceName: cliCtx.String(flagDevPortalServiceName),
-		DevPortalPort:        cliCtx.Int(flagDevPortalPort),
+		CatalogSyncInterval:      time.Minute,
+		AgentNamespace:           currentNamespace(),
+		DevPortalServiceName:     cliCtx.String(flagDevPortalServiceName),
+		DevPortalPort:            cliCtx.Int(flagDevPortalPort),
+		TraefikCatalogEntryPoint: cliCtx.String(flagTraefikCatalogEntryPoint),
+		IngressClassName:         cliCtx.String(flagIngressClassName),
 	}
 
 	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, topoWatch, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
@@ -211,12 +233,12 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
-	clientSet, err := clientset.NewForConfig(config)
+	kubeClientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
-	if err = initIngressClass(ctx, clientSet, edgeIngressWatcherCfg.IngressClassName); err != nil {
+	if err = initIngressClass(ctx, kubeClientSet, edgeIngressWatcherCfg.IngressClassName); err != nil {
 		return nil, nil, nil, fmt.Errorf("initialize ingressClass: %w", err)
 	}
 
@@ -224,18 +246,20 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Hub client set: %w", err)
 	}
+	traefikClientSet, err := createTraefikClientSet(kubeClientSet, config)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("create Traefik client set: %w", err)
+	}
 
-	kubeVers, err := clientSet.Discovery().ServerVersion()
+	kubeVers, err := kubeClientSet.Discovery().ServerVersion()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 
-	kubeInformer := informers.NewSharedInformerFactory(clientSet, 5*time.Minute)
+	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
-	ingressUpdater := admission.NewIngressUpdater(kubeInformer, clientSet, kubeVers.GitVersion)
-
-	go ingressUpdater.Run(ctx)
+	ingressUpdater := admission.NewIngressUpdater(kubeInformer, kubeClientSet, kubeVers.GitVersion)
 
 	acpEventHandler := admission.NewEventHandler(ingressUpdater)
 	ingClassWatcher := ingclass.NewWatcher()
@@ -250,29 +274,36 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
+	oasRegistry := catalog.NewServiceRegistry()
+	topoWatch.AddListener(oasRegistry.TopologyStateChanged)
+
+	catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, catalogWatcherCfg)
+
 	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
-	go acpWatcher.Run(ctx)
 
-	traefik, err := traefikClient(clientSet, config)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create Traefik client set: %w", err)
-	}
-
-	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, clientSet, traefik, hubInformer, edgeIngressWatcherCfg)
+	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, kubeClientSet, traefikClientSet, hubInformer, edgeIngressWatcherCfg)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
+
+	err = startKubeInformer(ctx, kubeVers.GitVersion, kubeInformer, ingClassWatcher)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
+	}
+
+	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("start hub informer: %w", err)
+	}
+
+	go acpWatcher.Run(ctx)
+	go ingressUpdater.Run(ctx)
 	go edgeIngressWatcher.Run(ctx)
-
-	oasRegistry := catalog.NewServiceRegistry()
-	topoWatch.AddListener(oasRegistry.TopologyStateChanged)
-	catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, hubClientSet, hubInformer, catalogWatcherCfg)
-
 	go catalogWatcher.Run(ctx)
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
-	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefik)
+	fwdAuthMdlwrs := reviewer.NewFwdAuthMiddlewares(authServerAddr, polGetter, traefikClientSet)
 
 	traefikReviewer := reviewer.NewTraefikIngress(ingClassWatcher, fwdAuthMdlwrs)
 	reviewers := []admission.Reviewer{
@@ -284,7 +315,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogadmission.NewHandler(platformClient, oasRegistry), nil
 }
 
-func traefikClient(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
+func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
 	crd, err := hasMiddlewareCRD(clientSet.Discovery())
 	if err != nil {
 		return nil, fmt.Errorf("check presence of Traefik Middleware CRD: %w", err)

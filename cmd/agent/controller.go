@@ -79,7 +79,7 @@ func newControllerCmd() controllerCmd {
 	}
 
 	flgs = append(flgs, globalFlags()...)
-	flgs = append(flgs, acpFlags()...)
+	flgs = append(flgs, admissionFlags()...)
 	flgs = append(flgs, devPortalFlags()...)
 
 	return controllerCmd{

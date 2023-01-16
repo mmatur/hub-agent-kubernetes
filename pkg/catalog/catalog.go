@@ -87,6 +87,10 @@ func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 	}
 
 	return &hubv1alpha1.Catalog{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "Catalog",
+		},
 		ObjectMeta: metav1.ObjectMeta{Name: e.Name},
 		Spec:       spec,
 		Status: hubv1alpha1.CatalogStatus{
