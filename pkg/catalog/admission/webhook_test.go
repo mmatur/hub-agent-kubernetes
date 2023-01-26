@@ -88,6 +88,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		Name:          catalogName,
 		Version:       "version-1",
 		Services:      testCatalogSpec.Services,
+		Domain:        "majestic-beaver-123.hub-traefik.io",
 		CustomDomains: testCatalogSpec.CustomDomains,
 		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
 		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
@@ -126,8 +127,8 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 			{Op: "replace", Path: "/status", Value: hubv1alpha1.CatalogStatus{
 				Version:  "version-1",
 				SyncedAt: now,
-				URLs:     "https://foo.example.com,https://bar.example.com",
-				Domains:  []string{"foo.example.com", "bar.example.com"},
+				URLs:     "https://majestic-beaver-123.hub-traefik.io,https://foo.example.com,https://bar.example.com",
+				Domain:   "majestic-beaver-123.hub-traefik.io",
 				SpecHash: "Sz6cVxZ70Qm0el1CHhSpsbou92U=",
 				Services: []hubv1alpha1.CatalogServiceStatus{
 					{
@@ -266,6 +267,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		ClusterID:     "cluster-id",
 		Name:          catalogName,
 		Version:       "version-4",
+		Domain:        "majestic-beaver-123.hub-traefik.io",
 		CustomDomains: newCatalog.Spec.CustomDomains,
 		Services:      newCatalog.Spec.Services,
 		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
@@ -306,8 +308,8 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 			{Op: "replace", Path: "/status", Value: hubv1alpha1.CatalogStatus{
 				Version:  "version-4",
 				SyncedAt: now,
-				Domains:  []string{"foo.example.com"},
-				URLs:     "https://foo.example.com",
+				Domain:   "majestic-beaver-123.hub-traefik.io",
+				URLs:     "https://majestic-beaver-123.hub-traefik.io,https://foo.example.com",
 				SpecHash: "rOG0fFXyK3/sUYGqjggW/ix7rFc=",
 				Services: []hubv1alpha1.CatalogServiceStatus{
 					{

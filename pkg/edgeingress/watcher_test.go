@@ -42,7 +42,7 @@ var toUpdate = hubv1alpha1.EdgeIngress{
 		Name:      "toUpdate",
 		Namespace: "default",
 		UID:       "uid",
-		Annotations: map[string]string{
+		Labels: map[string]string{
 			"app.kubernetes.io/managed-by": "traefik-hub",
 		},
 	},
@@ -65,7 +65,7 @@ var toDelete = hubv1alpha1.EdgeIngress{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "toDelete",
 		Namespace: "default",
-		Annotations: map[string]string{
+		Labels: map[string]string{
 			"app.kubernetes.io/managed-by": "traefik-hub",
 		},
 	},

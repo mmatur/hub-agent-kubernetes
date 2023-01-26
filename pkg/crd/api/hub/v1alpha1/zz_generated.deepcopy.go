@@ -407,11 +407,6 @@ func (in *CatalogSpec) DeepCopy() *CatalogSpec {
 func (in *CatalogStatus) DeepCopyInto(out *CatalogStatus) {
 	*out = *in
 	in.SyncedAt.DeepCopyInto(&out.SyncedAt)
-	if in.Domains != nil {
-		in, out := &in.Domains, &out.Domains
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.Services != nil {
 		in, out := &in.Services, &out.Services
 		*out = make([]CatalogServiceStatus, len(*in))

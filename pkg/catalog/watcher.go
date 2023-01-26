@@ -18,15 +18,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package catalog
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"hash/fnv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
+	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,9 +43,16 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const (
+	hubDomainSecretName          = "hub-certificate"
+	customDomainSecretNamePrefix = "hub-certificate-custom-domains"
+)
+
 // PlatformClient for the Catalog service.
 type PlatformClient interface {
 	GetCatalogs(ctx context.Context) ([]Catalog, error)
+	GetWildcardCertificate(ctx context.Context) (edgeingress.Certificate, error)
+	GetCertificateByDomains(ctx context.Context, domains []string) (edgeingress.Certificate, error)
 }
 
 // OASRegistry is a registry of OpenAPI Spec URLs.
@@ -51,17 +63,24 @@ type OASRegistry interface {
 
 // WatcherConfig holds the watcher configuration.
 type WatcherConfig struct {
-	CatalogSyncInterval      time.Duration
+	IngressClassName         string
 	AgentNamespace           string
+	TraefikCatalogEntryPoint string
+	TraefikTunnelEntryPoint  string
 	DevPortalServiceName     string
 	DevPortalPort            int
-	TraefikCatalogEntryPoint string
-	IngressClassName         string
+
+	CatalogSyncInterval time.Duration
+	CertSyncInterval    time.Duration
+	CertRetryInterval   time.Duration
 }
 
 // Watcher watches hub Catalogs and sync them with the cluster.
 type Watcher struct {
-	config WatcherConfig
+	config *WatcherConfig
+
+	wildCardCertMu sync.RWMutex
+	wildCardCert   edgeingress.Certificate
 
 	platform    PlatformClient
 	oasRegistry OASRegistry
@@ -74,7 +93,7 @@ type Watcher struct {
 }
 
 // NewWatcher returns a new Watcher.
-func NewWatcher(client PlatformClient, oasRegistry OASRegistry, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config WatcherConfig) *Watcher {
+func NewWatcher(client PlatformClient, oasRegistry OASRegistry, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config *WatcherConfig) *Watcher {
 	return &Watcher{
 		config: config,
 
@@ -94,7 +113,12 @@ func (w *Watcher) Run(ctx context.Context) {
 	t := time.NewTicker(w.config.CatalogSyncInterval)
 	defer t.Stop()
 
+	certSyncInterval := time.After(w.config.CertSyncInterval)
 	ctxSync, cancel := context.WithTimeout(ctx, 20*time.Second)
+	if err := w.syncCertificates(ctxSync); err != nil {
+		log.Error().Err(err).Msg("Unable to synchronize certificates with platform")
+		certSyncInterval = time.After(w.config.CertRetryInterval)
+	}
 	w.syncCatalogs(ctxSync)
 	cancel()
 
@@ -113,8 +137,183 @@ func (w *Watcher) Run(ctx context.Context) {
 			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
 			w.syncCatalogs(ctxSync)
 			cancel()
+
+		case <-certSyncInterval:
+			ctxSync, cancel = context.WithTimeout(ctx, 20*time.Second)
+			if err := w.syncCertificates(ctxSync); err != nil {
+				log.Error().Err(err).Msg("Unable to synchronize certificates with platform")
+				certSyncInterval = time.After(w.config.CertRetryInterval)
+				cancel()
+				continue
+			}
+			certSyncInterval = time.After(w.config.CertSyncInterval)
+			cancel()
 		}
 	}
+}
+
+func (w *Watcher) syncCertificates(ctx context.Context) error {
+	certificate, err := w.platform.GetWildcardCertificate(ctx)
+	if err != nil {
+		return fmt.Errorf("get certificate: %w", err)
+	}
+
+	w.wildCardCertMu.RLock()
+	if bytes.Equal(certificate.Certificate, w.wildCardCert.Certificate) &&
+		bytes.Equal(certificate.PrivateKey, w.wildCardCert.PrivateKey) {
+		w.wildCardCertMu.RUnlock()
+
+		return nil
+	}
+	w.wildCardCertMu.RUnlock()
+
+	if err = w.upsertSecret(ctx, certificate, hubDomainSecretName, w.config.AgentNamespace, nil); err != nil {
+		return fmt.Errorf("upsert secret: %w", err)
+	}
+
+	w.wildCardCertMu.Lock()
+	w.wildCardCert = certificate
+	w.wildCardCertMu.Unlock()
+
+	clusterCatalogs, err := w.hubInformer.Hub().V1alpha1().Catalogs().Lister().List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	for _, catalog := range clusterCatalogs {
+		err := w.setupCertificates(ctx, catalog, certificate)
+		if err != nil {
+			log.Error().Err(err).
+				Str("name", catalog.Name).
+				Str("namespace", catalog.Namespace).
+				Msg("unable to setup catalog certificates")
+		}
+	}
+
+	return nil
+}
+
+func (w *Watcher) setupCertificates(ctx context.Context, catalog *hubv1alpha1.Catalog, certificate edgeingress.Certificate) error {
+	servicesNamespaces := make(map[string]struct{})
+	for _, service := range catalog.Spec.Services {
+		if _, found := servicesNamespaces[service.Namespace]; !found {
+			if err := w.upsertSecret(ctx, certificate, hubDomainSecretName, service.Namespace, catalog); err != nil {
+				return fmt.Errorf("upsert secret: %w", err)
+			}
+			servicesNamespaces[service.Namespace] = struct{}{}
+		}
+	}
+
+	if len(catalog.Spec.CustomDomains) == 0 {
+		return nil
+	}
+
+	cert, err := w.platform.GetCertificateByDomains(ctx, catalog.Spec.CustomDomains)
+	if err != nil {
+		return fmt.Errorf("get certificate by domains %q: %w", strings.Join(catalog.Spec.CustomDomains, ","), err)
+	}
+
+	secretName, err := getCustomDomainSecretName(catalog.Name)
+	if err != nil {
+		return fmt.Errorf("get custom domains secret name: %w", err)
+	}
+
+	for namespace := range servicesNamespaces {
+		if err := w.upsertSecret(ctx, cert, secretName, namespace, catalog); err != nil {
+			return fmt.Errorf("upsert secret: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (w *Watcher) upsertSecret(ctx context.Context, cert edgeingress.Certificate, name, namespace string, c *hubv1alpha1.Catalog) error {
+	secret, err := w.kubeClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil && !kerror.IsNotFound(err) {
+		return fmt.Errorf("get secret: %w", err)
+	}
+
+	if kerror.IsNotFound(err) {
+		secret = &corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "core.k8s.io/v1",
+				Kind:       "Secret",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "traefik-hub",
+				},
+			},
+			Type: corev1.SecretTypeTLS,
+			Data: map[string][]byte{
+				"tls.crt": cert.Certificate,
+				"tls.key": cert.PrivateKey,
+			},
+		}
+		if c != nil {
+			secret.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: "hub.traefik.io/v1alpha1",
+				Kind:       "Catalog",
+				Name:       c.Name,
+				UID:        c.UID,
+			}}
+		}
+
+		_, err = w.kubeClientSet.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create secret: %w", err)
+		}
+
+		log.Debug().
+			Str("name", secret.Name).
+			Str("namespace", secret.Namespace).
+			Msg("Secret created")
+
+		return nil
+	}
+
+	newOwners := secret.OwnerReferences
+	if c != nil {
+		newOwners = appendOwnerReference(secret.OwnerReferences, metav1.OwnerReference{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "Catalog",
+			Name:       c.Name,
+			UID:        c.UID,
+		})
+	}
+	if bytes.Equal(secret.Data["tls.crt"], cert.Certificate) && len(secret.OwnerReferences) == len(newOwners) {
+		return nil
+	}
+
+	secret.Data = map[string][]byte{
+		"tls.crt": cert.Certificate,
+		"tls.key": cert.PrivateKey,
+	}
+	secret.OwnerReferences = newOwners
+
+	_, err = w.kubeClientSet.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update secret: %w", err)
+	}
+
+	log.Debug().
+		Str("name", secret.Name).
+		Str("namespace", secret.Namespace).
+		Msg("Secret updated")
+
+	return nil
+}
+
+func appendOwnerReference(references []metav1.OwnerReference, ref metav1.OwnerReference) []metav1.OwnerReference {
+	for _, reference := range references {
+		if reference.String() == ref.String() {
+			return references
+		}
+	}
+
+	return append(references, ref)
 }
 
 func (w *Watcher) syncCatalogs(ctx context.Context) {
@@ -224,6 +423,14 @@ func (w *Watcher) cleanCatalogs(ctx context.Context, catalogs map[string]*hubv1a
 }
 
 func (w *Watcher) syncChildResources(ctx context.Context, catalog *hubv1alpha1.Catalog) error {
+	w.wildCardCertMu.RLock()
+	certificate := w.wildCardCert
+	w.wildCardCertMu.RUnlock()
+
+	if err := w.setupCertificates(ctx, catalog, certificate); err != nil {
+		return fmt.Errorf("unable to setup catalog certificates: %w", err)
+	}
+
 	if err := w.cleanupIngresses(ctx, catalog); err != nil {
 		return fmt.Errorf("clean up ingresses: %w", err)
 	}
@@ -309,47 +516,56 @@ func (w *Watcher) upsertIngresses(ctx context.Context, catalog *hubv1alpha1.Cata
 	}
 
 	for namespace, services := range servicesByNamespace {
-		if err := w.upsertIngress(ctx, namespace, catalog, services); err != nil {
-			return fmt.Errorf("upsert catalog ingress for namespace %q: %w", namespace, err)
+		ingress, err := w.buildHubDomainIngress(namespace, catalog, services)
+		if err != nil {
+			return fmt.Errorf("build ingress for hub domain and namespace %q: %w", namespace, err)
+		}
+
+		if err = w.upsertIngress(ctx, ingress); err != nil {
+			return fmt.Errorf("upsert ingress for hub domain and namespace %q: %w", namespace, err)
+		}
+
+		if len(catalog.Spec.CustomDomains) != 0 {
+			ingress, err = w.buildCustomDomainsIngress(namespace, catalog, services)
+			if err != nil {
+				return fmt.Errorf("build ingress for custom domains and namespace %q: %w", namespace, err)
+			}
+
+			if err = w.upsertIngress(ctx, ingress); err != nil {
+				return fmt.Errorf("upsert ingress for custom domains and namespace %q: %w", namespace, err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (w *Watcher) upsertIngress(ctx context.Context, namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) error {
-	name, err := getIngressName(catalog.Name)
-	if err != nil {
-		return fmt.Errorf("get ingress name: %w", err)
-	}
-
-	existingIngress, err := w.kubeClientSet.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
+func (w *Watcher) upsertIngress(ctx context.Context, ingress *netv1.Ingress) error {
+	existingIngress, err := w.kubeClientSet.NetworkingV1().Ingresses(ingress.Namespace).Get(ctx, ingress.Name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get ingress: %w", err)
 	}
 
 	if kerror.IsNotFound(err) {
-		newIngress := w.buildIngress(namespace, name, catalog, services)
-		_, err = w.kubeClientSet.NetworkingV1().Ingresses(namespace).Create(ctx, newIngress, metav1.CreateOptions{})
+		_, err = w.kubeClientSet.NetworkingV1().Ingresses(ingress.Namespace).Create(ctx, ingress, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create ingress: %w", err)
 		}
 
 		log.Debug().
-			Str("name", newIngress.Name).
-			Str("namespace", newIngress.Namespace).
+			Str("name", ingress.Name).
+			Str("namespace", ingress.Namespace).
 			Msg("Ingress created")
 
 		return nil
 	}
 
-	updatedIngress := w.buildIngress(namespace, name, catalog, services)
-	existingIngress.Spec = updatedIngress.Spec
+	existingIngress.Spec = ingress.Spec
 	// Override Annotations and Labels in case new values are added in the future.
-	existingIngress.ObjectMeta.Annotations = updatedIngress.ObjectMeta.Annotations
-	existingIngress.ObjectMeta.Labels = updatedIngress.ObjectMeta.Labels
+	existingIngress.ObjectMeta.Annotations = ingress.ObjectMeta.Annotations
+	existingIngress.ObjectMeta.Labels = ingress.ObjectMeta.Labels
 
-	_, err = w.kubeClientSet.NetworkingV1().Ingresses(namespace).Update(ctx, updatedIngress, metav1.UpdateOptions{})
+	_, err = w.kubeClientSet.NetworkingV1().Ingresses(ingress.Namespace).Update(ctx, existingIngress, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("update ingress: %w", err)
 	}
@@ -369,9 +585,13 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, catalog *hubv1alpha1.Cat
 		return fmt.Errorf("list ingresses: %w", err)
 	}
 
-	catalogIngressName, err := getIngressName(catalog.Name)
+	hubDomainIngressName, err := getHubDomainIngressName(catalog.Name)
 	if err != nil {
-		return fmt.Errorf("get ingress name: %w", err)
+		return fmt.Errorf("get ingress name for hub domain: %w", err)
+	}
+	customDomainsIngressName, err := getCustomDomainsIngressName(catalog.Name)
+	if err != nil {
+		return fmt.Errorf("get ingress name for custom domains: %w", err)
 	}
 
 	catalogNamespaces := make(map[string]struct{})
@@ -380,7 +600,7 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, catalog *hubv1alpha1.Cat
 	}
 
 	for _, ingress := range hubIngresses {
-		if ingress.Name != catalogIngressName {
+		if ingress.Name != hubDomainIngressName && ingress.Name != customDomainsIngressName {
 			continue
 		}
 
@@ -400,17 +620,87 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, catalog *hubv1alpha1.Cat
 
 				continue
 			}
+
+			err = w.kubeClientSet.CoreV1().
+				Secrets(ingress.Namespace).
+				Delete(ctx, ingress.Spec.TLS[0].SecretName, metav1.DeleteOptions{})
+
+			if err != nil {
+				log.Ctx(ctx).
+					Error().
+					Err(err).
+					Str("catalog", catalog.Name).
+					Str("secret_name", ingress.Spec.TLS[0].SecretName).
+					Str("secret_namespace", ingress.Namespace).
+					Msg("Unable to clean Catalog's child Secret")
+			}
 		}
 	}
 
 	return nil
 }
 
-func (w *Watcher) buildIngress(namespace, name string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) *netv1.Ingress {
-	annotations := map[string]string{
-		"traefik.ingress.kubernetes.io/router.entrypoints": w.config.TraefikCatalogEntryPoint,
+func (w *Watcher) buildHubDomainIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) (*netv1.Ingress, error) {
+	name, err := getHubDomainIngressName(catalog.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get hub domain ingress name: %w", err)
 	}
 
+	return &netv1.Ingress{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "networking.k8s.io/v1",
+			Kind:       "Ingress",
+		},
+		ObjectMeta: w.buildIngressObjectMeta(namespace, name, catalog, w.config.TraefikTunnelEntryPoint),
+		Spec:       w.buildIngressSpec([]string{catalog.Status.Domain}, services, hubDomainSecretName),
+	}, nil
+}
+
+func (w *Watcher) buildCustomDomainsIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) (*netv1.Ingress, error) {
+	ingressName, err := getCustomDomainsIngressName(catalog.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get custom domains ingress name: %w", err)
+	}
+
+	secretName, err := getCustomDomainSecretName(catalog.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get custom domains secret name: %w", err)
+	}
+
+	return &netv1.Ingress{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "networking.k8s.io/v1",
+			Kind:       "Ingress",
+		},
+		ObjectMeta: w.buildIngressObjectMeta(namespace, ingressName, catalog, w.config.TraefikCatalogEntryPoint),
+		Spec:       w.buildIngressSpec(catalog.Spec.CustomDomains, services, secretName),
+	}, nil
+}
+
+func (w *Watcher) buildIngressObjectMeta(namespace, name string, catalog *hubv1alpha1.Catalog, entrypoint string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      name,
+		Namespace: namespace,
+		Annotations: map[string]string{
+			"traefik.ingress.kubernetes.io/router.tls":         "true",
+			"traefik.ingress.kubernetes.io/router.entrypoints": entrypoint,
+		},
+		Labels: map[string]string{
+			"app.kubernetes.io/managed-by": "traefik-hub",
+		},
+		// Set OwnerReference allow us to delete ingresses owned by a catalog.
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: catalog.APIVersion,
+				Kind:       catalog.Kind,
+				Name:       catalog.Name,
+				UID:        catalog.UID,
+			},
+		},
+	}
+}
+
+func (w *Watcher) buildIngressSpec(domains []string, services []hubv1alpha1.CatalogService, tlsSecretName string) netv1.IngressSpec {
 	pathType := netv1.PathTypePrefix
 
 	var paths []netv1.HTTPIngressPath
@@ -430,7 +720,7 @@ func (w *Watcher) buildIngress(namespace, name string, catalog *hubv1alpha1.Cata
 	}
 
 	var rules []netv1.IngressRule
-	for _, domain := range catalog.Status.Domains {
+	for _, domain := range domains {
 		rules = append(rules, netv1.IngressRule{
 			Host: domain,
 			IngressRuleValue: netv1.IngressRuleValue{
@@ -441,59 +731,75 @@ func (w *Watcher) buildIngress(namespace, name string, catalog *hubv1alpha1.Cata
 		})
 	}
 
-	return &netv1.Ingress{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "networking.k8s.io/v1",
-			APIVersion: "Ingress",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "traefik-hub",
+	return netv1.IngressSpec{
+		IngressClassName: pointer.StringPtr(w.config.IngressClassName),
+		Rules:            rules,
+		TLS: []netv1.IngressTLS{
+			{
+				Hosts:      domains,
+				SecretName: tlsSecretName,
 			},
-			// Set OwnerReference allow us to delete ingresses owned by a catalog.
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: catalog.APIVersion,
-					Kind:       catalog.Kind,
-					Name:       catalog.Name,
-					UID:        catalog.UID,
-				},
-			},
-		},
-		Spec: netv1.IngressSpec{
-			IngressClassName: pointer.StringPtr(w.config.IngressClassName),
-			Rules:            rules,
 		},
 	}
 }
 
-// getIngressName compute the ingress name from the catalog name. The name follow this format:
-// {catalog-name}-{hash(catalog-name)}
+// getHubDomainIngressName compute the ingress name for hub domain from the catalog name.
+// The name follow this format: {catalog-name}-{hash(catalog-name)}-hub
 // This hash is here to reduce the chance of getting a collision on an existing ingress.
-func getIngressName(catalogName string) (string, error) {
-	hash := fnv.New32()
-
-	if _, err := hash.Write([]byte(catalogName)); err != nil {
-		return "", fmt.Errorf("generate hash: %w", err)
+func getHubDomainIngressName(catalogName string) (string, error) {
+	h, err := hash(catalogName)
+	if err != nil {
+		return "", err
 	}
 
-	return fmt.Sprintf("%s-%d", catalogName, hash.Sum32()), nil
+	return fmt.Sprintf("%s-%d-hub", catalogName, h), nil
 }
 
-// getEdgeIngressPortalName compute the edge ingress portal name from the catalog name. The name follow this format:
-// {catalog-name}-portal-{hash(catalog-name)}
+// getCustomDomainsIngressName compute the ingress name for custom domains from the catalog name.
+// The name follow this format: {catalog-name}-{hash(catalog-name)}
+// This hash is here to reduce the chance of getting a collision on an existing ingress.
+func getCustomDomainsIngressName(catalogName string) (string, error) {
+	h, err := hash(catalogName)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d", catalogName, h), nil
+}
+
+// getEdgeIngressPortalName compute the edge ingress portal name from the catalog name.
+// The name follow this format: {catalog-name}-{hash(catalog-name)}-portal
 // This hash is here to reduce the chance of getting a collision on an existing ingress.
 func getEdgeIngressPortalName(catalogName string) (string, error) {
-	hash := fnv.New32()
-
-	if _, err := hash.Write([]byte(catalogName)); err != nil {
-		return "", fmt.Errorf("generate hash: %w", err)
+	h, err := hash(catalogName)
+	if err != nil {
+		return "", err
 	}
 
 	// EdgeIngresses generate Ingresses with the same name. Therefore, to prevent any conflicts between the portal
-	// ingress and the catalog ingresses the term "-portal-" must be added in between.
-	return fmt.Sprintf("%s-portal-%d", catalogName, hash.Sum32()), nil
+	// ingress and the catalog ingresses the term "-portal" must be added as a suffix.
+	return fmt.Sprintf("%s-%d-portal", catalogName, h), nil
+}
+
+// getCustomDomainSecretName compute the name of the secret storing the certificate of the custom domains.
+// The name follow this format: {customDomainSecretNamePrefix}-{hash(catalog-name)}
+// This hash is here to reduce the chance of getting a collision on an existing secret while staying under
+// the limit of 63 characters.
+func getCustomDomainSecretName(catalogName string) (string, error) {
+	h, err := hash(catalogName)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d", customDomainSecretNamePrefix, h), nil
+}
+
+func hash(name string) (uint32, error) {
+	h := fnv.New32()
+
+	if _, err := h.Write([]byte(name)); err != nil {
+		return 0, fmt.Errorf("generate hash: %w", err)
+	}
+
+	return h.Sum32(), nil
 }

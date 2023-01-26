@@ -212,7 +212,7 @@ func setupOIDCSecret(cliCtx *cli.Context, client clientset.Interface, token stri
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "hub-secret",
-			Annotations: map[string]string{
+			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "traefik-hub",
 			},
 		},

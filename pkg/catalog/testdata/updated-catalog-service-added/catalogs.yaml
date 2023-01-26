@@ -1,0 +1,20 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: Catalog
+metadata:
+  name: catalog
+spec:
+  customDomains:
+    - "hello.example.com"
+  services:
+    - pathPrefix: /whoami-1
+      name: whoami-1
+      namespace: default
+      port: 80
+status:
+  version: version-1
+  domain: majestic-beaver-123.hub-traefik.io
+  urls: "https://majestic-beaver-123.hub-traefik.io,https://hello.example.com"
+  specHash: "3oh1v5LUNVT5Xh01nzFNNyCTCTc="
+  services:
+    - name: whoami-1
+      namespace: default

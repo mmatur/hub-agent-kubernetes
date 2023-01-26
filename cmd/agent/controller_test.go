@@ -55,7 +55,7 @@ func TestSetupOIDCSecret(t *testing.T) {
 					Object: &corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "hub-secret",
-							Annotations: map[string]string{
+							Labels: map[string]string{
 								"app.kubernetes.io/managed-by": "traefik-hub",
 							},
 						},
@@ -74,7 +74,7 @@ func TestSetupOIDCSecret(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "hub-secret",
 						Namespace: "default",
-						Annotations: map[string]string{
+						Labels: map[string]string{
 							"app.kubernetes.io/managed-by": "traefik-hub",
 						},
 					},
@@ -97,7 +97,7 @@ func TestSetupOIDCSecret(t *testing.T) {
 					Object: &corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "hub-secret",
-							Annotations: map[string]string{
+							Labels: map[string]string{
 								"app.kubernetes.io/managed-by": "traefik-hub",
 							},
 						},

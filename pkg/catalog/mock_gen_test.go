@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 )
 
 // platformClientMock mock of PlatformClient.
@@ -112,8 +113,239 @@ func (_c *platformClientGetCatalogsCall) OnGetCatalogs() *platformClientGetCatal
 	return _c.Parent.OnGetCatalogs()
 }
 
+func (_c *platformClientGetCatalogsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetCatalogsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
 func (_c *platformClientGetCatalogsCall) OnGetCatalogsRaw() *platformClientGetCatalogsCall {
 	return _c.Parent.OnGetCatalogsRaw()
+}
+
+func (_c *platformClientGetCatalogsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetCatalogsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
+}
+
+func (_m *platformClientMock) GetCertificateByDomains(_ context.Context, domains []string) (edgeingress.Certificate, error) {
+	_ret := _m.Called(domains)
+
+	if _rf, ok := _ret.Get(0).(func([]string) (edgeingress.Certificate, error)); ok {
+		return _rf(domains)
+	}
+
+	_ra0, _ := _ret.Get(0).(edgeingress.Certificate)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return &platformClientGetCertificateByDomainsCall{Call: _m.Mock.On("GetCertificateByDomains", domains), Parent: _m}
+}
+
+func (_m *platformClientMock) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return &platformClientGetCertificateByDomainsCall{Call: _m.Mock.On("GetCertificateByDomains", domains), Parent: _m}
+}
+
+type platformClientGetCertificateByDomainsCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Panic(msg string) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Once() *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Twice() *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Times(i int) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) WaitUntil(w <-chan time.Time) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) After(d time.Duration) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Run(fn func(args mock.Arguments)) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) Maybe() *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) TypedReturns(a edgeingress.Certificate, b error) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) ReturnsFn(fn func([]string) (edgeingress.Certificate, error)) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) TypedRun(fn func([]string)) *platformClientGetCertificateByDomainsCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_domains, _ := args.Get(0).([]string)
+		fn(_domains)
+	})
+	return _c
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCatalogs() *platformClientGetCatalogsCall {
+	return _c.Parent.OnGetCatalogs()
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCatalogsRaw() *platformClientGetCatalogsCall {
+	return _c.Parent.OnGetCatalogsRaw()
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
+}
+
+func (_m *platformClientMock) GetWildcardCertificate(_ context.Context) (edgeingress.Certificate, error) {
+	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() (edgeingress.Certificate, error)); ok {
+		return _rf()
+	}
+
+	_ra0, _ := _ret.Get(0).(edgeingress.Certificate)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return &platformClientGetWildcardCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
+}
+
+func (_m *platformClientMock) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return &platformClientGetWildcardCertificateCall{Call: _m.Mock.On("GetWildcardCertificate"), Parent: _m}
+}
+
+type platformClientGetWildcardCertificateCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Panic(msg string) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Once() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Twice() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Times(i int) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) WaitUntil(w <-chan time.Time) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) After(d time.Duration) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Run(fn func(args mock.Arguments)) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) Maybe() *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) TypedReturns(a edgeingress.Certificate, b error) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) ReturnsFn(fn func() (edgeingress.Certificate, error)) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) TypedRun(fn func()) *platformClientGetWildcardCertificateCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCatalogs() *platformClientGetCatalogsCall {
+	return _c.Parent.OnGetCatalogs()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCatalogsRaw() *platformClientGetCatalogsCall {
+	return _c.Parent.OnGetCatalogsRaw()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
 }
 
 // oasRegistryMock mock of OASRegistry.

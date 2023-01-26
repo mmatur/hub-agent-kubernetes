@@ -86,8 +86,8 @@ type CatalogStatus struct {
 	// URLs are the URLs for accessing the Catalog API.
 	URLs string `json:"urls"`
 
-	// Domains are the domains of the Catalog API.
-	Domains []string `json:"domains"`
+	// Domain is the hub generated domain of the Catalog API.
+	Domain string `json:"domain"`
 
 	// DevPortalDomain is the domain for accessing the dev portal.
 	DevPortalDomain string `json:"devPortalDomain"`

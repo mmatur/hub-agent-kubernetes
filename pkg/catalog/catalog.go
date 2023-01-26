@@ -45,10 +45,10 @@ type Catalog struct {
 // Service is a service within a catalog.
 type Service = hubv1alpha1.CatalogService
 
-// Resource builds the v1alpha1 EdgeIngress resource.
-func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error) {
+// Resource builds the v1alpha1 Catalog resource.
+func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error) {
 	var serviceStatuses []hubv1alpha1.CatalogServiceStatus
-	for _, svc := range e.Services {
+	for _, svc := range c.Services {
 		svc := svc
 
 		openAPISpecURL := svc.OpenAPISpecURL
@@ -64,8 +64,8 @@ func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 	}
 
 	spec := hubv1alpha1.CatalogSpec{
-		CustomDomains: e.CustomDomains,
-		Services:      e.Services,
+		CustomDomains: c.CustomDomains,
+		Services:      c.Services,
 	}
 
 	specHash, err := spec.Hash()
@@ -73,17 +73,9 @@ func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		return nil, fmt.Errorf("compute spec hash: %w", err)
 	}
 
-	var domains []string
-	var urls []string
-	for _, customDomain := range e.CustomDomains {
-		domains = append(domains, customDomain)
+	urls := []string{"https://" + c.Domain}
+	for _, customDomain := range c.CustomDomains {
 		urls = append(urls, "https://"+customDomain)
-	}
-
-	// As soon as a custom domain is provided we stop proposing the hub generated domain.
-	if len(domains) == 0 {
-		domains = []string{e.Domain}
-		urls = append(urls, "https://"+e.Domain)
 	}
 
 	return &hubv1alpha1.Catalog{
@@ -91,12 +83,12 @@ func (e *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 			APIVersion: "hub.traefik.io/v1alpha1",
 			Kind:       "Catalog",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: e.Name},
+		ObjectMeta: metav1.ObjectMeta{Name: c.Name},
 		Spec:       spec,
 		Status: hubv1alpha1.CatalogStatus{
-			Version:  e.Version,
+			Version:  c.Version,
 			SyncedAt: metav1.Now(),
-			Domains:  domains,
+			Domain:   c.Domain,
 			URLs:     strings.Join(urls, ","),
 			SpecHash: specHash,
 			Services: serviceStatuses,

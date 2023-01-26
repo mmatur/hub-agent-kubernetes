@@ -170,13 +170,16 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		CertSyncInterval:        time.Hour,
 	}
 
-	catalogWatcherCfg := catalog.WatcherConfig{
-		CatalogSyncInterval:      time.Minute,
+	catalogWatcherCfg := &catalog.WatcherConfig{
+		IngressClassName:         cliCtx.String(flagIngressClassName),
 		AgentNamespace:           currentNamespace(),
+		TraefikCatalogEntryPoint: cliCtx.String(flagTraefikCatalogEntryPoint),
+		TraefikTunnelEntryPoint:  cliCtx.String(flagTraefikTunnelEntryPoint),
 		DevPortalServiceName:     cliCtx.String(flagDevPortalServiceName),
 		DevPortalPort:            cliCtx.Int(flagDevPortalPort),
-		TraefikCatalogEntryPoint: cliCtx.String(flagTraefikCatalogEntryPoint),
-		IngressClassName:         cliCtx.String(flagIngressClassName),
+		CatalogSyncInterval:      time.Minute,
+		CertSyncInterval:         time.Hour,
+		CertRetryInterval:        time.Minute,
 	}
 
 	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, topoWatch, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
@@ -227,7 +230,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, topoWatch *topology.Watcher, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, topoWatch *topology.Watcher, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg *catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
