@@ -168,16 +168,28 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	if cliCtx.String(flagTraefikMetricsURL) != "" {
-		mtrcsMgr, mtrcsStore, err := newMetrics(topoWatch, token, platformURL, cliCtx.String(flagTraefikMetricsURL), agentCfg.Metrics, configWatcher)
-		if err != nil {
-			return err
+		mtrcsMgr, mtrcsStore, errMetrics := newMetrics(topoWatch, token, platformURL, cliCtx.String(flagTraefikMetricsURL), agentCfg.Metrics, configWatcher)
+		if errMetrics != nil {
+			return errMetrics
 		}
 
 		group.Go(func() error {
-			return mtrcsMgr.Run(ctx)
+			errMM := mtrcsMgr.Run(ctx)
+			if errMM != nil {
+				log.Error().Err(errMM).Msg("metrics manager stopped")
+			}
+
+			return errMM
 		})
 
-		group.Go(func() error { return runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher) })
+		group.Go(func() error {
+			errAlerting := runAlerting(ctx, token, platformURL, mtrcsStore, topoFetcher)
+			if errAlerting != nil {
+				log.Error().Err(errAlerting).Msg("alerts stopped")
+			}
+
+			return errAlerting
+		})
 	}
 
 	group.Go(func() error {
@@ -186,15 +198,21 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	group.Go(func() error {
-		return webhookAdmission(ctx, cliCtx, platformClient, topoWatch)
+		errWh := webhookAdmission(ctx, cliCtx, platformClient, topoWatch)
+		if errWh != nil {
+			log.Error().Err(errWh).Msg("webhook stopped")
+		}
+
+		return errWh
 	})
 
 	group.Go(func() error {
-		if err := checker.Start(ctx); err != nil {
-			return err
+		errCheck := checker.Start(ctx)
+		if errCheck != nil {
+			log.Error().Err(errCheck).Msg("version checker stopped")
 		}
 
-		return nil
+		return errCheck
 	})
 
 	group.Go(func() error {
@@ -202,7 +220,12 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return nil
 	})
 
-	return group.Wait()
+	err = group.Wait()
+	if err != nil {
+		log.Error().Err(err).Msg("group wait stopped")
+	}
+
+	return err
 }
 
 func setupOIDCSecret(cliCtx *cli.Context, client clientset.Interface, token string) error {

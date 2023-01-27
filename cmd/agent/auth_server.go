@@ -99,7 +99,10 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 	acpWatcher := auth.NewWatcher(switcher, key)
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher)
+	if _, errInformer := hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher); errInformer != nil {
+		return fmt.Errorf("add ACP watcher: %w", errInformer)
+	}
+
 	hubInformer.Start(cliCtx.Context.Done())
 
 	for t, ok := range hubInformer.WaitForCacheSync(cliCtx.Context.Done()) {
@@ -109,7 +112,10 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 	}
 
 	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
-	kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(acpWatcher)
+	if _, errInformer := kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(acpWatcher); errInformer != nil {
+		return fmt.Errorf("add secret watcher: %w", errInformer)
+	}
+
 	kubeInformer.Start(cliCtx.Context.Done())
 
 	for t, ok := range kubeInformer.WaitForCacheSync(cliCtx.Context.Done()) {

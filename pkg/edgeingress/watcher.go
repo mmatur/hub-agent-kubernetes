@@ -370,7 +370,7 @@ func (w *Watcher) createIngressCatchAll(ctx context.Context) error {
 			},
 		},
 		Spec: netv1.IngressSpec{
-			IngressClassName: pointer.StringPtr(w.config.IngressClassName),
+			IngressClassName: pointer.String(w.config.IngressClassName),
 			TLS:              []netv1.IngressTLS{{SecretName: secretName}},
 			Rules: []netv1.IngressRule{
 				{
@@ -624,7 +624,7 @@ func buildIngress(edgeIng *hubv1alpha1.EdgeIngress, ing *netv1.Ingress, ingressC
 		},
 	}
 	ing.Spec = netv1.IngressSpec{
-		IngressClassName: pointer.StringPtr(ingressClassName),
+		IngressClassName: pointer.String(ingressClassName),
 		TLS: []netv1.IngressTLS{
 			{
 				SecretName: secretName,

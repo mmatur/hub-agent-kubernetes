@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
-	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -149,12 +148,12 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 				},
 			},
 			Status: netv1.IngressStatus{
-				LoadBalancer: corev1.LoadBalancerStatus{
-					Ingress: []corev1.LoadBalancerIngress{
+				LoadBalancer: netv1.IngressLoadBalancerStatus{
+					Ingress: []netv1.IngressLoadBalancerIngress{
 						{
 							IP:       "1.2.3.4",
 							Hostname: "foo.bar",
-							Ports: []corev1.PortStatus{
+							Ports: []netv1.IngressPortStatus{
 								{
 									Port:     8080,
 									Protocol: "TCP",

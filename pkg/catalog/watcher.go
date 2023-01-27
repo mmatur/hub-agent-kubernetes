@@ -732,7 +732,7 @@ func (w *Watcher) buildIngressSpec(domains []string, services []hubv1alpha1.Cata
 	}
 
 	return netv1.IngressSpec{
-		IngressClassName: pointer.StringPtr(w.config.IngressClassName),
+		IngressClassName: pointer.String(w.config.IngressClassName),
 		Rules:            rules,
 		TLS: []netv1.IngressTLS{
 			{

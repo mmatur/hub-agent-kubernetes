@@ -38,6 +38,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
 	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
 	catalogadmission "github.com/traefik/hub-agent-kubernetes/pkg/catalog/admission"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
@@ -191,7 +192,9 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 
 	router := chi.NewRouter()
 	router.Handle("/edge-ingress", edgeIngressAdmission)
-	router.Handle("/catalog", catalogAdmission)
+	if catalogAdmission != nil {
+		router.Handle("/catalog", catalogAdmission)
+	}
 	router.Handle("/ingress", acpAdmission)
 	router.Handle("/acp", webAdmissionACP)
 
@@ -272,15 +275,18 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler)
+	catalogAvailable, err := isCatalogAvailable(kubeClientSet)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("catalog available: %w", err)
+	}
+
+	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, catalogAvailable)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
 	oasRegistry := catalog.NewServiceRegistry()
 	topoWatch.AddListener(oasRegistry.TopologyStateChanged)
-
-	catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, catalogWatcherCfg)
 
 	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
 
@@ -289,20 +295,13 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
 
-	err = startKubeInformer(ctx, kubeVers.GitVersion, kubeInformer, ingClassWatcher)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
-	}
-
-	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("start hub informer: %w", err)
-	}
-
 	go acpWatcher.Run(ctx)
 	go ingressUpdater.Run(ctx)
 	go edgeIngressWatcher.Run(ctx)
-	go catalogWatcher.Run(ctx)
+	if catalogAvailable {
+		catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, catalogWatcherCfg)
+		go catalogWatcher.Run(ctx)
+	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
 
@@ -315,7 +314,12 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		traefikReviewer,
 	}
 
-	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogadmission.NewHandler(platformClient, oasRegistry), nil
+	var catalogHandler http.Handler
+	if catalogAvailable {
+		catalogHandler = catalogadmission.NewHandler(platformClient, oasRegistry)
+	}
+
+	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogHandler, nil
 }
 
 func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
@@ -336,11 +340,20 @@ func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config)
 	return traefikClientSet.TraefikV1alpha1(), nil
 }
 
-func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler) error {
-	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher)
-	hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler)
-	hubInformer.Hub().V1alpha1().Catalogs().Informer()
+func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler, catalogAvailable bool) error {
+	if _, err := hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher); err != nil {
+		return fmt.Errorf("add ingressClass event handler: %w", err)
+	}
+
+	if _, err := hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpEventHandler); err != nil {
+		return fmt.Errorf("add accessControlPolicy event handler: %w", err)
+	}
+
 	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
+
+	if catalogAvailable {
+		hubInformer.Hub().V1alpha1().Catalogs().Informer()
+	}
 
 	hubInformer.Start(ctx.Done())
 
@@ -355,9 +368,13 @@ func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInforme
 
 func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
 	if kubevers.SupportsNetV1IngressClasses(kubeVers) {
-		kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
+		if _, err := kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler); err != nil {
+			return fmt.Errorf("add v1 IngressClass event handler: %w", err)
+		}
 	} else if kubevers.SupportsNetV1Beta1IngressClasses(kubeVers) {
-		kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler)
+		if _, err := kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler); err != nil {
+			return fmt.Errorf("add v1beta1 IngressClass event handler: %w", err)
+		}
 	}
 
 	if kubevers.SupportsNetV1Ingresses(kubeVers) {
@@ -428,4 +445,25 @@ func hasMiddlewareCRD(clientSet discovery.DiscoveryInterface) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func isCatalogAvailable(clientSet discovery.DiscoveryInterface) (bool, error) {
+	crdList, err := clientSet.ServerResourcesForGroupVersion(hubv1alpha1.SchemeGroupVersion.String())
+	if err != nil {
+		if kerror.IsNotFound(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	log.Info().Interface("crds", crdList.APIResources).Msg("crds list")
+
+	for _, resource := range crdList.APIResources {
+		if resource.Kind == "Catalog" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

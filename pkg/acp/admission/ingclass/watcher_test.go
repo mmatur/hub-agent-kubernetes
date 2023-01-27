@@ -20,6 +20,7 @@ package ingclass
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,8 +41,13 @@ import (
 
 func setupEnv(clientSet clientset.Interface, hubClientSet hubclientset.Interface, watcher *Watcher) error {
 	kubeInformer := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
-	kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(watcher)
-	kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(watcher)
+	if _, err := kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(watcher); err != nil {
+		return fmt.Errorf("failed to add v1 ingress class event handler: %w", err)
+	}
+
+	if _, err := kubeInformer.Networking().V1beta1().IngressClasses().Informer().AddEventHandler(watcher); err != nil {
+		return fmt.Errorf("failed to add v1beta1 ingress class event handler: %w", err)
+	}
 
 	ctx := context.Background()
 	syncCtx, c := context.WithTimeout(ctx, 5*time.Second)
@@ -54,7 +60,10 @@ func setupEnv(clientSet clientset.Interface, hubClientSet hubclientset.Interface
 	}
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(watcher)
+	if _, err := hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(watcher); err != nil {
+		return fmt.Errorf("failed to add hub v1alpha1 ingress class event handler: %w", err)
+	}
+
 	hubInformer.Start(ctx.Done())
 
 	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)

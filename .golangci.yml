@@ -237,3 +237,17 @@ issues:
     - path: pkg/platform/client_test.go
       linters:
         - gocognit
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: cmd/agent/controller.go
+      text: "cyclomatic complexity 17 of func `(.*).run` is high"
+      linters:
+        - gocyclo
+    - path: cmd/agent/webhook_admission.go
+      text: "Function 'setupAdmissionHandlers' has too many statements"
+      linters:
+        - funlen
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: cmd/agent/auth_server.go
+      text: "cyclomatic complexity 16 of func `(.*).run` is high"
+      linters:
+        - gocyclo

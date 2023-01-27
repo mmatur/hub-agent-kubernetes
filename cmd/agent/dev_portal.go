@@ -85,7 +85,10 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 	catalogWatcher := devportal.NewWatcher(switcher)
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	hubInformer.Hub().V1alpha1().Catalogs().Informer().AddEventHandler(catalogWatcher)
+	if _, errInformer := hubInformer.Hub().V1alpha1().Catalogs().Informer().AddEventHandler(catalogWatcher); errInformer != nil {
+		return fmt.Errorf("add catalog watcher: %w", errInformer)
+	}
+
 	hubInformer.Start(cliCtx.Context.Done())
 
 	for t, ok := range hubInformer.WaitForCacheSync(cliCtx.Context.Done()) {

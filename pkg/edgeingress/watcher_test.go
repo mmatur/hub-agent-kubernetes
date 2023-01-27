@@ -216,7 +216,7 @@ func Test_WatcherRun(t *testing.T) {
 
 		wantPathType := netv1.PathTypePrefix
 		assert.Equal(t, netv1.IngressSpec{
-			IngressClassName: pointer.StringPtr("traefik-hub"),
+			IngressClassName: pointer.String("traefik-hub"),
 			TLS: []netv1.IngressTLS{
 				{
 					Hosts:      []string{edgeIngress.Domain},
@@ -485,7 +485,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 
 	wantPathType := netv1.PathTypePrefix
 	assert.Equal(t, netv1.IngressSpec{
-		IngressClassName: pointer.StringPtr("traefik-hub"),
+		IngressClassName: pointer.String("traefik-hub"),
 		TLS: []netv1.IngressTLS{
 			{
 				Hosts:      []string{wantEdgeIngress.Domain},
