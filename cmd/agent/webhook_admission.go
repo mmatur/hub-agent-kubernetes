@@ -127,7 +127,7 @@ func admissionFlags() []cli.Flag {
 			Name:    flagTraefikCatalogEntryPoint,
 			Usage:   "The entry point used by Traefik to expose catalog APIs",
 			EnvVars: []string{strcase.ToSNAKE(flagTraefikCatalogEntryPoint)},
-			Value:   "traefikhub-catalog",
+			Value:   "websecure",
 		},
 		&cli.StringFlag{
 			Name:    flagTraefikTunnelEntryPoint,

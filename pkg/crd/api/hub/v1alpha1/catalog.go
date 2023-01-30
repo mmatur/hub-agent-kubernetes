@@ -90,6 +90,7 @@ type CatalogStatus struct {
 	Domain string `json:"domain"`
 
 	// DevPortalDomain is the domain for accessing the dev portal.
+	// +optional
 	DevPortalDomain string `json:"devPortalDomain"`
 
 	// SpecHash is a hash representing the CatalogSpec
