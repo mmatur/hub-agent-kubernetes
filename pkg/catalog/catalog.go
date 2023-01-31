@@ -31,6 +31,7 @@ type Catalog struct {
 	WorkspaceID string `json:"workspaceId"`
 	ClusterID   string `json:"clusterId"`
 	Name        string `json:"name"`
+	Description string `json:"description"`
 
 	Version string `json:"version"`
 
@@ -64,6 +65,7 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 	}
 
 	spec := hubv1alpha1.CatalogSpec{
+		Description:   c.Description,
 		CustomDomains: c.CustomDomains,
 		Services:      c.Services,
 	}

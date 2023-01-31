@@ -48,6 +48,8 @@ type Catalog struct {
 
 // CatalogSpec configures a Catalog.
 type CatalogSpec struct {
+	// +optional
+	Description string `json:"description,omitempty"`
 	// CustomDomains are the custom domains under which the API will be exposed.
 	// +optional
 	CustomDomains []string `json:"customDomains,omitempty"`
