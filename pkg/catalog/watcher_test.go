@@ -57,8 +57,8 @@ func Test_WatcherRun(t *testing.T) {
 	namespaces := []string{"agent-ns", "default", "my-ns"}
 
 	tests := []struct {
-		desc             string
-		platformCatalogs []Catalog
+		desc            string
+		platformCatalog Catalog
 
 		clusterCatalogs  string
 		clusterIngresses string
@@ -71,17 +71,19 @@ func Test_WatcherRun(t *testing.T) {
 	}{
 		{
 			desc: "new catalog present on the platform needs to be created on the cluster",
-			platformCatalogs: []Catalog{
-				{
-					Name:          "new-catalog",
-					Version:       "version-1",
-					Domain:        "majestic-beaver-123.hub-traefik.io",
-					CustomDomains: []string{"hello.example.com", "welcome.example.com"},
-					Services: []Service{
-						{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 80},
-						{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "default", Port: 8080},
-						{PathPrefix: "/whoami-3", Name: "whoami-3", Namespace: "my-ns", Port: 8080},
-					},
+			platformCatalog: Catalog{
+				Name:    "new-catalog",
+				Version: "version-1",
+				Domain:  "majestic-beaver-123.hub-traefik.io",
+				CustomDomains: []CustomDomain{
+					{Name: "hello.example.com", Verified: true},
+					{Name: "welcome.example.com", Verified: true},
+					{Name: "not-verified.example.com", Verified: false},
+				},
+				Services: []Service{
+					{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 80},
+					{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "default", Port: 8080},
+					{PathPrefix: "/whoami-3", Name: "whoami-3", Namespace: "my-ns", Port: 8080},
 				},
 			},
 			wantCatalogs:      "testdata/new-catalog/want.catalogs.yaml",
@@ -91,16 +93,16 @@ func Test_WatcherRun(t *testing.T) {
 		},
 		{
 			desc: "a catalog has been updated on the platform: last service from a namespace deleted",
-			platformCatalogs: []Catalog{
-				{
-					Name:          "catalog",
-					Version:       "version-2",
-					Domain:        "majestic-beaver-123.hub-traefik.io",
-					CustomDomains: []string{"hello.example.com"},
-					Services: []Service{
-						{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 8080, OpenAPISpecURL: "http://hello.example.com/spec.json"},
-						{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "default", Port: 8080},
-					},
+			platformCatalog: Catalog{
+				Name:    "catalog",
+				Version: "version-2",
+				Domain:  "majestic-beaver-123.hub-traefik.io",
+				CustomDomains: []CustomDomain{
+					{Name: "hello.example.com", Verified: true},
+				},
+				Services: []Service{
+					{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 8080, OpenAPISpecURL: "http://hello.example.com/spec.json"},
+					{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "default", Port: 8080},
 				},
 			},
 			clusterCatalogs:   "testdata/updated-catalog-service-deleted/catalogs.yaml",
@@ -113,16 +115,13 @@ func Test_WatcherRun(t *testing.T) {
 		},
 		{
 			desc: "a catalog has been updated on the platform: new service in new namespace added",
-			platformCatalogs: []Catalog{
-				{
-					Name:          "catalog",
-					Version:       "version-2",
-					Domain:        "majestic-beaver-123.hub-traefik.io",
-					CustomDomains: []string{"hello.example.com"},
-					Services: []Service{
-						{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 8080},
-						{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "my-ns", Port: 8080},
-					},
+			platformCatalog: Catalog{
+				Name:    "catalog",
+				Version: "version-2",
+				Domain:  "majestic-beaver-123.hub-traefik.io",
+				Services: []Service{
+					{PathPrefix: "/whoami-1", Name: "whoami-1", Namespace: "default", Port: 8080},
+					{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "my-ns", Port: 8080},
 				},
 			},
 			clusterCatalogs:   "testdata/updated-catalog-service-added/catalogs.yaml",
@@ -183,7 +182,7 @@ func Test_WatcherRun(t *testing.T) {
 
 			getCatalogCount := 0
 			// Cancel the context on the second catalog synchronization occurred.
-			client.OnGetCatalogs().TypedReturns(test.platformCatalogs, nil).Run(func(_ mock.Arguments) {
+			client.OnGetCatalogs().TypedReturns([]Catalog{test.platformCatalog}, nil).Run(func(_ mock.Arguments) {
 				getCatalogCount++
 				if getCatalogCount == 2 {
 					cancel()
@@ -194,11 +193,21 @@ func Test_WatcherRun(t *testing.T) {
 					Certificate: []byte("cert"),
 					PrivateKey:  []byte("private"),
 				}, nil)
-			client.OnGetCertificateByDomains(test.platformCatalogs[0].CustomDomains).
-				TypedReturns(edgeingress.Certificate{
-					Certificate: []byte("cert"),
-					PrivateKey:  []byte("private"),
-				}, nil)
+
+			var wantCustomDomains []string
+			for _, customDomain := range test.platformCatalog.CustomDomains {
+				if customDomain.Verified {
+					wantCustomDomains = append(wantCustomDomains, customDomain.Name)
+				}
+			}
+
+			if len(wantCustomDomains) > 0 {
+				client.OnGetCertificateByDomains(wantCustomDomains).
+					TypedReturns(edgeingress.Certificate{
+						Certificate: []byte("cert"),
+						PrivateKey:  []byte("private"),
+					}, nil)
+			}
 
 			oasCh := make(chan struct{})
 			oasRegistry := newOasRegistryMock(t)
@@ -234,47 +243,81 @@ func Test_WatcherRun(t *testing.T) {
 
 			<-stop
 
-			catalogList, err := hubClientSet.HubV1alpha1().Catalogs().List(ctx, metav1.ListOptions{})
-			require.NoError(t, err)
-
-			var catalogs []hubv1alpha1.Catalog
-			for _, catalog := range catalogList.Items {
-				catalog.Status.SyncedAt = metav1.Time{}
-
-				catalogs = append(catalogs, catalog)
-			}
-
-			var ingresses []netv1.Ingress
-			for _, namespace := range namespaces {
-				var namespaceIngressList *netv1.IngressList
-				namespaceIngressList, err = kubeClientSet.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
-				require.NoError(t, err)
-
-				for _, ingress := range namespaceIngressList.Items {
-					ingress.Status = netv1.IngressStatus{}
-
-					ingresses = append(ingresses, ingress)
-				}
-			}
-
-			edgeIngresses, err := hubClientSet.HubV1alpha1().EdgeIngresses("agent-ns").List(ctx, metav1.ListOptions{})
-			require.NoError(t, err)
-
-			var secrets []corev1.Secret
-			for _, namespace := range namespaces {
-				var namespaceSecretList *corev1.SecretList
-				namespaceSecretList, err = kubeClientSet.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
-				require.NoError(t, err)
-
-				secrets = append(secrets, namespaceSecretList.Items...)
-			}
-
-			assert.ElementsMatch(t, wantCatalogs, catalogs)
-			assert.ElementsMatch(t, wantIngresses, ingresses)
-			assert.ElementsMatch(t, wantEdgeIngresses, edgeIngresses.Items)
-			assert.ElementsMatch(t, wantSecrets, secrets)
+			assertCatalogsMatches(t, hubClientSet, wantCatalogs)
+			assertEdgeIngressesMatches(t, hubClientSet, "agent-ns", wantEdgeIngresses)
+			assertSecretsMatches(t, kubeClientSet, namespaces, wantSecrets)
+			assertIngressesMatches(t, kubeClientSet, namespaces, wantIngresses)
 		})
 	}
+}
+
+func assertSecretsMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []corev1.Secret) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var secrets []corev1.Secret
+	for _, namespace := range namespaces {
+		namespaceSecretList, err := kubeClientSet.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+
+		secrets = append(secrets, namespaceSecretList.Items...)
+	}
+
+	assert.ElementsMatch(t, want, secrets)
+}
+
+func assertCatalogsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, want []hubv1alpha1.Catalog) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	catalogList, err := hubClientSet.HubV1alpha1().Catalogs().List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	var catalogs []hubv1alpha1.Catalog
+	for _, catalog := range catalogList.Items {
+		catalog.Status.SyncedAt = metav1.Time{}
+
+		catalogs = append(catalogs, catalog)
+	}
+
+	assert.ElementsMatch(t, want, catalogs)
+}
+
+func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, namespace string, want []hubv1alpha1.EdgeIngress) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	edgeIngresses, err := hubClientSet.HubV1alpha1().EdgeIngresses(namespace).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, want, edgeIngresses.Items)
+}
+
+func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []netv1.Ingress) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var ingresses []netv1.Ingress
+	for _, namespace := range namespaces {
+		namespaceIngressList, err := kubeClientSet.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+
+		for _, ingress := range namespaceIngressList.Items {
+			ingress.Status = netv1.IngressStatus{}
+
+			ingresses = append(ingresses, ingress)
+		}
+	}
+
+	assert.ElementsMatch(t, want, ingresses)
 }
 
 func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {

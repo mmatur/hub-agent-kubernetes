@@ -21,6 +21,8 @@ spec:
 status:
   version: version-1
   domain: majestic-beaver-123.hub-traefik.io
+  customDomains:
+    - "hello.example.com"
   urls: "https://majestic-beaver-123.hub-traefik.io,https://hello.example.com"
   specHash: "3oh1v5LUNVT5Xh01nzFNNyCTCTc="
   services:

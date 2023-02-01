@@ -181,7 +181,7 @@ func (w *Watcher) syncCertificates(ctx context.Context) error {
 	}
 
 	for _, catalog := range clusterCatalogs {
-		err := w.setupCertificates(ctx, catalog, certificate)
+		err = w.setupCertificates(ctx, catalog, certificate)
 		if err != nil {
 			log.Error().Err(err).
 				Str("name", catalog.Name).
@@ -208,9 +208,9 @@ func (w *Watcher) setupCertificates(ctx context.Context, catalog *hubv1alpha1.Ca
 		return nil
 	}
 
-	cert, err := w.platform.GetCertificateByDomains(ctx, catalog.Spec.CustomDomains)
+	cert, err := w.platform.GetCertificateByDomains(ctx, catalog.Status.CustomDomains)
 	if err != nil {
-		return fmt.Errorf("get certificate by domains %q: %w", strings.Join(catalog.Spec.CustomDomains, ","), err)
+		return fmt.Errorf("get certificate by domains %q: %w", strings.Join(catalog.Status.CustomDomains, ","), err)
 	}
 
 	secretName, err := getCustomDomainSecretName(catalog.Name)
@@ -387,7 +387,7 @@ func (w *Watcher) updateCatalog(ctx context.Context, oldCatalog *hubv1alpha1.Cat
 
 	obj.ObjectMeta = oldCatalog.ObjectMeta
 
-	if obj.Status.SpecHash != oldCatalog.Status.SpecHash {
+	if obj.Status.Version != oldCatalog.Status.Version {
 		obj, err = w.hubClientSet.HubV1alpha1().Catalogs().Update(ctx, obj, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("updating Catalog: %w", err)
@@ -525,7 +525,7 @@ func (w *Watcher) upsertIngresses(ctx context.Context, catalog *hubv1alpha1.Cata
 			return fmt.Errorf("upsert ingress for hub domain and namespace %q: %w", namespace, err)
 		}
 
-		if len(catalog.Spec.CustomDomains) != 0 {
+		if len(catalog.Status.CustomDomains) != 0 {
 			ingress, err = w.buildCustomDomainsIngress(namespace, catalog, services)
 			if err != nil {
 				return fmt.Errorf("build ingress for custom domains and namespace %q: %w", namespace, err)
@@ -673,7 +673,7 @@ func (w *Watcher) buildCustomDomainsIngress(namespace string, catalog *hubv1alph
 			Kind:       "Ingress",
 		},
 		ObjectMeta: w.buildIngressObjectMeta(namespace, ingressName, catalog, w.config.TraefikCatalogEntryPoint),
-		Spec:       w.buildIngressSpec(catalog.Spec.CustomDomains, services, secretName),
+		Spec:       w.buildIngressSpec(catalog.Status.CustomDomains, services, secretName),
 	}, nil
 }
 

@@ -3,8 +3,6 @@ kind: Catalog
 metadata:
   name: catalog
 spec:
-  customDomains:
-    - "hello.example.com"
   services:
     - pathPrefix: /whoami-1
       name: whoami-1
@@ -17,8 +15,8 @@ spec:
 status:
   version: version-2
   domain: majestic-beaver-123.hub-traefik.io
-  urls: "https://majestic-beaver-123.hub-traefik.io,https://hello.example.com"
-  specHash: "ehn0ZtUOngXxSesVYqRCB54fjvU="
+  urls: "https://majestic-beaver-123.hub-traefik.io"
+  specHash: "WYBiIYBSuOezXwz1b27yI2df80Q="
   services:
     - name: whoami-1
       namespace: default

@@ -596,11 +596,13 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 func TestClient_GetCatalogs(t *testing.T) {
 	wantCatalogs := []catalog.Catalog{
 		{
-			WorkspaceID:   "workspace-id",
-			ClusterID:     "cluster-id",
-			Name:          "name",
-			Version:       "version",
-			CustomDomains: []string{"hello.example.com"},
+			WorkspaceID: "workspace-id",
+			ClusterID:   "cluster-id",
+			Name:        "name",
+			Version:     "version",
+			CustomDomains: []catalog.CustomDomain{
+				{Name: "hello.example.com", Verified: true},
+			},
 			Services: []catalog.Service{
 				{
 					Name:       "user",
@@ -675,11 +677,13 @@ func TestClient_CreateCatalog(t *testing.T) {
 			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
 			catalog: &catalog.Catalog{
-				WorkspaceID:   "workspace-id",
-				ClusterID:     "cluster-id",
-				Name:          "name",
-				Version:       "version-1",
-				CustomDomains: []string{"hello.example.com"},
+				WorkspaceID: "workspace-id",
+				ClusterID:   "cluster-id",
+				Name:        "name",
+				Version:     "version-1",
+				CustomDomains: []catalog.CustomDomain{
+					{Name: "hello.example.com", Verified: true},
+				},
 				Services: []catalog.Service{
 					{
 						Name:       "user",

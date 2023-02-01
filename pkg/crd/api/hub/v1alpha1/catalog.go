@@ -91,6 +91,9 @@ type CatalogStatus struct {
 	// Domain is the hub generated domain of the Catalog API.
 	Domain string `json:"domain"`
 
+	// CustomDomains are the custom domains for accessing the exposed service.
+	CustomDomains []string `json:"customDomains,omitempty"`
+
 	// DevPortalDomain is the domain for accessing the dev portal.
 	// +optional
 	DevPortalDomain string `json:"devPortalDomain"`

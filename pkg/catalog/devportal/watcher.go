@@ -159,14 +159,22 @@ func (w *Watcher) OnDelete(obj interface{}) {
 	}
 }
 
-func (w *Watcher) updateCatalogsFromCRD(policy *hubv1alpha1.Catalog) {
+func (w *Watcher) updateCatalogsFromCRD(c *hubv1alpha1.Catalog) {
 	w.catalogsMu.Lock()
 	defer w.catalogsMu.Unlock()
 
-	w.catalogs[policy.Name] = catalog.Catalog{
-		Name:          policy.Name,
-		Services:      policy.Spec.Services,
-		CustomDomains: policy.Spec.CustomDomains,
+	var verifiedCustomDomains []catalog.CustomDomain
+	for _, customDomain := range c.Status.CustomDomains {
+		verifiedCustomDomains = append(verifiedCustomDomains, catalog.CustomDomain{
+			Name:     customDomain,
+			Verified: true,
+		})
+	}
+
+	w.catalogs[c.Name] = catalog.Catalog{
+		Name:          c.Name,
+		Services:      c.Spec.Services,
+		CustomDomains: verifiedCustomDomains,
 	}
 }
 

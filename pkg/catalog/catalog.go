@@ -35,12 +35,18 @@ type Catalog struct {
 
 	Version string `json:"version"`
 
-	Domain        string    `json:"domain"`
-	CustomDomains []string  `json:"customDomains"`
-	Services      []Service `json:"services,omitempty"`
+	Domain        string         `json:"domain"`
+	CustomDomains []CustomDomain `json:"customDomains"`
+	Services      []Service      `json:"services,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// CustomDomain holds domain information.
+type CustomDomain struct {
+	Name     string `json:"name"`
+	Verified bool   `json:"verified"`
 }
 
 // Service is a service within a catalog.
@@ -64,9 +70,14 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		})
 	}
 
+	var customDomains []string
+	for _, domain := range c.CustomDomains {
+		customDomains = append(customDomains, domain.Name)
+	}
+
 	spec := hubv1alpha1.CatalogSpec{
 		Description:   c.Description,
-		CustomDomains: c.CustomDomains,
+		CustomDomains: customDomains,
 		Services:      c.Services,
 	}
 
@@ -75,10 +86,18 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		return nil, fmt.Errorf("compute spec hash: %w", err)
 	}
 
-	urls := []string{"https://" + c.Domain}
+	var urls []string
+	var verifiedCustomDomains []string
 	for _, customDomain := range c.CustomDomains {
-		urls = append(urls, "https://"+customDomain)
+		if !customDomain.Verified {
+			continue
+		}
+
+		urls = append(urls, "https://"+customDomain.Name)
+		verifiedCustomDomains = append(verifiedCustomDomains, customDomain.Name)
 	}
+
+	urls = append(urls, "https://"+c.Domain)
 
 	return &hubv1alpha1.Catalog{
 		TypeMeta: metav1.TypeMeta{
@@ -88,12 +107,13 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		ObjectMeta: metav1.ObjectMeta{Name: c.Name},
 		Spec:       spec,
 		Status: hubv1alpha1.CatalogStatus{
-			Version:  c.Version,
-			SyncedAt: metav1.Now(),
-			Domain:   c.Domain,
-			URLs:     strings.Join(urls, ","),
-			SpecHash: specHash,
-			Services: serviceStatuses,
+			Version:       c.Version,
+			SyncedAt:      metav1.Now(),
+			Domain:        c.Domain,
+			CustomDomains: verifiedCustomDomains,
+			URLs:          strings.Join(urls, ","),
+			SpecHash:      specHash,
+			Services:      serviceStatuses,
 		},
 	}, nil
 }
