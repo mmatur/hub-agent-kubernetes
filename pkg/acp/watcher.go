@@ -190,43 +190,47 @@ func needUpdate(a ACP, policy *hubv1alpha1.AccessControlPolicy) bool {
 func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 	spec := hubv1alpha1.AccessControlPolicySpec{}
 	switch {
-	case a.OIDCGoogle != nil:
-		spec.OIDCGoogle = &hubv1alpha1.AccessControlOIDCGoogle{
-			ClientID:       a.OIDCGoogle.ClientID,
-			RedirectURL:    a.OIDCGoogle.RedirectURL,
-			LogoutURL:      a.OIDCGoogle.LogoutURL,
-			AuthParams:     a.OIDCGoogle.AuthParams,
-			ForwardHeaders: a.OIDCGoogle.ForwardHeaders,
-			Emails:         a.OIDCGoogle.Emails,
+	case a.JWT != nil:
+		spec.JWT = &hubv1alpha1.AccessControlPolicyJWT{
+			SigningSecret:              a.JWT.SigningSecret,
+			SigningSecretBase64Encoded: a.JWT.SigningSecretBase64Encoded,
+			PublicKey:                  a.JWT.PublicKey,
+			JWKsFile:                   a.JWT.JWKsFile.String(),
+			JWKsURL:                    a.JWT.JWKsURL,
+			StripAuthorizationHeader:   a.JWT.StripAuthorizationHeader,
+			ForwardHeaders:             a.JWT.ForwardHeaders,
+			TokenQueryKey:              a.JWT.TokenQueryKey,
+			Claims:                     a.JWT.Claims,
 		}
 
-		if a.OIDCGoogle.Secret != nil {
-			spec.OIDCGoogle.Secret = &corev1.SecretReference{
-				Name:      a.OIDCGoogle.Secret.Name,
-				Namespace: a.OIDCGoogle.Secret.Namespace,
-			}
+	case a.BasicAuth != nil:
+		spec.BasicAuth = &hubv1alpha1.AccessControlPolicyBasicAuth{
+			Users:                    a.BasicAuth.Users,
+			Realm:                    a.BasicAuth.Realm,
+			StripAuthorizationHeader: a.BasicAuth.StripAuthorizationHeader,
+			ForwardUsernameHeader:    a.BasicAuth.ForwardUsernameHeader,
 		}
 
-		if a.OIDCGoogle.StateCookie != nil {
-			spec.OIDCGoogle.StateCookie = &hubv1alpha1.StateCookie{
-				SameSite: a.OIDCGoogle.StateCookie.SameSite,
-				Secure:   a.OIDCGoogle.StateCookie.Secure,
-				Domain:   a.OIDCGoogle.StateCookie.Domain,
-				Path:     a.OIDCGoogle.StateCookie.Path,
-			}
+	case a.APIKey != nil:
+		keys := make([]hubv1alpha1.AccessControlPolicyAPIKeyKey, 0, len(a.APIKey.Keys))
+		for _, k := range a.APIKey.Keys {
+			keys = append(keys, hubv1alpha1.AccessControlPolicyAPIKeyKey{
+				ID:       k.ID,
+				Metadata: k.Metadata,
+				Value:    k.Value,
+			})
 		}
 
-		if a.OIDCGoogle.Session != nil {
-			spec.OIDCGoogle.Session = &hubv1alpha1.Session{
-				SameSite: a.OIDCGoogle.Session.SameSite,
-				Secure:   a.OIDCGoogle.Session.Secure,
-				Domain:   a.OIDCGoogle.Session.Domain,
-				Path:     a.OIDCGoogle.Session.Path,
-				Refresh:  a.OIDCGoogle.Session.Refresh,
-			}
+		spec.APIKey = &hubv1alpha1.AccessControlPolicyAPIKey{
+			Header:         a.APIKey.Header,
+			Query:          a.APIKey.Query,
+			Cookie:         a.APIKey.Cookie,
+			Keys:           keys,
+			ForwardHeaders: a.APIKey.ForwardHeaders,
 		}
+
 	case a.OIDC != nil:
-		spec.OIDC = &hubv1alpha1.AccessControlOIDC{
+		spec.OIDC = &hubv1alpha1.AccessControlPolicyOIDC{
 			Issuer:         a.OIDC.Issuer,
 			ClientID:       a.OIDC.ClientID,
 			RedirectURL:    a.OIDC.RedirectURL,
@@ -263,25 +267,40 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 			}
 		}
 
-	case a.JWT != nil:
-		spec.JWT = &hubv1alpha1.AccessControlPolicyJWT{
-			SigningSecret:              a.JWT.SigningSecret,
-			SigningSecretBase64Encoded: a.JWT.SigningSecretBase64Encoded,
-			PublicKey:                  a.JWT.PublicKey,
-			JWKsFile:                   a.JWT.JWKsFile.String(),
-			JWKsURL:                    a.JWT.JWKsURL,
-			StripAuthorizationHeader:   a.JWT.StripAuthorizationHeader,
-			ForwardHeaders:             a.JWT.ForwardHeaders,
-			TokenQueryKey:              a.JWT.TokenQueryKey,
-			Claims:                     a.JWT.Claims,
+	case a.OIDCGoogle != nil:
+		spec.OIDCGoogle = &hubv1alpha1.AccessControlPolicyOIDCGoogle{
+			ClientID:       a.OIDCGoogle.ClientID,
+			RedirectURL:    a.OIDCGoogle.RedirectURL,
+			LogoutURL:      a.OIDCGoogle.LogoutURL,
+			AuthParams:     a.OIDCGoogle.AuthParams,
+			ForwardHeaders: a.OIDCGoogle.ForwardHeaders,
+			Emails:         a.OIDCGoogle.Emails,
 		}
 
-	case a.BasicAuth != nil:
-		spec.BasicAuth = &hubv1alpha1.AccessControlPolicyBasicAuth{
-			Users:                    a.BasicAuth.Users,
-			Realm:                    a.BasicAuth.Realm,
-			StripAuthorizationHeader: a.BasicAuth.StripAuthorizationHeader,
-			ForwardUsernameHeader:    a.BasicAuth.ForwardUsernameHeader,
+		if a.OIDCGoogle.Secret != nil {
+			spec.OIDCGoogle.Secret = &corev1.SecretReference{
+				Name:      a.OIDCGoogle.Secret.Name,
+				Namespace: a.OIDCGoogle.Secret.Namespace,
+			}
+		}
+
+		if a.OIDCGoogle.StateCookie != nil {
+			spec.OIDCGoogle.StateCookie = &hubv1alpha1.StateCookie{
+				SameSite: a.OIDCGoogle.StateCookie.SameSite,
+				Secure:   a.OIDCGoogle.StateCookie.Secure,
+				Domain:   a.OIDCGoogle.StateCookie.Domain,
+				Path:     a.OIDCGoogle.StateCookie.Path,
+			}
+		}
+
+		if a.OIDCGoogle.Session != nil {
+			spec.OIDCGoogle.Session = &hubv1alpha1.Session{
+				SameSite: a.OIDCGoogle.Session.SameSite,
+				Secure:   a.OIDCGoogle.Session.Secure,
+				Domain:   a.OIDCGoogle.Session.Domain,
+				Path:     a.OIDCGoogle.Session.Path,
+				Refresh:  a.OIDCGoogle.Session.Refresh,
+			}
 		}
 	}
 

@@ -34,7 +34,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt/expr"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/expr"
 	"golang.org/x/oauth2"
 )
 

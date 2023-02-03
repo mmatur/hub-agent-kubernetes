@@ -10,7 +10,7 @@ linters-settings:
     disable:
       - fieldalignment
   gocyclo:
-    min-complexity: 15
+    min-complexity: 16
   maligned:
     suggest-new: true
   goconst:
@@ -251,3 +251,20 @@ issues:
       text: "cyclomatic complexity 16 of func `(.*).run` is high"
       linters:
         - gocyclo
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: cmd/agent/controller.go
+      text: "cyclomatic complexity 17 of func `(.*).run` is high"
+      linters:
+        - gocyclo
+    - path: cmd/agent/webhook_admission.go
+      text: "Function 'setupAdmissionHandlers' has too many statements"
+      linters:
+        - funlen
+    # Reducing cyclomatic complexity would reduce readability.
+    - path: cmd/agent/auth_server.go
+      text: "cyclomatic complexity 16 of func `(.*).run` is high"
+      linters:
+        - gocyclo
+    # Reducing complexity would reduce readability.
+    - path: pkg/acp/apikey/api_key.go
+      text: "(.*) has complex nested blocks \\(complexity: 5\\)"

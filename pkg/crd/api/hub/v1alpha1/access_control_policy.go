@@ -47,10 +47,11 @@ type AccessControlPolicy struct {
 
 // AccessControlPolicySpec configures an access control policy.
 type AccessControlPolicySpec struct {
-	JWT        *AccessControlPolicyJWT       `json:"jwt,omitempty"`
-	BasicAuth  *AccessControlPolicyBasicAuth `json:"basicAuth,omitempty"`
-	OIDC       *AccessControlOIDC            `json:"oidc,omitempty"`
-	OIDCGoogle *AccessControlOIDCGoogle      `json:"oidcGoogle,omitempty"`
+	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
+	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
+	APIKey     *AccessControlPolicyAPIKey     `json:"apiKey,omitempty"`
+	OIDC       *AccessControlPolicyOIDC       `json:"oidc,omitempty"`
+	OIDCGoogle *AccessControlPolicyOIDCGoogle `json:"oidcGoogle,omitempty"`
 }
 
 // Hash return AccessControlPolicySpec hash.
@@ -87,8 +88,35 @@ type AccessControlPolicyBasicAuth struct {
 	ForwardUsernameHeader    string   `json:"forwardUsernameHeader,omitempty"`
 }
 
-// AccessControlOIDC holds the OIDC authentication configuration.
-type AccessControlOIDC struct {
+// AccessControlPolicyAPIKey configure an APIKey control policy.
+type AccessControlPolicyAPIKey struct {
+	// Header name where to look for the API key. One of header, query or cookie must be set.
+	Header string `json:"header,omitempty"`
+	// Query name where to look for the API key. One of header, query or cookie must be set.
+	Query string `json:"query,omitempty"`
+	// Cookie name where to look for the API key. One of header, query or cookie must be set.
+	Cookie string `json:"cookie,omitempty"`
+	// Keys define the set of authorized keys to access a protected resource.
+	// +kubebuilder:validation:MinItems:=1
+	Keys []AccessControlPolicyAPIKeyKey `json:"keys,omitempty"`
+	// ForwardHeaders instructs the middleware to forward key metadata as header values upon successful authentication.
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+}
+
+// AccessControlPolicyAPIKeyKey defines an API key.
+type AccessControlPolicyAPIKeyKey struct {
+	// ID is the unique identifier of the key.
+	// +kubebuilder:validation:Required
+	ID string `json:"id"`
+	// Value is the SHAKE-256 hash (using 64 bytes) of the API key.
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
+	// Metadata holds arbitrary metadata for this key, can be used by ForwardHeaders.
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// AccessControlPolicyOIDC holds the OIDC authentication configuration.
+type AccessControlPolicyOIDC struct {
 	Issuer   string `json:"issuer,omitempty"`
 	ClientID string `json:"clientId,omitempty"`
 
@@ -106,8 +134,8 @@ type AccessControlOIDC struct {
 	Claims         string            `json:"claims,omitempty"`
 }
 
-// AccessControlOIDCGoogle holds the Google OIDC authentication configuration.
-type AccessControlOIDCGoogle struct {
+// AccessControlPolicyOIDCGoogle holds the Google OIDC authentication configuration.
+type AccessControlPolicyOIDCGoogle struct {
 	ClientID string `json:"clientId,omitempty"`
 
 	Secret *corev1.SecretReference `json:"secret,omitempty"`
@@ -121,7 +149,8 @@ type AccessControlOIDCGoogle struct {
 
 	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
 	// Emails are the allowed emails to connect.
-	Emails []string `json:"emails"`
+	// +kubebuilder:validation:MinItems:=1
+	Emails []string `json:"emails,omitempty"`
 }
 
 // StateCookie holds state cookie configuration.

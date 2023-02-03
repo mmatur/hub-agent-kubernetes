@@ -52,6 +52,28 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 			},
 		},
 		{
+			desc:    "api key",
+			fixture: "fixtures/acp/api-key.yml",
+			want: map[string]*AccessControlPolicy{
+				"my-acp": {
+					Name:   "my-acp",
+					Method: "apiKey",
+					APIKey: &AccessControlPolicyAPIKey{
+						Header: "Api-Key",
+						Query:  "api-key",
+						Keys: []AccessControlPolicyAPIKeyKey{
+							{ID: "user-1", Value: "redacted"},
+							{ID: "user-2", Value: "redacted"},
+						},
+						ForwardHeaders: map[string]string{
+							"Id":    "_id",
+							"Group": "group",
+						},
+					},
+				},
+			},
+		},
+		{
 			desc:    "jwt",
 			fixture: "fixtures/acp/jwt.yml",
 			want: map[string]*AccessControlPolicy{

@@ -4,7 +4,7 @@ FROM golang:1-alpine AS delve-builder
 # GCC is needed
 RUN apk --no-cache --no-progress add build-base
 
-RUN go install github.com/go-delve/delve/cmd/dlv@v1.9.0
+RUN go install github.com/go-delve/delve/cmd/dlv@v1.20.1
 
 FROM alpine
 
@@ -19,4 +19,4 @@ EXPOSE 80
 EXPOSE 443
 EXPOSE 40000
 
-ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "--accept-multiclient", "--continue", "--", "./hub-agent-kubernetes"]
+ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "--continue", "--", "exec", "./hub-agent-kubernetes"]

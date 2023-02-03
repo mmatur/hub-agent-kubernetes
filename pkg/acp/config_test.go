@@ -35,18 +35,17 @@ func TestBuildClaims(t *testing.T) {
 		{
 			desc:     "1 user",
 			emails:   []string{"email1"},
-			expected: `Equals("email","email1")`,
+			expected: `Equals("email", "email1")`,
 		},
 		{
 			desc:     "2 user",
 			emails:   []string{"email1", "email2"},
-			expected: `Equals("email","email1")||Equals("email","email2")`,
+			expected: `Equals("email", "email1") || Equals("email", "email2")`,
 		},
 	}
 
 	for _, test := range testCases {
 		test := test
-
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 

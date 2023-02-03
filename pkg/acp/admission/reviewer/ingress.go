@@ -106,6 +106,11 @@ func headerToForward(cfg *acp.Config) ([]string, error) {
 			headerToFwd = append(headerToFwd, "Authorization")
 		}
 
+	case cfg.APIKey != nil:
+		for headerName := range cfg.APIKey.ForwardHeaders {
+			headerToFwd = append(headerToFwd, headerName)
+		}
+
 	case cfg.OIDC != nil:
 		for headerName := range cfg.OIDC.ForwardHeaders {
 			headerToFwd = append(headerToFwd, headerName)

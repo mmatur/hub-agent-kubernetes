@@ -1,0 +1,16 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: my-acp
+spec:
+  apiKey:
+    header: Api-Key
+    query: api-key
+    keys:
+      - id: user-1
+        value: 17fa993d5eecbd361f30baf0b9b2329ad053bb6d5fec2228eca55e9b4914fface3af69bcc9a6b5f7ff093aa9a0d00811d0b2a3ee67eac60c57e79d2fd99bbde0
+      - id: user-2
+        value: 2f721b4773058cdaec7c09c325375b1b3c88a610e1faa429fb4bf0f1b40e334da308ef1d1c542afcdac87f2df7122be9eb353b0765e7d4a128c36ce044ff1f6d
+    forwardHeaders:
+      Id: _id
+      Group: group

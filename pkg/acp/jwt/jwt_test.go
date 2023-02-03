@@ -87,9 +87,11 @@ func TestNew(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
-			_, err := NewHandler(&test.jwtCfg, "acp@my-ns")
+			t.Parallel()
 
+			_, err := NewHandler(&test.jwtCfg, "acp@my-ns")
 			test.wantErr(t, err)
 		})
 	}

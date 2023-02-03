@@ -51,7 +51,7 @@ func createOIDCPolicy(uid, name, issuer string, secret *corev1.SecretReference) 
 	return &hubv1alpha1.AccessControlPolicy{
 		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
 		Spec: hubv1alpha1.AccessControlPolicySpec{
-			OIDC: &hubv1alpha1.AccessControlOIDC{
+			OIDC: &hubv1alpha1.AccessControlPolicyOIDC{
 				Issuer:   issuer,
 				ClientID: "ID",
 				Secret:   secret,

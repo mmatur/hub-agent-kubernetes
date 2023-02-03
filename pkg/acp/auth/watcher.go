@@ -27,6 +27,7 @@ import (
 	"github.com/mitchellh/hashstructure/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/apikey"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
@@ -262,6 +263,9 @@ func buildRoute(ctx context.Context, name string, cfg *acp.Config) (http.Handler
 	case cfg.BasicAuth != nil:
 		return basicauth.NewHandler(cfg.BasicAuth, name)
 
+	case cfg.APIKey != nil:
+		return apikey.NewHandler(cfg.APIKey, name)
+
 	case cfg.OIDC != nil:
 		return oidc.NewHandler(ctx, cfg.OIDC, name)
 
@@ -280,6 +284,9 @@ func getACPType(cfg *acp.Config) string {
 
 	case cfg.BasicAuth != nil:
 		return "Basic Auth"
+
+	case cfg.APIKey != nil:
+		return "API Key"
 
 	case cfg.OIDC != nil:
 		return "OIDC"

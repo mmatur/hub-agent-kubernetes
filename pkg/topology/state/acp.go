@@ -20,6 +20,7 @@ package state
 import (
 	"strings"
 
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -59,6 +60,15 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 				Realm:                    policy.Spec.BasicAuth.Realm,
 				StripAuthorizationHeader: policy.Spec.BasicAuth.StripAuthorizationHeader,
 				ForwardUsernameHeader:    policy.Spec.BasicAuth.ForwardUsernameHeader,
+			}
+		case policy.Spec.APIKey != nil:
+			acp.Method = "apiKey"
+			acp.APIKey = &AccessControlPolicyAPIKey{
+				Header:         policy.Spec.APIKey.Header,
+				Query:          policy.Spec.APIKey.Query,
+				Cookie:         policy.Spec.APIKey.Cookie,
+				Keys:           redactKeys(policy.Spec.APIKey.Keys),
+				ForwardHeaders: policy.Spec.APIKey.ForwardHeaders,
 			}
 		case policy.Spec.OIDC != nil:
 			acp.Method = "oidc"
@@ -157,4 +167,16 @@ func redactPasswords(rawUsers []string) string {
 	}
 
 	return strings.Join(users, ",")
+}
+
+func redactKeys(keys []hubv1alpha1.AccessControlPolicyAPIKeyKey) []AccessControlPolicyAPIKeyKey {
+	out := make([]AccessControlPolicyAPIKeyKey, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, AccessControlPolicyAPIKeyKey{
+			ID:       key.ID,
+			Metadata: key.Metadata,
+			Value:    "redacted",
+		})
+	}
+	return out
 }

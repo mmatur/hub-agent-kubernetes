@@ -21,18 +21,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/apikey"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 )
 
-// Config is the configuration of an Access Control Policy. It is used to setup ACP handlers.
+// Config is the configuration of an Access Control Policy. It is used to set up ACP handlers.
 type Config struct {
-	JWT        *jwt.Config
-	BasicAuth  *basicauth.Config
-	OIDC       *oidc.Config
-	OIDCGoogle *OIDCGoogle
+	JWT        *jwt.Config       `json:"jwt"`
+	BasicAuth  *basicauth.Config `json:"basicAuth"`
+	APIKey     *apikey.Config    `json:"apiKey"`
+	OIDC       *oidc.Config      `json:"oidc"`
+	OIDCGoogle *OIDCGoogle       `json:"oidcGoogle"`
 }
 
 // OIDCGoogle is the Google OIDC configuration.
@@ -74,6 +76,28 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 			},
 		}
 
+	case policy.Spec.APIKey != nil:
+		apiKeyConfig := policy.Spec.APIKey
+
+		keys := make([]apikey.Key, 0, len(apiKeyConfig.Keys))
+		for _, k := range apiKeyConfig.Keys {
+			keys = append(keys, apikey.Key{
+				ID:       k.ID,
+				Metadata: k.Metadata,
+				Value:    k.Value,
+			})
+		}
+
+		return &Config{
+			APIKey: &apikey.Config{
+				Header:         apiKeyConfig.Header,
+				Query:          apiKeyConfig.Query,
+				Cookie:         apiKeyConfig.Cookie,
+				Keys:           keys,
+				ForwardHeaders: apiKeyConfig.ForwardHeaders,
+			},
+		}
+
 	case policy.Spec.OIDC != nil:
 		oidcCfg := policy.Spec.OIDC
 
@@ -106,7 +130,7 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 			}
 		}
 
-		if oidcCfg.StateCookie != nil {
+		if oidcCfg.Session != nil {
 			conf.OIDC.Session = &oidc.AuthSession{
 				Path:     oidcCfg.Session.Path,
 				Domain:   oidcCfg.Session.Domain,
@@ -117,6 +141,7 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 		}
 
 		return conf
+
 	case policy.Spec.OIDCGoogle != nil:
 		oidcGoogleCfg := policy.Spec.OIDCGoogle
 
@@ -170,10 +195,10 @@ func ConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) *Config {
 
 // buildClaims builds the claims from the emails.
 func buildClaims(emails []string) string {
-	var claims []string
+	var matchers []string
 	for _, email := range emails {
-		claims = append(claims, fmt.Sprintf(`Equals("email",%q)`, email))
+		matchers = append(matchers, fmt.Sprintf(`Equals("email", %q)`, email))
 	}
 
-	return strings.Join(claims, "||")
+	return strings.Join(matchers, " || ")
 }

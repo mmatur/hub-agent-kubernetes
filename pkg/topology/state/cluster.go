@@ -117,6 +117,7 @@ type AccessControlPolicy struct {
 	Name       string                         `json:"name"`
 	Method     string                         `json:"method"`
 	JWT        *AccessControlPolicyJWT        `json:"jwt,omitempty"`
+	APIKey     *AccessControlPolicyAPIKey     `json:"apiKey,omitempty"`
 	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
 	OIDC       *AccessControlPolicyOIDC       `json:"oidc,omitempty"`
 	OIDCGoogle *AccessControlPolicyOIDCGoogle `json:"oidcGoogle,omitempty"`
@@ -137,10 +138,26 @@ type AccessControlPolicyJWT struct {
 
 // AccessControlPolicyBasicAuth holds the HTTP basic authentication configuration.
 type AccessControlPolicyBasicAuth struct {
-	Users                    string `json:"users,omitempty"`
+	Users                    string `json:"users,omitempty"` // Redacted.
 	Realm                    string `json:"realm,omitempty"`
 	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
 	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
+}
+
+// AccessControlPolicyAPIKey describes the settings for APIKey authentication within an access control policy.
+type AccessControlPolicyAPIKey struct {
+	Header         string                         `json:"header,omitempty"`
+	Query          string                         `json:"query,omitempty"`
+	Cookie         string                         `json:"cookie,omitempty"`
+	Keys           []AccessControlPolicyAPIKeyKey `json:"keys,omitempty"`
+	ForwardHeaders map[string]string              `json:"forwardHeaders,omitempty"`
+}
+
+// AccessControlPolicyAPIKeyKey defines an API key.
+type AccessControlPolicyAPIKeyKey struct {
+	ID       string            `json:"id"`
+	Metadata map[string]string `json:"metadata"`
+	Value    string            `json:"value"` // Redacted.
 }
 
 // AccessControlPolicyOIDC holds the OIDC configuration.

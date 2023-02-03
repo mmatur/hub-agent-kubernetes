@@ -99,20 +99,6 @@ func (w *EventHandler) OnDelete(obj interface{}) {
 
 func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {
 	switch {
-	case newCfg.OIDC != nil:
-		if oldCfg.OIDC == nil {
-			return true
-		}
-
-		return !reflect.DeepEqual(oldCfg.OIDC.ForwardHeaders, newCfg.OIDC.ForwardHeaders)
-
-	case newCfg.OIDCGoogle != nil:
-		if oldCfg.OIDCGoogle == nil {
-			return true
-		}
-
-		return !reflect.DeepEqual(oldCfg.OIDCGoogle.ForwardHeaders, newCfg.OIDCGoogle.ForwardHeaders)
-
 	case newCfg.JWT != nil:
 		if oldCfg.JWT == nil {
 			return true
@@ -128,6 +114,27 @@ func headersChanged(oldCfg, newCfg hubv1alpha1.AccessControlPolicySpec) bool {
 
 		return newCfg.BasicAuth.ForwardUsernameHeader != oldCfg.BasicAuth.ForwardUsernameHeader ||
 			newCfg.BasicAuth.StripAuthorizationHeader != oldCfg.BasicAuth.StripAuthorizationHeader
+
+	case newCfg.APIKey != nil:
+		if oldCfg.APIKey == nil {
+			return true
+		}
+
+		return !reflect.DeepEqual(oldCfg.APIKey.ForwardHeaders, newCfg.APIKey.ForwardHeaders)
+
+	case newCfg.OIDC != nil:
+		if oldCfg.OIDC == nil {
+			return true
+		}
+
+		return !reflect.DeepEqual(oldCfg.OIDC.ForwardHeaders, newCfg.OIDC.ForwardHeaders)
+
+	case newCfg.OIDCGoogle != nil:
+		if oldCfg.OIDCGoogle == nil {
+			return true
+		}
+
+		return !reflect.DeepEqual(oldCfg.OIDCGoogle.ForwardHeaders, newCfg.OIDCGoogle.ForwardHeaders)
 
 	default:
 		return false
