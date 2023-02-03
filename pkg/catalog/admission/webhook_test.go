@@ -267,8 +267,9 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	}
 	wantUpdateReq := &platform.UpdateCatalogReq{
-		CustomDomains: newCatalog.Spec.CustomDomains,
-		Services:      newCatalog.Spec.Services,
+		CustomDomains:   newCatalog.Spec.CustomDomains,
+		DevPortalDomain: newCatalog.Status.DevPortalDomain,
+		Services:        newCatalog.Spec.Services,
 	}
 	wantCustomDomains := []catalog.CustomDomain{
 		{Name: "foo.example.com", Verified: true},

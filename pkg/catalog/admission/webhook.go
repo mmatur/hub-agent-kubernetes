@@ -171,8 +171,9 @@ func (h *Handler) reviewUpdateOperation(ctx context.Context, oldCatalog, newCata
 	log.Ctx(ctx).Info().Msg("Updating Catalog resource")
 
 	updateReq := &platform.UpdateCatalogReq{
-		CustomDomains: newCatalog.Spec.CustomDomains,
-		Services:      newCatalog.Spec.Services,
+		CustomDomains:   newCatalog.Spec.CustomDomains,
+		DevPortalDomain: newCatalog.Status.DevPortalDomain,
+		Services:        newCatalog.Spec.Services,
 	}
 
 	updatedCatalog, err := h.platform.UpdateCatalog(ctx, oldCatalog.Name, oldCatalog.Status.Version, updateReq)
