@@ -27,7 +27,7 @@ status:
     - hello.example.com
     - welcome.example.com
   urls: "https://hello.example.com,https://welcome.example.com,https://majestic-beaver-123.hub-traefik.io"
-  specHash: "fP0Zp4Ge2lexD1xhGZAlEl7Br9w="
+  hash: "DFnCOdZG+y+gIomoDrEv3sfZD7o="
   services:
     - name: whoami-1
       namespace: default

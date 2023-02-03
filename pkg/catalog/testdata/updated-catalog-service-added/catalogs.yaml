@@ -12,7 +12,7 @@ status:
   version: version-1
   domain: majestic-beaver-123.hub-traefik.io
   urls: "https://majestic-beaver-123.hub-traefik.io"
-  specHash: "3oh1v5LUNVT5Xh01nzFNNyCTCTc="
+  hash: "3oh1v5LUNVT5Xh01nzFNNyCTCTc="
   services:
     - name: whoami-1
       namespace: default

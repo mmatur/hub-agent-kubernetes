@@ -134,7 +134,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 				URLs:          "https://foo.example.com,https://majestic-beaver-123.hub-traefik.io",
 				Domain:        "majestic-beaver-123.hub-traefik.io",
 				CustomDomains: []string{"foo.example.com"},
-				SpecHash:      "Sz6cVxZ70Qm0el1CHhSpsbou92U=",
+				Hash:          "fVAN1OdLndjP7JZfRldgqlEt/rg=",
 				Services: []hubv1alpha1.CatalogServiceStatus{
 					{
 						Name:           "whoami",
@@ -231,6 +231,9 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 				},
 			},
 		},
+		Status: hubv1alpha1.CatalogStatus{
+			DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
+		},
 	}
 	oldCatalog := hubv1alpha1.Catalog{
 		TypeMeta: metav1.TypeMeta{
@@ -271,15 +274,16 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		{Name: "foo.example.com", Verified: true},
 	}
 	updatedCatalog := &catalog.Catalog{
-		WorkspaceID:   "workspace-id",
-		ClusterID:     "cluster-id",
-		Name:          catalogName,
-		Version:       "version-4",
-		Domain:        "majestic-beaver-123.hub-traefik.io",
-		CustomDomains: wantCustomDomains,
-		Services:      newCatalog.Spec.Services,
-		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
+		WorkspaceID:     "workspace-id",
+		ClusterID:       "cluster-id",
+		Name:            catalogName,
+		Version:         "version-4",
+		Domain:          "majestic-beaver-123.hub-traefik.io",
+		CustomDomains:   wantCustomDomains,
+		DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
+		Services:        newCatalog.Spec.Services,
+		CreatedAt:       time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+		UpdatedAt:       time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := newPlatformClientMock(t)
@@ -314,12 +318,13 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		PatchType: wantPatchType,
 		Patch: mustMarshal(t, []patch{
 			{Op: "replace", Path: "/status", Value: hubv1alpha1.CatalogStatus{
-				Version:       "version-4",
-				SyncedAt:      now,
-				Domain:        "majestic-beaver-123.hub-traefik.io",
-				CustomDomains: []string{"foo.example.com"},
-				URLs:          "https://foo.example.com,https://majestic-beaver-123.hub-traefik.io",
-				SpecHash:      "rOG0fFXyK3/sUYGqjggW/ix7rFc=",
+				Version:         "version-4",
+				SyncedAt:        now,
+				Domain:          "majestic-beaver-123.hub-traefik.io",
+				CustomDomains:   []string{"foo.example.com"},
+				DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
+				URLs:            "https://foo.example.com,https://majestic-beaver-123.hub-traefik.io",
+				Hash:            "IkBmEGA3dwLFryBkdOz/4tkAz1g=",
 				Services: []hubv1alpha1.CatalogServiceStatus{
 					{
 						Name:           "new-whoami",

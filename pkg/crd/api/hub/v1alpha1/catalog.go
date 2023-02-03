@@ -18,11 +18,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"crypto/sha1" //nolint:gosec // Used for content diffing, no impact on security
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,19 +52,6 @@ type CatalogSpec struct {
 	Services []CatalogService `json:"services,omitempty"`
 }
 
-// Hash generates the hash of the spec.
-func (in *CatalogSpec) Hash() (string, error) {
-	b, err := json.Marshal(in)
-	if err != nil {
-		return "", fmt.Errorf("encode Catalog: %w", err)
-	}
-
-	hash := sha1.New() //nolint:gosec // Used for content diffing, no impact on security
-	hash.Write(b)
-
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
-}
-
 // CatalogService defines how a Kubernetes Service is exposed within a Catalog.
 type CatalogService struct {
 	Name       string `json:"name"`
@@ -98,8 +80,8 @@ type CatalogStatus struct {
 	// +optional
 	DevPortalDomain string `json:"devPortalDomain"`
 
-	// SpecHash is a hash representing the CatalogSpec
-	SpecHash string `json:"specHash,omitempty"`
+	// Hash is a hash representing the Catalog.
+	Hash string `json:"hash,omitempty"`
 
 	Services []CatalogServiceStatus `json:"services,omitempty"`
 }

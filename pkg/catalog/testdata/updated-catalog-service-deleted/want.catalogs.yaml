@@ -21,7 +21,7 @@ status:
   customDomains:
     - "hello.example.com"
   urls: "https://hello.example.com,https://majestic-beaver-123.hub-traefik.io"
-  specHash: "JiNFWTDh2QN2UXI2axjtY21Zpf0="
+  hash: "wZusy6+fz5zmubMOJ44cWK1ZI4Y="
   services:
     - name: whoami-1
       namespace: default

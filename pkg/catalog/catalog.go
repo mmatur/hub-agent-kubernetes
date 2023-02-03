@@ -18,6 +18,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package catalog
 
 import (
+	"crypto/sha1" //nolint:gosec // Used for content diffing, no impact on security
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -35,9 +38,10 @@ type Catalog struct {
 
 	Version string `json:"version"`
 
-	Domain        string         `json:"domain"`
-	CustomDomains []CustomDomain `json:"customDomains"`
-	Services      []Service      `json:"services,omitempty"`
+	Domain          string         `json:"domain"`
+	CustomDomains   []CustomDomain `json:"customDomains"`
+	DevPortalDomain string         `json:"devPortalDomain,omitempty"`
+	Services        []Service      `json:"services,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -81,11 +85,6 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		Services:      c.Services,
 	}
 
-	specHash, err := spec.Hash()
-	if err != nil {
-		return nil, fmt.Errorf("compute spec hash: %w", err)
-	}
-
 	var urls []string
 	var verifiedCustomDomains []string
 	for _, customDomain := range c.CustomDomains {
@@ -99,7 +98,7 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 
 	urls = append(urls, "https://"+c.Domain)
 
-	return &hubv1alpha1.Catalog{
+	catalog := &hubv1alpha1.Catalog{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "hub.traefik.io/v1alpha1",
 			Kind:       "Catalog",
@@ -107,13 +106,47 @@ func (c *Catalog) Resource(oasRegistry OASRegistry) (*hubv1alpha1.Catalog, error
 		ObjectMeta: metav1.ObjectMeta{Name: c.Name},
 		Spec:       spec,
 		Status: hubv1alpha1.CatalogStatus{
-			Version:       c.Version,
-			SyncedAt:      metav1.Now(),
-			Domain:        c.Domain,
-			CustomDomains: verifiedCustomDomains,
-			URLs:          strings.Join(urls, ","),
-			SpecHash:      specHash,
-			Services:      serviceStatuses,
+			Version:         c.Version,
+			SyncedAt:        metav1.Now(),
+			Domain:          c.Domain,
+			CustomDomains:   verifiedCustomDomains,
+			DevPortalDomain: c.DevPortalDomain,
+			URLs:            strings.Join(urls, ","),
+			Services:        serviceStatuses,
 		},
-	}, nil
+	}
+
+	catalogHash, err := Hash(catalog)
+	if err != nil {
+		return nil, fmt.Errorf("compute catalog hash: %w", err)
+	}
+
+	catalog.Status.Hash = catalogHash
+
+	return catalog, nil
+}
+
+type catalogHash struct {
+	CustomDomains   []string                     `json:"customDomains,omitempty"`
+	Services        []hubv1alpha1.CatalogService `json:"services,omitempty"`
+	DevPortalDomain string                       `json:"devPortalDomain"`
+}
+
+// Hash generates the hash of the catalog based on its CustomDomains, Services and the Status.DevPortalDomain.
+func Hash(c *hubv1alpha1.Catalog) (string, error) {
+	ch := catalogHash{
+		CustomDomains:   c.Spec.CustomDomains,
+		Services:        c.Spec.Services,
+		DevPortalDomain: c.Status.DevPortalDomain,
+	}
+
+	b, err := json.Marshal(ch)
+	if err != nil {
+		return "", fmt.Errorf("encode catalog: %w", err)
+	}
+
+	hash := sha1.New() //nolint:gosec // Used for content diffing, no impact on security
+	hash.Write(b)
+
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
 }

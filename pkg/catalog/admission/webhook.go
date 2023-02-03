@@ -127,13 +127,13 @@ func (h *Handler) review(ctx context.Context, req *admv1.AdmissionRequest) ([]by
 
 	// Skip the review if the Catalog hasn't changed since the last platform sync.
 	if newCatalog != nil {
-		var specHash string
-		specHash, err = newCatalog.Spec.Hash()
+		var catalogHash string
+		catalogHash, err = catalog.Hash(newCatalog)
 		if err != nil {
-			return nil, fmt.Errorf("compute spec hash: %w", err)
+			return nil, fmt.Errorf("compute catalog hash: %w", err)
 		}
 
-		if newCatalog.Status.SpecHash == specHash {
+		if newCatalog.Status.Hash == catalogHash {
 			return nil, nil
 		}
 	}

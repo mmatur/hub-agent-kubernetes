@@ -102,8 +102,9 @@ type CreateCatalogReq struct {
 
 // UpdateCatalogReq is a request for updating a catalog.
 type UpdateCatalogReq struct {
-	CustomDomains []string          `json:"customDomains"`
-	Services      []catalog.Service `json:"services"`
+	DevPortalDomain string            `json:"devPortalDomain"`
+	CustomDomains   []string          `json:"customDomains"`
+	Services        []catalog.Service `json:"services"`
 }
 
 // Command defines patch operation to apply on the cluster.

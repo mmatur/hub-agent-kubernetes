@@ -603,6 +603,7 @@ func TestClient_GetCatalogs(t *testing.T) {
 			CustomDomains: []catalog.CustomDomain{
 				{Name: "hello.example.com", Verified: true},
 			},
+			DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
 			Services: []catalog.Service{
 				{
 					Name:       "user",
@@ -778,7 +779,8 @@ func TestClient_UpdateCatalog(t *testing.T) {
 			name:    "name",
 			version: "version-1",
 			updateReq: &UpdateCatalogReq{
-				CustomDomains: []string{"hello.example.com"},
+				CustomDomains:   []string{"hello.example.com"},
+				DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
 				Services: []catalog.Service{
 					{
 						Name:       "user",
@@ -791,10 +793,12 @@ func TestClient_UpdateCatalog(t *testing.T) {
 			returnStatusCode: http.StatusOK,
 			wantErr:          assert.NoError,
 			catalog: &catalog.Catalog{
-				WorkspaceID: "workspace-id",
-				ClusterID:   "cluster-id",
-				Name:        "name",
-				Version:     "version-1",
+				WorkspaceID:     "workspace-id",
+				ClusterID:       "cluster-id",
+				Name:            "name",
+				Version:         "version-1",
+				CustomDomains:   []catalog.CustomDomain{{Name: "hello.example.com", Verified: true}},
+				DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
 				Services: []catalog.Service{
 					{
 						Name:       "user",
