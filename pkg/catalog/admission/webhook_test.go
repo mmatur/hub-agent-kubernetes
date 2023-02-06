@@ -39,6 +39,7 @@ import (
 
 var testCatalogSpec = hubv1alpha1.CatalogSpec{
 	CustomDomains: []string{"foo.example.com", "bar.example.com"},
+	Description:   "My awesome catalog",
 	Services: []hubv1alpha1.CatalogService{
 		{
 			Name:       "whoami",
@@ -79,6 +80,7 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 	}
 	wantCreateReq := &platform.CreateCatalogReq{
 		Name:          catalogName,
+		Description:   testCatalogSpec.Description,
 		Services:      testCatalogSpec.Services,
 		CustomDomains: testCatalogSpec.CustomDomains,
 	}
@@ -221,6 +223,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: catalogName},
 		Spec: hubv1alpha1.CatalogSpec{
+			Description:   "My updated catalog",
 			CustomDomains: []string{"foo.example.com"},
 			Services: []hubv1alpha1.CatalogService{
 				{
@@ -268,6 +271,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 	}
 	wantUpdateReq := &platform.UpdateCatalogReq{
 		CustomDomains:   newCatalog.Spec.CustomDomains,
+		Description:     newCatalog.Spec.Description,
 		DevPortalDomain: newCatalog.Status.DevPortalDomain,
 		Services:        newCatalog.Spec.Services,
 	}
@@ -281,6 +285,7 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Version:         "version-4",
 		Domain:          "majestic-beaver-123.hub-traefik.io",
 		CustomDomains:   wantCustomDomains,
+		Description:     "my updated catalog",
 		DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
 		Services:        newCatalog.Spec.Services,
 		CreatedAt:       time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),

@@ -161,6 +161,7 @@ linters:
     - ireturn
     - contextcheck
     - errchkjson
+    - musttag
 
 issues:
   exclude-use-default: false
