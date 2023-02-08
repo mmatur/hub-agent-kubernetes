@@ -48,7 +48,13 @@ func TestWatcher_OnAdd(t *testing.T) {
 	t.Cleanup(cancel)
 
 	go watcher.Run(ctx)
-	watcher.OnAdd(createCatalog("my-catalog", srv.URL))
+	catalog := createCatalog("my-catalog", srv.URL)
+	catalog.Status.Services = append(catalog.Status.Services, hubv1alpha1.CatalogServiceStatus{
+		Name:           "svc",
+		Namespace:      "ns",
+		OpenAPISpecURL: srv.URL,
+	})
+	watcher.OnAdd(catalog)
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -141,11 +147,24 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	catalog.Spec.Services = append(catalog.Spec.Services, hubv1alpha1.CatalogService{
-		Name:           "svc2",
-		Namespace:      "ns",
-		Port:           80,
-		OpenAPISpecURL: srv.URL,
+		Name:      "svc2",
+		Namespace: "ns",
+		Port:      80,
 	})
+
+	serviceStatuses := []hubv1alpha1.CatalogServiceStatus{
+		{
+			Name:           "svc",
+			Namespace:      "ns",
+			OpenAPISpecURL: srv.URL,
+		},
+		{
+			Name:           "svc2",
+			Namespace:      "ns",
+			OpenAPISpecURL: srv.URL,
+		},
+	}
+	catalog.Status.Services = append(catalog.Status.Services, serviceStatuses...)
 
 	watcher.OnUpdate(nil, catalog)
 
@@ -171,7 +190,7 @@ func TestWatcher_OnUpdate(t *testing.T) {
 			body:   oasSpec,
 		},
 		{
-			desc:   "get Open API spec",
+			desc:   "get Open API spec with url from status",
 			path:   "/my-catalog/services/svc2@ns",
 			status: http.StatusOK,
 			body:   oasSpec,
