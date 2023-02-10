@@ -20,7 +20,6 @@ package admission
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -28,7 +27,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -84,10 +82,6 @@ func (h ACPHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	patches, err := h.review(ctx, ar.Request)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
-
-		if errors.Is(err, platform.ErrVersionConflict) {
-			err = errors.New("platform conflict: a more recent version of this resource is available")
-		}
 
 		ar.Response = &admv1.AdmissionResponse{
 			Allowed: false,

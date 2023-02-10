@@ -42,9 +42,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 )
 
-// ErrVersionConflict indicates a conflict error on the EdgeIngress resource being modified.
-var ErrVersionConflict = errors.New("version conflict")
-
 // APIError represents an error returned by the API.
 type APIError struct {
 	StatusCode int
@@ -472,8 +469,6 @@ func (c *Client) CreateEdgeIngress(ctx context.Context, createReq *CreateEdgeIng
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusCreated:
 		var edgeIng edgeingress.EdgeIngress
 
@@ -522,8 +517,6 @@ func (c *Client) UpdateEdgeIngress(ctx context.Context, namespace, name, lastKno
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusOK:
 		var edgeIng edgeingress.EdgeIngress
 
@@ -568,8 +561,6 @@ func (c *Client) DeleteEdgeIngress(ctx context.Context, namespace, name, lastKno
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return ErrVersionConflict
 	case http.StatusNoContent:
 		return nil
 	default:
@@ -615,8 +606,6 @@ func (c *Client) CreateACP(ctx context.Context, policy *hubv1alpha1.AccessContro
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusCreated:
 		var a acp.ACP
 		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
@@ -668,8 +657,6 @@ func (c *Client) UpdateACP(ctx context.Context, oldVersion string, policy *hubv1
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusOK:
 		var a acp.ACP
 		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
@@ -712,8 +699,6 @@ func (c *Client) DeleteACP(ctx context.Context, oldVersion, name string) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return ErrVersionConflict
 	case http.StatusNoContent:
 		return nil
 	default:
@@ -755,8 +740,6 @@ func (c *Client) CreateCatalog(ctx context.Context, createReq *CreateCatalogReq)
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusCreated:
 		var c catalog.Catalog
 
@@ -844,8 +827,6 @@ func (c *Client) UpdateCatalog(ctx context.Context, name, lastKnownVersion strin
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return nil, ErrVersionConflict
 	case http.StatusOK:
 		var c catalog.Catalog
 
@@ -888,8 +869,6 @@ func (c *Client) DeleteCatalog(ctx context.Context, name, lastKnownVersion strin
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case http.StatusConflict:
-		return ErrVersionConflict
 	case http.StatusNoContent:
 		return nil
 	default:

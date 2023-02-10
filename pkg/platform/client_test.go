@@ -353,7 +353,7 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 			},
 		},
 		{
-			desc: "conflict",
+			desc: "error",
 			createReq: &CreateEdgeIngressReq{
 				Name:      "name",
 				Namespace: "namespace",
@@ -366,7 +366,7 @@ func TestClient_CreateEdgeIngress(t *testing.T) {
 				},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -455,14 +455,14 @@ func TestClient_UpdateEdgeIngress(t *testing.T) {
 			},
 		},
 		{
-			desc:    "conflict",
+			desc:    "error",
 			version: "version-1",
 			updateReq: &UpdateEdgeIngressReq{
 				Service: Service{Name: "service-name", Port: 8080},
 				ACP:     &ACP{Name: "acp-name"},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -539,12 +539,12 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 			wantErr:          assert.NoError,
 		},
 		{
-			desc:             "conflict",
+			desc:             "error",
 			version:          "version-1",
 			name:             "name",
 			namespace:        "namespace",
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -698,7 +698,7 @@ func TestClient_CreateCatalog(t *testing.T) {
 			},
 		},
 		{
-			desc: "conflict",
+			desc: "error",
 			createReq: &CreateCatalogReq{
 				Name: "name",
 				Services: []catalog.Service{
@@ -711,7 +711,7 @@ func TestClient_CreateCatalog(t *testing.T) {
 				},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -812,7 +812,7 @@ func TestClient_UpdateCatalog(t *testing.T) {
 			},
 		},
 		{
-			desc:    "conflict",
+			desc:    "error",
 			version: "version-1",
 			name:    "name",
 			updateReq: &UpdateCatalogReq{
@@ -826,7 +826,7 @@ func TestClient_UpdateCatalog(t *testing.T) {
 				},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -900,11 +900,11 @@ func TestClient_DeleteCatalog(t *testing.T) {
 			wantErr:          assert.NoError,
 		},
 		{
-			desc:             "conflict",
+			desc:             "error",
 			version:          "version-1",
 			name:             "name",
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -986,7 +986,7 @@ func TestClient_CreateACP(t *testing.T) {
 			},
 		},
 		{
-			desc: "conflict",
+			desc: "error",
 			policy: &hubv1alpha1.AccessControlPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "name",
@@ -999,7 +999,7 @@ func TestClient_CreateACP(t *testing.T) {
 				},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -1105,7 +1105,7 @@ func TestClient_UpdateACP(t *testing.T) {
 				},
 			},
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -1186,11 +1186,11 @@ func TestClient_DeleteACP(t *testing.T) {
 			wantErr:          assert.NoError,
 		},
 		{
-			desc:             "conflict",
+			desc:             "error",
 			name:             "name",
 			namespace:        "namespace",
 			returnStatusCode: http.StatusConflict,
-			wantErr:          assertErrorIs(ErrVersionConflict),
+			wantErr:          assert.Error,
 		},
 	}
 
@@ -1287,12 +1287,6 @@ func TestClient_GetEdgeIngresses(t *testing.T) {
 
 	require.Equal(t, 1, callCount)
 	assert.Equal(t, wantEdgeIngresses, gotEdgeIngresses)
-}
-
-func assertErrorIs(wantErr error) assert.ErrorAssertionFunc {
-	return func(t assert.TestingT, err error, i ...interface{}) bool {
-		return assert.ErrorIs(t, err, wantErr, i...)
-	}
 }
 
 func TestClient_GetCertificate(t *testing.T) {

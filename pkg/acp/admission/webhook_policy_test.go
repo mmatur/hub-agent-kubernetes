@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,7 +31,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +112,7 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 
 	// Conflict version scenario.
-	client.OnCreateACP(policyCreate).TypedReturns(nil, platform.ErrVersionConflict).Once()
+	client.OnCreateACP(policyCreate).TypedReturns(nil, errors.New("BOOM")).Once()
 
 	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestWebhookPolicy_ServeHTTP_Create(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "create ACP: BOOM",
 		},
 	}
 
@@ -228,7 +228,7 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 
 	// Conflict version scenario.
-	client.OnUpdateACP("oldVersion", policyUpdate).TypedReturns(nil, platform.ErrVersionConflict).Once()
+	client.OnUpdateACP("oldVersion", policyUpdate).TypedReturns(nil, errors.New("BOOM")).Once()
 
 	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestWebhookPolicy_ServeHTTP_Update(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "update ACP: BOOM",
 		},
 	}
 
@@ -278,7 +278,7 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 				t.Helper()
 
 				client := newBackendMock(t)
-				client.OnDeleteACP("oldVersion", "acp").TypedReturns(platform.ErrVersionConflict).Once()
+				client.OnDeleteACP("oldVersion", "acp").TypedReturns(errors.New("BOOM")).Once()
 
 				return client
 			},
@@ -287,7 +287,7 @@ func TestWebhookPolicy_ServeHTTP_Delete(t *testing.T) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Status:  "Failure",
-					Message: "platform conflict: a more recent version of this resource is available",
+					Message: "delete: BOOM",
 				},
 			},
 		},

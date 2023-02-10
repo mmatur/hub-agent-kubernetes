@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -179,7 +180,7 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnCreateCatalogRaw(mock.Anything).TypedReturns(nil, platform.ErrVersionConflict).Once()
+	client.OnCreateCatalogRaw(mock.Anything).TypedReturns(nil, errors.New("BOOM")).Once()
 
 	oasRegistry := newOasRegistryMock(t)
 
@@ -201,7 +202,7 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "create catalog: BOOM",
 		},
 	}
 
@@ -401,7 +402,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 
 	client := newPlatformClientMock(t)
 	client.OnUpdateCatalogRaw(mock.Anything, mock.Anything, mock.Anything).
-		TypedReturns(nil, platform.ErrVersionConflict).Once()
+		TypedReturns(nil, errors.New("BOOM")).Once()
 
 	oasRegistry := newOasRegistryMock(t)
 
@@ -423,7 +424,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "update catalog: BOOM",
 		},
 	}
 
@@ -525,7 +526,7 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnDeleteCatalogRaw(mock.Anything, mock.Anything).TypedReturns(platform.ErrVersionConflict).Once()
+	client.OnDeleteCatalogRaw(mock.Anything, mock.Anything).TypedReturns(errors.New("BOOM")).Once()
 
 	oasRegistry := newOasRegistryMock(t)
 
@@ -547,7 +548,7 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "delete catalog: BOOM",
 		},
 	}
 

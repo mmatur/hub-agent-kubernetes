@@ -20,7 +20,6 @@ package admission
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -86,10 +85,6 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	patches, err := h.review(ctx, ar.Request)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Unable to handle admission request")
-
-		if errors.Is(err, platform.ErrVersionConflict) {
-			err = errors.New("platform conflict: a more recent version of this resource is available")
-		}
 
 		setReviewErrorResponse(&ar, err)
 	} else {

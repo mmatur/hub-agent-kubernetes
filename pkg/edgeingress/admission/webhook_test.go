@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -180,7 +181,7 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 	}
 
 	client := newBackendMock(t)
-	client.OnCreateEdgeIngressRaw(mock.Anything).TypedReturns(nil, platform.ErrVersionConflict).Once()
+	client.OnCreateEdgeIngressRaw(mock.Anything).TypedReturns(nil, errors.New("BOOM")).Once()
 
 	h := NewHandler(client)
 
@@ -200,7 +201,7 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "create edge ingress: BOOM",
 		},
 	}
 
@@ -418,7 +419,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 
 	client := newBackendMock(t)
 	client.OnUpdateEdgeIngressRaw(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		TypedReturns(nil, platform.ErrVersionConflict).Once()
+		TypedReturns(nil, errors.New("BOOM")).Once()
 
 	h := NewHandler(client)
 
@@ -438,7 +439,7 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "update edge ingress: BOOM",
 		},
 	}
 
@@ -570,7 +571,7 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 
 	client := newBackendMock(t)
 	client.OnDeleteEdgeIngressRaw(mock.Anything, mock.Anything, mock.Anything).
-		TypedReturns(platform.ErrVersionConflict).Once()
+		TypedReturns(errors.New("BOOM")).Once()
 
 	h := NewHandler(client)
 
@@ -590,7 +591,7 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "platform conflict: a more recent version of this resource is available",
+			Message: "delete edge ingress: BOOM",
 		},
 	}
 
