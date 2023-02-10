@@ -269,3 +269,8 @@ issues:
     # Reducing complexity would reduce readability.
     - path: pkg/acp/apikey/api_key.go
       text: "(.*) has complex nested blocks \\(complexity: 5\\)"
+    - path: portal/embed.go
+      linters:
+        - gochecknoglobals
+    - path: portal/embed.go
+      text: "pattern dist: no matching files found"

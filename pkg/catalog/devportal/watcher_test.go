@@ -37,12 +37,13 @@ func TestWatcher_OnAdd(t *testing.T) {
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := rw.Write(oasSpec)
-		require.NoError(t, err)
+		_, writeErr := rw.Write(oasSpec)
+		require.NoError(t, writeErr)
 	}))
 
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
@@ -67,20 +68,20 @@ func TestWatcher_OnAdd(t *testing.T) {
 	}{
 		{
 			desc:   "list services",
-			path:   "/my-catalog/services",
+			path:   "/api/my-catalog/services",
 			status: http.StatusOK,
 			// json lib add a new line in the end.
 			body: []byte("[\"svc@ns\"]\n"),
 		},
 		{
 			desc:   "get Open API spec",
-			path:   "/my-catalog/services/svc@ns",
+			path:   "/api/my-catalog/services/svc@ns",
 			status: http.StatusOK,
 			body:   oasSpec,
 		},
 		{
 			desc:   "not found",
-			path:   "/my-catalog/services/unknown@ns",
+			path:   "/api/my-catalog/services/unknown@ns",
 			status: http.StatusNotFound,
 			body:   []byte{},
 		},
@@ -129,12 +130,13 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := rw.Write(oasSpec)
-		require.NoError(t, err)
+		_, writeErr := rw.Write(oasSpec)
+		require.NoError(t, writeErr)
 	}))
 
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
@@ -179,25 +181,25 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}{
 		{
 			desc:   "list services",
-			path:   "/my-catalog/services",
+			path:   "/api/my-catalog/services",
 			status: http.StatusOK,
 			body:   []byte("[\"svc@ns\",\"svc2@ns\"]\n"),
 		},
 		{
 			desc:   "get Open API spec",
-			path:   "/my-catalog/services/svc@ns",
+			path:   "/api/my-catalog/services/svc@ns",
 			status: http.StatusOK,
 			body:   oasSpec,
 		},
 		{
 			desc:   "get Open API spec with url from status",
-			path:   "/my-catalog/services/svc2@ns",
+			path:   "/api/my-catalog/services/svc2@ns",
 			status: http.StatusOK,
 			body:   oasSpec,
 		},
 		{
 			desc:   "not found",
-			path:   "/my-catalog/services/unknown@ns",
+			path:   "/api/my-catalog/services/unknown@ns",
 			status: http.StatusNotFound,
 			body:   []byte{},
 		},
@@ -227,12 +229,13 @@ func TestWatcher_OnDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := rw.Write(oasSpec)
-		require.NoError(t, err)
+		_, writeErr := rw.Write(oasSpec)
+		require.NoError(t, writeErr)
 	}))
 
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher)
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"sync"
@@ -32,6 +33,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/portal"
 )
 
 // NOTE: if we use the same watcher for all resources, then we need to restart it when new CRDs are
@@ -42,29 +44,39 @@ import (
 
 // Watcher watches access control policy resources and builds configurations out of them.
 type Watcher struct {
-	catalogsMu sync.RWMutex
-	catalogs   map[string]catalog.Catalog
-	previous   uint64
+	catalogsMu   sync.RWMutex
+	catalogs     map[string]catalog.Catalog
+	hostCatalogs map[string]*catalog.Catalog
+	previous     uint64
 
 	refresh chan struct{}
 
 	switcher   *HTTPHandlerSwitcher
 	httpClient *http.Client
+
+	indexTemplate *template.Template
 }
 
 // NewWatcher returns a new watcher to track Catalog resources. It calls the given Updater when a Catalog is modified at most
 // once every throttle.
-func NewWatcher(switcher *HTTPHandlerSwitcher) *Watcher {
+func NewWatcher(switcher *HTTPHandlerSwitcher) (*Watcher, error) {
 	client := retryablehttp.NewClient()
 	client.RetryMax = 4
 	client.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "watcher_catalog_client").Logger())
 
-	return &Watcher{
-		catalogs:   make(map[string]catalog.Catalog),
-		refresh:    make(chan struct{}, 1),
-		switcher:   switcher,
-		httpClient: client.StandardClient(),
+	indexTemplate, err := template.ParseFS(portal.WebUI, "index.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse index.html template: %w", err)
 	}
+
+	return &Watcher{
+		catalogs:      make(map[string]catalog.Catalog),
+		hostCatalogs:  make(map[string]*catalog.Catalog),
+		refresh:       make(chan struct{}, 1),
+		switcher:      switcher,
+		httpClient:    client.StandardClient(),
+		indexTemplate: indexTemplate,
+	}, nil
 }
 
 // Run launches listener if the watcher is dirty.
@@ -141,9 +153,7 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 func (w *Watcher) OnDelete(obj interface{}) {
 	switch v := obj.(type) {
 	case *hubv1alpha1.Catalog:
-		w.catalogsMu.Lock()
-		delete(w.catalogs, v.ObjectMeta.Name)
-		w.catalogsMu.Unlock()
+		w.deleteCatalog(v.Name)
 
 	default:
 		log.Error().
@@ -182,11 +192,32 @@ func (w *Watcher) updateCatalogsFromCRD(c *hubv1alpha1.Catalog) {
 
 		services = append(services, svc)
 	}
-	w.catalogs[c.Name] = catalog.Catalog{
-		Name:          c.Name,
-		Services:      services,
-		CustomDomains: verifiedCustomDomains,
+
+	devPortalDomain := c.Status.DevPortalDomain
+
+	cc := catalog.Catalog{
+		Name:            c.Name,
+		Description:     c.Spec.Description,
+		Services:        services,
+		CustomDomains:   verifiedCustomDomains,
+		DevPortalDomain: devPortalDomain,
 	}
+
+	w.catalogs[c.Name] = cc
+	w.hostCatalogs[devPortalDomain] = &cc
+}
+
+func (w *Watcher) deleteCatalog(name string) {
+	w.catalogsMu.Lock()
+	defer w.catalogsMu.Unlock()
+
+	c, ok := w.catalogs[name]
+	if !ok {
+		return
+	}
+
+	delete(w.hostCatalogs, c.DevPortalDomain)
+	delete(w.catalogs, c.Name)
 }
 
 func (w *Watcher) buildRoutes() http.Handler {
@@ -196,10 +227,42 @@ func (w *Watcher) buildRoutes() http.Handler {
 	router := chi.NewRouter()
 	for name, cfg := range w.catalogs {
 		cfg := cfg
-		path := "/" + name
+		path := "/api/" + name
 
 		router.Mount(path, w.buildRoute(name, &cfg))
 	}
+
+	router.Get("/", func(rw http.ResponseWriter, req *http.Request) {
+		w.catalogsMu.RLock()
+		c, ok := w.hostCatalogs[req.Host]
+		w.catalogsMu.RUnlock()
+
+		if !ok {
+			log.Debug().Str("host", req.Host).Msg("Catalog not found")
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		data := struct {
+			Name        string
+			Description string
+		}{
+			Name:        c.Name,
+			Description: c.Description,
+		}
+
+		if err := w.indexTemplate.Execute(rw, data); err != nil {
+			log.Error().Err(err).
+				Str("host", req.Host).
+				Str("catalog_name", data.Name).
+				Msg("Unable to execute index template")
+
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	})
+
+	router.Method(http.MethodGet, "/*", http.FileServer(http.FS(portal.WebUI)))
 
 	return router
 }

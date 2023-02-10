@@ -1,6 +1,27 @@
 # syntax=docker/dockerfile:1.2
+# Portal UI dependencies
+FROM node:18-alpine AS portal-ui-deps
+
+WORKDIR /app
+
+COPY portal/package.json portal/yarn.lock ./
+
+ENV NODE_ENV=production
+RUN yarn install --frozen-lockfile --production
+
+# Portal UI build
+FROM node:18-alpine AS portal-ui-builder
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+COPY --from=portal-ui-deps /app/node_modules ./node_modules
+COPY portal .
+
+RUN NODE_OPTIONS=--max-old-space-size=2048 yarn build
+
 # Go mod
-FROM --platform=$BUILDPLATFORM golang:1.19-alpine as gomod
+FROM --platform=$BUILDPLATFORM golang:1.19-alpine AS gomod
 
 WORKDIR /go/src/github.com/traefik/hub-agent-kubernetes
 
@@ -10,7 +31,7 @@ COPY go.sum .
 RUN go mod download
 
 # Go build
-FROM --platform=$BUILDPLATFORM golang:1.19-alpine as gobuild
+FROM --platform=$BUILDPLATFORM golang:1.19-alpine AS gobuild
 
 WORKDIR /go/src/github.com/traefik/hub-agent-kubernetes
 
@@ -19,6 +40,7 @@ RUN apk --update upgrade \
     && update-ca-certificates
 
 COPY --from=gomod /go/pkg/ /go/pkg/
+COPY --from=portal-ui-builder /app/dist ./portal/dist
 COPY . .
 
 ARG TARGETPLATFORM

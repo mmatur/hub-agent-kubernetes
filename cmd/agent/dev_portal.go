@@ -82,7 +82,10 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 	}
 
 	switcher := devportal.NewHandlerSwitcher()
-	catalogWatcher := devportal.NewWatcher(switcher)
+	catalogWatcher, err := devportal.NewWatcher(switcher)
+	if err != nil {
+		return fmt.Errorf("create portal watcher: %w", err)
+	}
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 	if _, errInformer := hubInformer.Hub().V1alpha1().Catalogs().Informer().AddEventHandler(catalogWatcher); errInformer != nil {

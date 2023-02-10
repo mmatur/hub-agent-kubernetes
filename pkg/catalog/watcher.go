@@ -204,7 +204,7 @@ func (w *Watcher) setupCertificates(ctx context.Context, catalog *hubv1alpha1.Ca
 		}
 	}
 
-	if len(catalog.Spec.CustomDomains) == 0 {
+	if len(catalog.Status.CustomDomains) == 0 {
 		return nil
 	}
 
