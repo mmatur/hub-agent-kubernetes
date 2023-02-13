@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY package.json yarn.lock ./
 
-RUN yarn install
+RUN yarn install --frozen-lockfile --production
 
 # Portal UI build
 FROM node:18-alpine AS portal-ui-builder

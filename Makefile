@@ -14,7 +14,7 @@ DOCKER_BUILD_PLATFORMS ?= linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
 DOCKER_IMAGE_TAG ?= $(if $(TAG_NAME),$(TAG_NAME),latest)
 OUTPUT := $(if $(OUTPUT),$(OUTPUT),$(BIN_NAME))
 
-default: clean lint test build
+default: clean build-portal lint test build
 
 lint:
 	golangci-lint run
@@ -22,10 +22,10 @@ lint:
 clean:
 	rm -rf cover.out
 
-test: clean build-portal
+test: clean
 	go test -v -race -cover ./...
 
-build: clean build-portal
+build: clean
 	@echo Version: $(VERSION) $(BUILD_DATE)
 	CGO_ENABLED=0 go build -v -trimpath -ldflags '-X "github.com/traefik/hub-agent-kubernetes/pkg/version.date=${BUILD_DATE}" -X "github.com/traefik/hub-agent-kubernetes/pkg/version.version=${VERSION}" -X "github.com/traefik/hub-agent-kubernetes/pkg/version.commit=${SHA}"' -o ${OUTPUT} ${MAIN_DIRECTORY}
 
