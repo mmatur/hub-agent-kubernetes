@@ -13,6 +13,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "default-catalog-1680030486-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -46,6 +47,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "my-ns-catalog-1680030486-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:

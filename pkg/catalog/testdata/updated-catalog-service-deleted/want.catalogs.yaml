@@ -29,4 +29,3 @@ status:
     - name: whoami-2
       namespace: default
       openApiSpecUrl: "http://whoami-2.default.svc:8080/spec.json"
-

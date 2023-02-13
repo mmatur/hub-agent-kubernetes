@@ -299,7 +299,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	go ingressUpdater.Run(ctx)
 	go edgeIngressWatcher.Run(ctx)
 	if catalogAvailable {
-		catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, catalogWatcherCfg)
+		catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, catalogWatcherCfg)
 		go catalogWatcher.Run(ctx)
 	}
 

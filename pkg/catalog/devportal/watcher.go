@@ -353,8 +353,8 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 
 		overrideServersAndSecurity(&oas, c)
 
-		rw.WriteHeader(http.StatusOK)
 		rw.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+		rw.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(rw).Encode(oas); err != nil {
 			log.Error().Err(err).
 				Str("catalog_name", name).

@@ -28,8 +28,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -60,14 +62,16 @@ func Test_WatcherRun(t *testing.T) {
 		desc            string
 		platformCatalog Catalog
 
-		clusterCatalogs  string
-		clusterIngresses string
-		clusterSecrets   string
+		clusterCatalogs    string
+		clusterIngresses   string
+		clusterSecrets     string
+		clusterMiddlewares string
 
 		wantCatalogs      string
 		wantIngresses     string
 		wantEdgeIngresses string
 		wantSecrets       string
+		wantMiddlewares   string
 	}{
 		{
 			desc: "new catalog present on the platform needs to be created on the cluster",
@@ -90,6 +94,7 @@ func Test_WatcherRun(t *testing.T) {
 			wantIngresses:     "testdata/new-catalog/want.ingresses.yaml",
 			wantEdgeIngresses: "testdata/new-catalog/want.edge-ingresses.yaml",
 			wantSecrets:       "testdata/new-catalog/want.secrets.yaml",
+			wantMiddlewares:   "testdata/new-catalog/want.middlewares.yaml",
 		},
 		{
 			desc: "a catalog has been updated on the platform: last service from a namespace deleted",
@@ -105,13 +110,15 @@ func Test_WatcherRun(t *testing.T) {
 					{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "default", Port: 8080},
 				},
 			},
-			clusterCatalogs:   "testdata/updated-catalog-service-deleted/catalogs.yaml",
-			clusterIngresses:  "testdata/updated-catalog-service-deleted/ingresses.yaml",
-			clusterSecrets:    "testdata/updated-catalog-service-deleted/secrets.yaml",
-			wantCatalogs:      "testdata/updated-catalog-service-deleted/want.catalogs.yaml",
-			wantEdgeIngresses: "testdata/updated-catalog-service-deleted/want.edge-ingresses.yaml",
-			wantIngresses:     "testdata/updated-catalog-service-deleted/want.ingresses.yaml",
-			wantSecrets:       "testdata/updated-catalog-service-deleted/want.secrets.yaml",
+			clusterCatalogs:    "testdata/updated-catalog-service-deleted/catalogs.yaml",
+			clusterIngresses:   "testdata/updated-catalog-service-deleted/ingresses.yaml",
+			clusterSecrets:     "testdata/updated-catalog-service-deleted/secrets.yaml",
+			clusterMiddlewares: "testdata/updated-catalog-service-deleted/middlewares.yaml",
+			wantCatalogs:       "testdata/updated-catalog-service-deleted/want.catalogs.yaml",
+			wantEdgeIngresses:  "testdata/updated-catalog-service-deleted/want.edge-ingresses.yaml",
+			wantIngresses:      "testdata/updated-catalog-service-deleted/want.ingresses.yaml",
+			wantSecrets:        "testdata/updated-catalog-service-deleted/want.secrets.yaml",
+			wantMiddlewares:    "testdata/updated-catalog-service-deleted/want.middlewares.yaml",
 		},
 		{
 			desc: "a catalog has been updated on the platform: new service in new namespace added",
@@ -124,13 +131,15 @@ func Test_WatcherRun(t *testing.T) {
 					{PathPrefix: "/whoami-2", Name: "whoami-2", Namespace: "my-ns", Port: 8080},
 				},
 			},
-			clusterCatalogs:   "testdata/updated-catalog-service-added/catalogs.yaml",
-			clusterIngresses:  "testdata/updated-catalog-service-added/ingresses.yaml",
-			clusterSecrets:    "testdata/updated-catalog-service-added/secrets.yaml",
-			wantCatalogs:      "testdata/updated-catalog-service-added/want.catalogs.yaml",
-			wantEdgeIngresses: "testdata/updated-catalog-service-added/want.edge-ingresses.yaml",
-			wantIngresses:     "testdata/updated-catalog-service-added/want.ingresses.yaml",
-			wantSecrets:       "testdata/updated-catalog-service-added/want.secrets.yaml",
+			clusterCatalogs:    "testdata/updated-catalog-service-added/catalogs.yaml",
+			clusterIngresses:   "testdata/updated-catalog-service-added/ingresses.yaml",
+			clusterSecrets:     "testdata/updated-catalog-service-added/secrets.yaml",
+			clusterMiddlewares: "testdata/updated-catalog-service-added/middlewares.yaml",
+			wantCatalogs:       "testdata/updated-catalog-service-added/want.catalogs.yaml",
+			wantEdgeIngresses:  "testdata/updated-catalog-service-added/want.edge-ingresses.yaml",
+			wantIngresses:      "testdata/updated-catalog-service-added/want.ingresses.yaml",
+			wantSecrets:        "testdata/updated-catalog-service-added/want.secrets.yaml",
+			wantMiddlewares:    "testdata/updated-catalog-service-added/want.middlewares.yaml",
 		},
 	}
 
@@ -142,10 +151,12 @@ func Test_WatcherRun(t *testing.T) {
 			wantIngresses := loadFixtures[netv1.Ingress](t, test.wantIngresses)
 			wantEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.wantEdgeIngresses)
 			wantSecrets := loadFixtures[corev1.Secret](t, test.wantSecrets)
+			wantMiddlewares := loadFixtures[traefikv1alpha1.Middleware](t, test.wantMiddlewares)
 
 			clusterCatalogs := loadFixtures[hubv1alpha1.Catalog](t, test.clusterCatalogs)
 			clusterIngresses := loadFixtures[netv1.Ingress](t, test.clusterIngresses)
 			clusterSecrets := loadFixtures[corev1.Secret](t, test.clusterSecrets)
+			clusterMiddlewares := loadFixtures[traefikv1alpha1.Middleware](t, test.clusterMiddlewares)
 
 			var kubeObjects []runtime.Object
 			kubeObjects = append(kubeObjects, services...)
@@ -161,8 +172,14 @@ func Test_WatcherRun(t *testing.T) {
 				hubObjects = append(hubObjects, clusterCatalog.DeepCopy())
 			}
 
+			var traefikObjects []runtime.Object
+			for _, clusterMiddleware := range clusterMiddlewares {
+				traefikObjects = append(traefikObjects, clusterMiddleware.DeepCopy())
+			}
+
 			kubeClientSet := kubemock.NewSimpleClientset(kubeObjects...)
 			hubClientSet := hubkubemock.NewSimpleClientset(hubObjects...)
+			traefikClientSet := traefikkubemock.NewSimpleClientset(traefikObjects...)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -223,7 +240,7 @@ func Test_WatcherRun(t *testing.T) {
 				TypedReturns("").
 				Maybe()
 
-			w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, &WatcherConfig{
+			w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
 				IngressClassName:         "ingress-class",
 				AgentNamespace:           "agent-ns",
 				TraefikCatalogEntryPoint: "catalog-entrypoint",
@@ -247,6 +264,7 @@ func Test_WatcherRun(t *testing.T) {
 			assertEdgeIngressesMatches(t, hubClientSet, "agent-ns", wantEdgeIngresses)
 			assertSecretsMatches(t, kubeClientSet, namespaces, wantSecrets)
 			assertIngressesMatches(t, kubeClientSet, namespaces, wantIngresses)
+			assertMiddlewaresMatches(t, traefikClientSet, namespaces, wantMiddlewares)
 		})
 	}
 }
@@ -320,6 +338,23 @@ func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, nam
 	assert.ElementsMatch(t, want, ingresses)
 }
 
+func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Clientset, namespaces []string, want []traefikv1alpha1.Middleware) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var middlewares []traefikv1alpha1.Middleware
+	for _, namespace := range namespaces {
+		namespaceMiddlewareList, err := traefikClientSet.TraefikV1alpha1().Middlewares(namespace).List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+
+		middlewares = append(middlewares, namespaceMiddlewareList.Items...)
+	}
+
+	assert.ElementsMatch(t, want, middlewares)
+}
+
 func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
 	kubeClientSet := kubemock.NewSimpleClientset()
 	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 0)
@@ -336,6 +371,8 @@ func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
 
 	kubeInformer.Start(ctx.Done())
 	kubeInformer.WaitForCacheSync(ctx.Done())
+
+	traefikClientSet := traefikkubemock.NewSimpleClientset()
 
 	client := newPlatformClientMock(t)
 
@@ -358,7 +395,7 @@ func TestWatcher_Run_OASRegistryUpdated(t *testing.T) {
 	oasRegistry := newOasRegistryMock(t)
 	oasRegistry.OnUpdated().TypedReturns(oasCh)
 
-	w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, &WatcherConfig{
+	w := NewWatcher(client, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
 		IngressClassName:         "ingress-class",
 		TraefikCatalogEntryPoint: "entrypoint",
 		// Very high interval to prevent the ticker from firing.

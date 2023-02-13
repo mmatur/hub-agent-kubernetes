@@ -22,14 +22,17 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -90,10 +93,12 @@ type Watcher struct {
 
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformer.SharedInformerFactory
+
+	traefikClientSet v1alpha1.TraefikV1alpha1Interface
 }
 
 // NewWatcher returns a new Watcher.
-func NewWatcher(client PlatformClient, oasRegistry OASRegistry, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config *WatcherConfig) *Watcher {
+func NewWatcher(client PlatformClient, oasRegistry OASRegistry, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherConfig) *Watcher {
 	return &Watcher{
 		config: config,
 
@@ -105,6 +110,8 @@ func NewWatcher(client PlatformClient, oasRegistry OASRegistry, kubeClientSet cl
 
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
+
+		traefikClientSet: traefikClientSet,
 	}
 }
 
@@ -516,7 +523,12 @@ func (w *Watcher) upsertIngresses(ctx context.Context, catalog *hubv1alpha1.Cata
 	}
 
 	for namespace, services := range servicesByNamespace {
-		ingress, err := w.buildHubDomainIngress(namespace, catalog, services)
+		traefikMiddlewareName, err := w.setupStripPrefixMiddleware(ctx, catalog, services, namespace)
+		if err != nil {
+			return fmt.Errorf("setup stripPrefix middleware: %w", err)
+		}
+
+		ingress, err := w.buildHubDomainIngress(namespace, catalog, services, traefikMiddlewareName)
 		if err != nil {
 			return fmt.Errorf("build ingress for hub domain and namespace %q: %w", namespace, err)
 		}
@@ -526,7 +538,7 @@ func (w *Watcher) upsertIngresses(ctx context.Context, catalog *hubv1alpha1.Cata
 		}
 
 		if len(catalog.Status.CustomDomains) != 0 {
-			ingress, err = w.buildCustomDomainsIngress(namespace, catalog, services)
+			ingress, err = w.buildCustomDomainsIngress(namespace, catalog, services, traefikMiddlewareName)
 			if err != nil {
 				return fmt.Errorf("build ingress for custom domains and namespace %q: %w", namespace, err)
 			}
@@ -538,6 +550,52 @@ func (w *Watcher) upsertIngresses(ctx context.Context, catalog *hubv1alpha1.Cata
 	}
 
 	return nil
+}
+
+func (w *Watcher) setupStripPrefixMiddleware(ctx context.Context, catalog *hubv1alpha1.Catalog, services []Service, namespace string) (string, error) {
+	name, err := getStripPrefixMiddlewareName(catalog.Name)
+	if err != nil {
+		return "", fmt.Errorf("get stripPrefix middleware name: %w", err)
+	}
+
+	existingMiddleware, existingErr := w.traefikClientSet.Middlewares(namespace).Get(ctx, name, metav1.GetOptions{})
+	if existingErr != nil && !kerror.IsNotFound(existingErr) {
+		return "", fmt.Errorf("get middleware: %w", existingErr)
+	}
+
+	middleware := newStripPrefixMiddleware(name, namespace, services)
+
+	traefikMiddlewareName, err := getTraefikStripPrefixMiddlewareName(namespace, catalog)
+	if err != nil {
+		return "", fmt.Errorf("get Traefik stripPrefix middleware name: %w", err)
+	}
+
+	if kerror.IsNotFound(existingErr) {
+		_, err = w.traefikClientSet.Middlewares(namespace).Create(ctx, &middleware, metav1.CreateOptions{})
+		if err != nil {
+			return "", fmt.Errorf("create middleware: %w", err)
+		}
+
+		log.Debug().
+			Str("name", name).
+			Str("namespace", namespace).
+			Msg("Middleware created")
+
+		return traefikMiddlewareName, nil
+	}
+
+	if middleware.Spec == existingMiddleware.Spec {
+		return traefikMiddlewareName, nil
+	}
+
+	existingMiddleware.Spec = middleware.Spec
+
+	_, err = w.traefikClientSet.Middlewares(existingMiddleware.Namespace).Update(ctx, existingMiddleware, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("update middleware: %w", err)
+	}
+
+	return traefikMiddlewareName, nil
 }
 
 func (w *Watcher) upsertIngress(ctx context.Context, ingress *netv1.Ingress) error {
@@ -605,6 +663,48 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, catalog *hubv1alpha1.Cat
 		}
 
 		if _, ok := catalogNamespaces[ingress.Namespace]; !ok {
+			err = w.kubeClientSet.CoreV1().
+				Secrets(ingress.Namespace).
+				Delete(ctx, ingress.Spec.TLS[0].SecretName, metav1.DeleteOptions{})
+
+			if err != nil {
+				log.Ctx(ctx).
+					Error().
+					Err(err).
+					Str("catalog", catalog.Name).
+					Str("secret_name", ingress.Spec.TLS[0].SecretName).
+					Str("secret_namespace", ingress.Namespace).
+					Msg("Unable to clean Catalog's child Secret")
+			}
+
+			middlewareName, err := getStripPrefixMiddlewareName(catalog.Name)
+			if err != nil {
+				log.Ctx(ctx).
+					Error().
+					Err(err).
+					Str("catalog", catalog.Name).
+					Str("middleware_namespace", ingress.Namespace).
+					Msg("Unable to get Catalog's child Middleware name")
+
+				continue
+			}
+
+			err = w.traefikClientSet.
+				Middlewares(ingress.Namespace).
+				Delete(ctx, middlewareName, metav1.DeleteOptions{})
+
+			if err != nil && !kerror.IsNotFound(err) {
+				log.Ctx(ctx).
+					Error().
+					Err(err).
+					Str("catalog", catalog.Name).
+					Str("middleware_name", middlewareName).
+					Str("middleware_namespace", ingress.Namespace).
+					Msg("Unable to clean Catalog's child Middleware")
+
+				continue
+			}
+
 			err = w.kubeClientSet.NetworkingV1().
 				Ingresses(ingress.Namespace).
 				Delete(ctx, ingress.Name, metav1.DeleteOptions{})
@@ -620,27 +720,13 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, catalog *hubv1alpha1.Cat
 
 				continue
 			}
-
-			err = w.kubeClientSet.CoreV1().
-				Secrets(ingress.Namespace).
-				Delete(ctx, ingress.Spec.TLS[0].SecretName, metav1.DeleteOptions{})
-
-			if err != nil {
-				log.Ctx(ctx).
-					Error().
-					Err(err).
-					Str("catalog", catalog.Name).
-					Str("secret_name", ingress.Spec.TLS[0].SecretName).
-					Str("secret_namespace", ingress.Namespace).
-					Msg("Unable to clean Catalog's child Secret")
-			}
 		}
 	}
 
 	return nil
 }
 
-func (w *Watcher) buildHubDomainIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) (*netv1.Ingress, error) {
+func (w *Watcher) buildHubDomainIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	name, err := getHubDomainIngressName(catalog.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get hub domain ingress name: %w", err)
@@ -651,12 +737,12 @@ func (w *Watcher) buildHubDomainIngress(namespace string, catalog *hubv1alpha1.C
 			APIVersion: "networking.k8s.io/v1",
 			Kind:       "Ingress",
 		},
-		ObjectMeta: w.buildIngressObjectMeta(namespace, name, catalog, w.config.TraefikTunnelEntryPoint),
+		ObjectMeta: w.buildIngressObjectMeta(namespace, name, catalog, w.config.TraefikTunnelEntryPoint, traefikMiddlewareName),
 		Spec:       w.buildIngressSpec([]string{catalog.Status.Domain}, services, hubDomainSecretName),
 	}, nil
 }
 
-func (w *Watcher) buildCustomDomainsIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService) (*netv1.Ingress, error) {
+func (w *Watcher) buildCustomDomainsIngress(namespace string, catalog *hubv1alpha1.Catalog, services []hubv1alpha1.CatalogService, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	ingressName, err := getCustomDomainsIngressName(catalog.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get custom domains ingress name: %w", err)
@@ -672,18 +758,19 @@ func (w *Watcher) buildCustomDomainsIngress(namespace string, catalog *hubv1alph
 			APIVersion: "networking.k8s.io/v1",
 			Kind:       "Ingress",
 		},
-		ObjectMeta: w.buildIngressObjectMeta(namespace, ingressName, catalog, w.config.TraefikCatalogEntryPoint),
+		ObjectMeta: w.buildIngressObjectMeta(namespace, ingressName, catalog, w.config.TraefikCatalogEntryPoint, traefikMiddlewareName),
 		Spec:       w.buildIngressSpec(catalog.Status.CustomDomains, services, secretName),
 	}, nil
 }
 
-func (w *Watcher) buildIngressObjectMeta(namespace, name string, catalog *hubv1alpha1.Catalog, entrypoint string) metav1.ObjectMeta {
+func (w *Watcher) buildIngressObjectMeta(namespace, name string, catalog *hubv1alpha1.Catalog, entrypoint, traefikMiddlewareName string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
 		Annotations: map[string]string{
 			"traefik.ingress.kubernetes.io/router.tls":         "true",
 			"traefik.ingress.kubernetes.io/router.entrypoints": entrypoint,
+			"traefik.ingress.kubernetes.io/router.middlewares": traefikMiddlewareName,
 		},
 		Labels: map[string]string{
 			"app.kubernetes.io/managed-by": "traefik-hub",
@@ -792,6 +879,54 @@ func getCustomDomainSecretName(catalogName string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s-%d", customDomainSecretNamePrefix, h), nil
+}
+
+func newStripPrefixMiddleware(name, namespace string, services []Service) traefikv1alpha1.Middleware {
+	var prefixes []string
+	for _, service := range services {
+		prefixes = append(prefixes, service.PathPrefix)
+	}
+	sort.Slice(prefixes, func(i, j int) bool {
+		return len(prefixes[i]) > len(prefixes[j])
+	})
+
+	return traefikv1alpha1.Middleware{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Middleware",
+			APIVersion: "traefik.containo.us/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: traefikv1alpha1.MiddlewareSpec{
+			StripPrefix: &traefikv1alpha1.StripPrefix{
+				Prefixes:   prefixes,
+				ForceSlash: false,
+			},
+		},
+	}
+}
+
+// getStripPrefixMiddlewareName compute the name of the stripPrefix middleware.
+// The name follow this format: {{catalog-name}-hash({catalog-name})-stripprefix}
+// This hash is here to reduce the chance of getting a collision on an existing secret while staying under
+// the limit of 63 characters.
+func getStripPrefixMiddlewareName(catalogName string) (string, error) {
+	h, err := hash(catalogName)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d-stripprefix", catalogName, h), nil
+}
+
+func getTraefikStripPrefixMiddlewareName(namespace string, catalog *hubv1alpha1.Catalog) (string, error) {
+	middlewareName, err := getStripPrefixMiddlewareName(catalog.Name)
+	if err != nil {
+		return "", fmt.Errorf("get stripPrefix middleware name: %w", err)
+	}
+	return fmt.Sprintf("%s-%s@kubernetescrd", namespace, middlewareName), nil
 }
 
 func hash(name string) (uint32, error) {

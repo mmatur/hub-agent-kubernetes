@@ -13,6 +13,8 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "default-new-catalog-4277033999-stripprefix@kubernetescrd"
+
 spec:
   ingressClassName: ingress-class
   rules:
@@ -54,6 +56,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "my-ns-new-catalog-4277033999-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -88,6 +91,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: catalog-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "default-new-catalog-4277033999-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -146,6 +150,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: catalog-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "my-ns-new-catalog-4277033999-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
