@@ -7,17 +7,15 @@
   },
   "servers": [
     {
-      "url": "/authentication",
-      "description": ""
-    },
-    {
-      "url": "/yolo",
-      "description": ""
-    },
+      "url": "https://localhost/api/v3"
+    }
   ],
   "paths": {
     "/users/{id}": {
+      "servers": [{"url":  "path-server.com"}],
       "get": {
+        "security": [{"secure": []}],
+        "servers": [{"url": "method-server.com"}],
         "operationId": "getUserItem",
         "tags": [
           "User"
@@ -375,7 +373,7 @@
             ]
           }
         }
-      },
+      }
     },
     "responses": {},
     "parameters": {},

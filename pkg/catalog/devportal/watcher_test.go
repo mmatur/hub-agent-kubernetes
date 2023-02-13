@@ -32,8 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const generatedDomain = "generated.hub.domain"
+
 func TestWatcher_OnAdd(t *testing.T) {
-	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read.yaml")
+	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read-before.json")
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -49,12 +51,14 @@ func TestWatcher_OnAdd(t *testing.T) {
 	t.Cleanup(cancel)
 
 	go watcher.Run(ctx)
-	catalog := createCatalog("my-catalog", srv.URL)
+	catalog := createCatalog(srv.URL)
 	catalog.Status.Services = append(catalog.Status.Services, hubv1alpha1.CatalogServiceStatus{
 		Name:           "svc",
 		Namespace:      "ns",
 		OpenAPISpecURL: srv.URL,
 	})
+	catalog.Status.Domain = generatedDomain
+
 	watcher.OnAdd(catalog)
 
 	time.Sleep(50 * time.Millisecond)
@@ -72,12 +76,6 @@ func TestWatcher_OnAdd(t *testing.T) {
 			status: http.StatusOK,
 			// json lib add a new line in the end.
 			body: []byte("[\"svc@ns\"]\n"),
-		},
-		{
-			desc:   "get Open API spec",
-			path:   "/api/my-catalog/services/svc@ns",
-			status: http.StatusOK,
-			body:   oasSpec,
 		},
 		{
 			desc:   "not found",
@@ -106,27 +104,85 @@ func TestWatcher_OnAdd(t *testing.T) {
 	}
 }
 
-func createCatalog(name, openAPISpecURL string) *hubv1alpha1.Catalog {
-	catalog := &hubv1alpha1.Catalog{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: hubv1alpha1.CatalogSpec{
-			Services: []hubv1alpha1.CatalogService{
-				{
-					Name:           "svc",
-					Namespace:      "ns",
-					Port:           80,
-					PathPrefix:     "",
-					OpenAPISpecURL: openAPISpecURL,
-				},
-			},
-			CustomDomains: nil,
-		},
-	}
-	return catalog
+func TestWatcher_OnAdd_getSpec(t *testing.T) {
+	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read-before.json")
+	require.NoError(t, err)
+
+	wantSpec, err := os.ReadFile("./fixtures/openapi-spec-read-after.json")
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		_, err = rw.Write(oasSpec)
+		require.NoError(t, err)
+	}))
+
+	switcher := NewHandlerSwitcher()
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	t.Cleanup(cancel)
+
+	go watcher.Run(ctx)
+	catalog := createCatalog(srv.URL)
+	catalog.Status.Services = append(catalog.Status.Services, hubv1alpha1.CatalogServiceStatus{
+		Name:           "svc",
+		Namespace:      "ns",
+		OpenAPISpecURL: srv.URL,
+	})
+	catalog.Status.Domain = generatedDomain
+
+	watcher.OnAdd(catalog)
+
+	time.Sleep(50 * time.Millisecond)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/api/my-catalog/services/svc@ns", nil)
+
+	switcher.ServeHTTP(rw, req)
+
+	resp, err := io.ReadAll(rw.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, rw.Code)
+	assert.JSONEq(t, string(wantSpec), string(resp))
+}
+
+func TestWatcher_OnAdd_backendSend4xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.WriteHeader(http.StatusUnprocessableEntity)
+	}))
+
+	switcher := NewHandlerSwitcher()
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	t.Cleanup(cancel)
+
+	go watcher.Run(ctx)
+	catalog := createCatalog(srv.URL)
+	catalog.Status.Services = append(catalog.Status.Services, hubv1alpha1.CatalogServiceStatus{
+		Name:           "svc",
+		Namespace:      "ns",
+		OpenAPISpecURL: srv.URL,
+	})
+	catalog.Status.Domain = generatedDomain
+
+	watcher.OnAdd(catalog)
+
+	time.Sleep(50 * time.Millisecond)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/api/my-catalog/services/svc@ns", nil)
+
+	switcher.ServeHTTP(rw, req)
+
+	assert.Equal(t, http.StatusBadGateway, rw.Code)
 }
 
 func TestWatcher_OnUpdate(t *testing.T) {
-	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read.yaml")
+	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read-before.json")
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -143,7 +199,7 @@ func TestWatcher_OnUpdate(t *testing.T) {
 
 	go watcher.Run(ctx)
 
-	catalog := createCatalog("my-catalog", srv.URL)
+	catalog := createCatalog(srv.URL)
 	watcher.OnAdd(catalog)
 
 	time.Sleep(10 * time.Millisecond)
@@ -186,18 +242,6 @@ func TestWatcher_OnUpdate(t *testing.T) {
 			body:   []byte("[\"svc@ns\",\"svc2@ns\"]\n"),
 		},
 		{
-			desc:   "get Open API spec",
-			path:   "/api/my-catalog/services/svc@ns",
-			status: http.StatusOK,
-			body:   oasSpec,
-		},
-		{
-			desc:   "get Open API spec with url from status",
-			path:   "/api/my-catalog/services/svc2@ns",
-			status: http.StatusOK,
-			body:   oasSpec,
-		},
-		{
 			desc:   "not found",
 			path:   "/api/my-catalog/services/unknown@ns",
 			status: http.StatusNotFound,
@@ -224,8 +268,93 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}
 }
 
+func TestWatcher_OnUpdate_getSpec(t *testing.T) {
+	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read-before.json")
+	require.NoError(t, err)
+
+	wantSpec, err := os.ReadFile("./fixtures/openapi-spec-read-after-custom-domain.json")
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		_, err = rw.Write(oasSpec)
+		require.NoError(t, err)
+	}))
+
+	switcher := NewHandlerSwitcher()
+	watcher, err := NewWatcher(switcher)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	t.Cleanup(cancel)
+
+	go watcher.Run(ctx)
+
+	catalog := createCatalog(srv.URL)
+	watcher.OnAdd(catalog)
+
+	time.Sleep(10 * time.Millisecond)
+
+	catalog.Spec.Services = append(catalog.Spec.Services, hubv1alpha1.CatalogService{
+		Name:      "svc2",
+		Namespace: "ns",
+		Port:      80,
+	})
+
+	serviceStatuses := []hubv1alpha1.CatalogServiceStatus{
+		{
+			Name:           "svc",
+			Namespace:      "ns",
+			OpenAPISpecURL: srv.URL,
+		},
+		{
+			Name:           "svc2",
+			Namespace:      "ns",
+			OpenAPISpecURL: srv.URL,
+		},
+	}
+	catalog.Status.CustomDomains = []string{"customdomain.com", "secondcustomdomain.com"}
+	catalog.Status.Services = append(catalog.Status.Services, serviceStatuses...)
+	catalog.Status.Domain = generatedDomain
+
+	watcher.OnUpdate(nil, catalog)
+
+	time.Sleep(10 * time.Millisecond)
+
+	testCases := []struct {
+		desc string
+		path string
+	}{
+		{
+			desc: "get Open API spec",
+			path: "/api/my-catalog/services/svc@ns",
+		},
+		{
+			desc: "get Open API spec with url from status",
+			path: "/api/my-catalog/services/svc2@ns",
+		},
+	}
+
+	for _, test := range testCases {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			rw := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "http://localhost"+test.path, nil)
+
+			switcher.ServeHTTP(rw, req)
+
+			resp, err := io.ReadAll(rw.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, rw.Code)
+			assert.JSONEq(t, string(wantSpec), string(resp))
+		})
+	}
+}
+
 func TestWatcher_OnDelete(t *testing.T) {
-	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read.yaml")
+	oasSpec, err := os.ReadFile("./fixtures/openapi-spec-read-before.json")
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -242,7 +371,7 @@ func TestWatcher_OnDelete(t *testing.T) {
 
 	go watcher.Run(ctx)
 
-	catalog := createCatalog("my-catalog", srv.URL)
+	catalog := createCatalog(srv.URL)
 	watcher.OnAdd(catalog)
 
 	time.Sleep(10 * time.Millisecond)
@@ -283,4 +412,23 @@ func TestWatcher_OnDelete(t *testing.T) {
 			assert.Equal(t, test.status, rw.Code)
 		})
 	}
+}
+
+func createCatalog(openAPISpecURL string) *hubv1alpha1.Catalog {
+	catalog := &hubv1alpha1.Catalog{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-catalog"},
+		Spec: hubv1alpha1.CatalogSpec{
+			Services: []hubv1alpha1.CatalogService{
+				{
+					Name:           "svc",
+					Namespace:      "ns",
+					Port:           80,
+					PathPrefix:     "",
+					OpenAPISpecURL: openAPISpecURL,
+				},
+			},
+			CustomDomains: nil,
+		},
+	}
+	return catalog
 }

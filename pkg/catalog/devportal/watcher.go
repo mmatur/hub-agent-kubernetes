@@ -22,10 +22,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"sync"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/mitchellh/hashstructure/v2"
@@ -199,6 +199,7 @@ func (w *Watcher) updateCatalogsFromCRD(c *hubv1alpha1.Catalog) {
 		Name:            c.Name,
 		Description:     c.Spec.Description,
 		Services:        services,
+		Domain:          c.Status.Domain,
 		CustomDomains:   verifiedCustomDomains,
 		DevPortalDomain: devPortalDomain,
 	}
@@ -325,6 +326,7 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 
 			return
 		}
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode < 200 || resp.StatusCode > 300 {
 			rw.WriteHeader(http.StatusBadGateway)
@@ -338,16 +340,54 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 			return
 		}
 
-		rw.WriteHeader(http.StatusOK)
-		rw.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-		if _, err := io.Copy(rw, resp.Body); err != nil {
+		var oas openapi3.T
+		if err := json.NewDecoder(resp.Body).Decode(&oas); err != nil {
 			log.Error().Err(err).
 				Str("catalog_name", name).
 				Str("service_name", svcName).
 				Str("url", u).
-				Msg("Copy content")
+				Msg("Decode open api spec")
+
+			return
+		}
+
+		overrideServersAndSecurity(&oas, c)
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+		if err := json.NewEncoder(rw).Encode(oas); err != nil {
+			log.Error().Err(err).
+				Str("catalog_name", name).
+				Str("service_name", svcName).
+				Str("url", u).
+				Msg("Write content")
 		}
 	})
 
 	return router
+}
+
+func overrideServersAndSecurity(oas *openapi3.T, c *catalog.Catalog) {
+	oas.Servers = nil
+	for _, domain := range c.CustomDomains {
+		oas.Servers = append(oas.Servers, &openapi3.Server{URL: "https://" + domain.Name})
+	}
+
+	if len(oas.Servers) == 0 {
+		oas.Servers = openapi3.Servers{{URL: "https://" + c.Domain}}
+	}
+
+	oas.Security = nil
+
+	for i := range oas.Paths {
+		oas.Paths[i].Servers = nil
+
+		for method := range oas.Paths[i].Operations() {
+			operation := oas.Paths[i].GetOperation(method)
+			operation.Servers = nil
+			operation.Security = nil
+
+			oas.Paths[i].SetOperation(method, operation)
+		}
+	}
 }
