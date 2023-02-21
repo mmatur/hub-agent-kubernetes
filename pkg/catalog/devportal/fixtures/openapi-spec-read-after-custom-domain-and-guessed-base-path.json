@@ -6,7 +6,10 @@
   },
   "servers": [
     {
-      "url": "https://generated.hub.domain/prefix/api/v3"
+      "url": "https://customdomain.com/prefix/api/v3"
+    },
+    {
+      "url": "https://secondcustomdomain.com/prefix/api/v3"
     }
   ],
   "paths": {
