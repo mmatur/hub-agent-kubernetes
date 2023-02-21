@@ -45,6 +45,7 @@ func NewPolGetter(informer hubinformer.SharedInformerFactory) *PolGetter {
 }
 
 // GetConfig gets ACP configuration.
+// Note this method does not resolve secret references.
 func (p PolGetter) GetConfig(canonicalName string) (*acp.Config, error) {
 	policy, err := p.informer.Hub().V1alpha1().AccessControlPolicies().Lister().Get(canonicalName)
 	if err != nil {

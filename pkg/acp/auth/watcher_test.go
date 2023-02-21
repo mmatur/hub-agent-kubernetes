@@ -26,50 +26,19 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
+	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func createPolicy(uid, name string) *hubv1alpha1.AccessControlPolicy {
-	return createPolicyWithSecret(uid, name, "secret")
-}
-
-func createPolicyWithSecret(uid, name, secret string) *hubv1alpha1.AccessControlPolicy {
-	return &hubv1alpha1.AccessControlPolicy{
-		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
-		Spec: hubv1alpha1.AccessControlPolicySpec{
-			JWT: &hubv1alpha1.AccessControlPolicyJWT{
-				SigningSecret: secret,
-			},
-		},
-	}
-}
-
-func createOIDCPolicy(uid, name, issuer string, secret *corev1.SecretReference) *hubv1alpha1.AccessControlPolicy {
-	return &hubv1alpha1.AccessControlPolicy{
-		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
-		Spec: hubv1alpha1.AccessControlPolicySpec{
-			OIDC: &hubv1alpha1.AccessControlPolicyOIDC{
-				Issuer:   issuer,
-				ClientID: "ID",
-				Secret:   secret,
-			},
-		},
-	}
-}
-
-func createSecret(namespace, name string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Data: map[string][]byte{
-			"clientSecret": []byte("1234567890123456"),
-		},
-	}
-}
-
-func TestWatcher_OnAddOIDC(t *testing.T) {
+func TestWatcher_CreateOIDCACP(t *testing.T) {
 	var data string
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Add("Content-Type", "application/json")
@@ -81,18 +50,25 @@ func TestWatcher_OnAddOIDC(t *testing.T) {
 	data = fmt.Sprintf(`{"issuer":%q}`, srv.URL)
 
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher, "1234567891234567")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	t.Cleanup(cancel)
+	// Initialize this client set with the required "hub-secret".
+	kubeClientSet := kubemock.NewSimpleClientset(
+		createSecret("default", "hub-secret", "key", "1234567891234567"),
+	)
+	hubClientSet := hubkubemock.NewSimpleClientset()
+	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
-	go watcher.Run(ctx)
-
-	// Add oidc without secret
-	watcher.OnAdd(createOIDCPolicy("1", "my-oidc", srv.URL, &corev1.SecretReference{Namespace: "ns", Name: "secret"}))
+	// Create an ACP referencing a secret that does not exist yet.
+	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createOIDCPolicy("1", "my-oidc", srv.URL, &corev1.SecretReference{Namespace: "ns", Name: "secret"}),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
 
 	time.Sleep(10 * time.Millisecond)
 
+	// ACP has been created, but not the secret it references, so calling the handler should give a 404.
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/my-oidc", nil)
 
@@ -100,11 +76,18 @@ func TestWatcher_OnAddOIDC(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, rw.Code)
 
-	// Add secret for oidc
-	watcher.OnAdd(createSecret("ns", "secret"))
+	// Now, create the missing secret, it should be processed by the watcher and the ACP handler should be created.
+	_, err = kubeClientSet.CoreV1().Secrets("ns").Create(
+		context.Background(),
+		createSecret("ns", "secret", "clientSecret", "secret"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	// Give it some time, just to be sure.
+	time.Sleep(10 * time.Millisecond)
 
+	// Calling the ACP endpoint should now work.
 	rw = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "http://localhost/my-oidc", nil)
 
@@ -113,22 +96,38 @@ func TestWatcher_OnAddOIDC(t *testing.T) {
 	assert.Equal(t, http.StatusFound, rw.Code)
 }
 
-func TestWatcher_OnAdd(t *testing.T) {
+func TestWatcher_CreateACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher, "")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	t.Cleanup(cancel)
+	// Initialize this client set with the required "hub-secret".
+	kubeClientSet := kubemock.NewSimpleClientset(
+		createSecret("default", "hub-secret", "key", "1234567891234567"),
+	)
+	hubClientSet := hubkubemock.NewSimpleClientset()
+	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
-	go watcher.Run(ctx)
-
-	watcher.OnAdd(createPolicy("1", "my-policy-1"))
-	watcher.OnAdd(createPolicy("2", "my-policy-2"))
-	watcher.OnAdd(createPolicy("3", "my-policy-3"))
+	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("1", "my-policy-1"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+	_, err = hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("2", "my-policy-2"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+	_, err = hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("3", "my-policy-3"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
 
 	time.Sleep(10 * time.Millisecond)
 
-	testCases := []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		jwt      string
@@ -163,7 +162,7 @@ func TestWatcher_OnAdd(t *testing.T) {
 		},
 	}
 
-	for _, test := range testCases {
+	for _, test := range tests {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
@@ -182,22 +181,33 @@ func TestWatcher_OnAdd(t *testing.T) {
 	}
 }
 
-func TestWatcher_OnUpdate(t *testing.T) {
+func TestWatcher_UpdateACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher, "")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	t.Cleanup(cancel)
+	// Initialize this client set with the required "hub-secret".
+	kubeClientSet := kubemock.NewSimpleClientset(
+		createSecret("default", "hub-secret", "key", "1234567891234567"),
+	)
+	hubClientSet := hubkubemock.NewSimpleClientset()
+	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
-	go watcher.Run(ctx)
+	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicyWithSecret("1", "my-policy-1", "Wrong secret"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
 
-	watcher.OnAdd(createPolicyWithSecret("1", "my-policy-1", "Wrong secret"))
-
-	watcher.OnUpdate(nil, createPolicy("1", "my-policy-1"))
+	_, err = hubClientSet.HubV1alpha1().AccessControlPolicies().Update(
+		context.Background(),
+		createPolicy("1", "my-policy-1"),
+		metav1.UpdateOptions{},
+	)
+	require.NoError(t, err)
 
 	time.Sleep(10 * time.Millisecond)
 
-	testCases := []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		jwt      string
@@ -216,7 +226,7 @@ func TestWatcher_OnUpdate(t *testing.T) {
 		},
 	}
 
-	for _, test := range testCases {
+	for _, test := range tests {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
@@ -235,26 +245,57 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}
 }
 
-func TestWatcher_OnDelete(t *testing.T) {
+func TestWatcher_DeleteACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
-	watcher := NewWatcher(switcher, "")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	t.Cleanup(cancel)
+	// Initialize this client set with the required "hub-secret".
+	kubeClientSet := kubemock.NewSimpleClientset(
+		createSecret("default", "hub-secret", "key", "1234567891234567"),
+	)
+	hubClientSet := hubkubemock.NewSimpleClientset()
+	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
-	go watcher.Run(ctx)
+	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("1", "my-policy-1"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+	_, err = hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("2", "my-policy-2"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+	_, err = hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
+		context.Background(),
+		createPolicy("3", "my-policy-3"),
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
 
-	watcher.OnAdd(createPolicy("1", "my-policy-1"))
-	watcher.OnAdd(createPolicy("2", "my-policy-2"))
-	watcher.OnAdd(createPolicy("3", "my-policy-3"))
-
-	watcher.OnDelete(createPolicy("1", "my-policy-1"))
-	watcher.OnDelete(createPolicy("2", "my-policy-2"))
-	watcher.OnDelete(createPolicy("3", "my-policy-3"))
+	err = hubClientSet.HubV1alpha1().AccessControlPolicies().Delete(
+		context.Background(),
+		"my-policy-1",
+		metav1.DeleteOptions{},
+	)
+	require.NoError(t, err)
+	err = hubClientSet.HubV1alpha1().AccessControlPolicies().Delete(
+		context.Background(),
+		"my-policy-2",
+		metav1.DeleteOptions{},
+	)
+	require.NoError(t, err)
+	err = hubClientSet.HubV1alpha1().AccessControlPolicies().Delete(
+		context.Background(),
+		"my-policy-3",
+		metav1.DeleteOptions{},
+	)
+	require.NoError(t, err)
 
 	time.Sleep(10 * time.Millisecond)
 
-	testCases := []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		expected int
@@ -281,7 +322,7 @@ func TestWatcher_OnDelete(t *testing.T) {
 		},
 	}
 
-	for _, test := range testCases {
+	for _, test := range tests {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
@@ -293,5 +334,79 @@ func TestWatcher_OnDelete(t *testing.T) {
 
 			assert.Equal(t, test.expected, rw.Code)
 		})
+	}
+}
+
+func startWatcher(t *testing.T, switcher *HTTPHandlerSwitcher, kubeClientSet *kubemock.Clientset, hubClientSet *hubkubemock.Clientset) {
+	t.Helper()
+
+	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
+
+	watcher := NewWatcher(
+		switcher,
+		hubInformer.Hub().V1alpha1().AccessControlPolicies().Lister(),
+		acp.NewKubeSecretValueGetter(kubeInformer.Core().V1().Secrets().Lister()),
+	)
+
+	_, err := hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(watcher)
+	require.NoError(t, err)
+	_, err = kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(watcher)
+	require.NoError(t, err)
+
+	hubInformer.Start(context.Background().Done())
+	for typ, ok := range hubInformer.WaitForCacheSync(context.Background().Done()) {
+		if !ok {
+			t.Fatalf("wait for cache sync: %s", typ)
+		}
+	}
+
+	kubeInformer.Start(context.Background().Done())
+	for typ, ok := range kubeInformer.WaitForCacheSync(context.Background().Done()) {
+		if !ok {
+			t.Fatalf("wait for cache sync: %s", typ)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	go watcher.Run(ctx)
+}
+
+func createPolicy(uid, name string) *hubv1alpha1.AccessControlPolicy {
+	return createPolicyWithSecret(uid, name, "secret")
+}
+
+func createPolicyWithSecret(uid, name, secret string) *hubv1alpha1.AccessControlPolicy {
+	return &hubv1alpha1.AccessControlPolicy{
+		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
+		Spec: hubv1alpha1.AccessControlPolicySpec{
+			JWT: &hubv1alpha1.AccessControlPolicyJWT{
+				SigningSecret: secret,
+			},
+		},
+	}
+}
+
+func createOIDCPolicy(uid, name, issuer string, secret *corev1.SecretReference) *hubv1alpha1.AccessControlPolicy {
+	return &hubv1alpha1.AccessControlPolicy{
+		ObjectMeta: metav1.ObjectMeta{UID: ktypes.UID(uid), Name: name},
+		Spec: hubv1alpha1.AccessControlPolicySpec{
+			OIDC: &hubv1alpha1.AccessControlPolicyOIDC{
+				Issuer:   issuer,
+				ClientID: "ID",
+				Secret:   secret,
+			},
+		},
+	}
+}
+
+func createSecret(namespace, name, key, value string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Data: map[string][]byte{
+			key: []byte(value),
+		},
 	}
 }

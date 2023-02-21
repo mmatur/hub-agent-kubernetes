@@ -37,15 +37,15 @@ import (
 
 // Config configures a JWT ACP handler.
 type Config struct {
-	SigningSecret              string
-	SigningSecretBase64Encoded bool
-	PublicKey                  string
-	JWKsFile                   FileOrContent
-	JWKsURL                    string
-	StripAuthorizationHeader   bool
-	ForwardHeaders             map[string]string
-	TokenQueryKey              string
-	Claims                     string
+	SigningSecret              string            `json:"signingSecret,omitempty"`
+	SigningSecretBase64Encoded bool              `json:"signingSecretBase64Encoded,omitempty"`
+	PublicKey                  string            `json:"publicKey,omitempty"`
+	JWKsFile                   FileOrContent     `json:"jwksFile,omitempty"`
+	JWKsURL                    string            `json:"jwksUrl,omitempty"`
+	StripAuthorizationHeader   bool              `json:"stripAuthorizationHeader,omitempty"`
+	ForwardHeaders             map[string]string `json:"forwardHeaders,omitempty"`
+	TokenQueryKey              string            `json:"tokenQueryKey,omitempty"`
+	Claims                     string            `json:"claims,omitempty"`
 }
 
 func (cfg *Config) keySet() (KeySet, error) {

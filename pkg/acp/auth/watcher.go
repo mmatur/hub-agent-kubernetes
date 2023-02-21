@@ -19,7 +19,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -30,9 +29,12 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/apikey"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oauthintro"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	hubv1alpha1lister "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // NOTE: if we use the same watcher for all resources, then we need to restart it when new CRDs are
@@ -41,19 +43,16 @@ import (
 // Also, if multiple clients of this watcher are not interested in the same resources
 // add a parameter to NewWatcher to subscribe only to a subset of events.
 
-type oidcSecret struct {
-	ClientSecret string
-}
-
 // Watcher watches access control policy resources and builds configurations out of them.
 type Watcher struct {
-	key string
-
 	configsMu sync.RWMutex
 	configs   map[string]*acp.Config
 	previous  uint64
 
-	secrets map[string]oidcSecret
+	acps               hubv1alpha1lister.AccessControlPolicyLister
+	secrets            acp.SecretGetter
+	secretRefCounterMu sync.RWMutex
+	secretRefCounter   map[string]int
 
 	refresh chan struct{}
 
@@ -62,13 +61,14 @@ type Watcher struct {
 
 // NewWatcher returns a new watcher to track ACP resources. It calls the given Updater when an ACP is modified at most
 // once every throttle.
-func NewWatcher(switcher *HTTPHandlerSwitcher, key string) *Watcher {
+func NewWatcher(switcher *HTTPHandlerSwitcher, acps hubv1alpha1lister.AccessControlPolicyLister, secrets acp.SecretGetter) *Watcher {
 	return &Watcher{
-		key:      key,
-		configs:  make(map[string]*acp.Config),
-		secrets:  make(map[string]oidcSecret),
-		refresh:  make(chan struct{}, 1),
-		switcher: switcher,
+		configs:          make(map[string]*acp.Config),
+		acps:             acps,
+		secrets:          secrets,
+		secretRefCounter: make(map[string]int),
+		refresh:          make(chan struct{}, 1),
+		switcher:         switcher,
 	}
 }
 
@@ -77,20 +77,23 @@ func (w *Watcher) Run(ctx context.Context) {
 	for {
 		select {
 		case <-w.refresh:
-			w.configsMu.RLock()
-
-			w.populateSecrets()
-
-			hash, err := hashstructure.Hash(w.configs, hashstructure.FormatV2, nil)
+			configs, err := w.makeConfigs()
 			if err != nil {
-				log.Error().Err(err).Msg("Unable to hash")
+				log.Error().Err(err).Msg("Could not build ACP configs")
 			}
 
-			w.configsMu.RUnlock()
+			hash, err := hashstructure.Hash(configs, hashstructure.FormatV2, nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Could not to compute ACP configs hash")
+			}
 
 			if err == nil && w.previous == hash {
 				continue
 			}
+
+			w.configsMu.Lock()
+			w.configs = configs
+			w.configsMu.Unlock()
 
 			w.previous = hash
 
@@ -104,54 +107,27 @@ func (w *Watcher) Run(ctx context.Context) {
 	}
 }
 
-func (w *Watcher) populateSecrets() {
-	for name, config := range w.configs {
-		logger := log.With().Str("acp_name", name).Logger()
-		cfg := config.OIDC
-		if cfg == nil && config.OIDCGoogle != nil {
-			cfg = &config.OIDCGoogle.Config
-		}
-
-		if cfg == nil {
-			continue
-		}
-
-		if cfg.Secret == nil {
-			logger.Error().Msg("Secret is missing")
-			continue
-		}
-
-		logger = logger.With().Str("secret_namespace", cfg.Secret.Namespace).
-			Str("secret_name", cfg.Secret.Name).Logger()
-
-		secret, ok := w.secrets[cfg.Secret.Namespace+"@"+cfg.Secret.Name]
-		if !ok {
-			logger.Error().Msg("Secret is missing")
-			continue
-		}
-
-		if err := populateSecrets(cfg, secret); err != nil {
-			logger.Error().Err(err).Msg("error while populating secrets")
-		}
-	}
-}
-
 // OnAdd implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnAdd(obj interface{}) {
 	switch v := obj.(type) {
 	case *hubv1alpha1.AccessControlPolicy:
-		w.updateConfigFromPolicy(v)
+		refs := secretReferences(v)
+		w.secretRefCounterMu.Lock()
+		for _, ref := range refs {
+			w.secretRefCounter[ref]++
+		}
+		w.secretRefCounterMu.Unlock()
 
 	case *corev1.Secret:
-		w.configsMu.Lock()
-		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
-			ClientSecret: string(v.Data["clientSecret"]),
+		w.secretRefCounterMu.RLock()
+		c := w.secretRefCounter[secretKey(v.Name, v.Namespace)]
+		w.secretRefCounterMu.RUnlock()
+		if c == 0 {
+			return
 		}
-		w.configsMu.Unlock()
 
 	default:
 		log.Error().
-			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received add event of unknown type")
 		return
@@ -164,21 +140,34 @@ func (w *Watcher) OnAdd(obj interface{}) {
 }
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
-func (w *Watcher) OnUpdate(_, newObj interface{}) {
+func (w *Watcher) OnUpdate(oldObj, newObj interface{}) {
 	switch v := newObj.(type) {
 	case *hubv1alpha1.AccessControlPolicy:
-		w.updateConfigFromPolicy(v)
+		oldRefs := secretReferences(oldObj.(*hubv1alpha1.AccessControlPolicy))
+		newRefs := secretReferences(v)
+		w.secretRefCounterMu.Lock()
+		for _, ref := range oldRefs {
+			if w.secretRefCounter[ref] > 1 {
+				w.secretRefCounter[ref]--
+			} else {
+				delete(w.secretRefCounter, ref)
+			}
+		}
+		for _, ref := range newRefs {
+			w.secretRefCounter[ref]++
+		}
+		w.secretRefCounterMu.Unlock()
 
 	case *corev1.Secret:
-		w.configsMu.Lock()
-		w.secrets[v.Namespace+"@"+v.Name] = oidcSecret{
-			ClientSecret: string(v.Data["clientSecret"]),
+		w.secretRefCounterMu.RLock()
+		c := w.secretRefCounter[secretKey(v.Name, v.Namespace)]
+		w.secretRefCounterMu.RUnlock()
+		if c == 0 {
+			return
 		}
-		w.configsMu.Unlock()
 
 	default:
 		log.Error().
-			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", newObj)).
 			Msg("Received update event of unknown type")
 		return
@@ -190,35 +179,31 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 	}
 }
 
-func (w *Watcher) updateConfigFromPolicy(policy *hubv1alpha1.AccessControlPolicy) {
-	w.configsMu.Lock()
-	defer w.configsMu.Unlock()
-
-	w.configs[policy.ObjectMeta.Name] = acp.ConfigFromPolicy(policy)
-	if w.configs[policy.ObjectMeta.Name].OIDC != nil {
-		w.configs[policy.ObjectMeta.Name].OIDC.Key = w.key
-	}
-	if w.configs[policy.ObjectMeta.Name].OIDCGoogle != nil {
-		w.configs[policy.ObjectMeta.Name].OIDCGoogle.Key = w.key
-	}
-}
-
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnDelete(obj interface{}) {
 	switch v := obj.(type) {
 	case *hubv1alpha1.AccessControlPolicy:
-		w.configsMu.Lock()
-		delete(w.configs, v.ObjectMeta.Name)
-		w.configsMu.Unlock()
+		refs := secretReferences(v)
+		w.secretRefCounterMu.Lock()
+		for _, ref := range refs {
+			if w.secretRefCounter[ref] > 1 {
+				w.secretRefCounter[ref]--
+			} else {
+				delete(w.secretRefCounter, ref)
+			}
+		}
+		w.secretRefCounterMu.Unlock()
 
 	case *corev1.Secret:
-		w.configsMu.Lock()
-		delete(w.secrets, v.Namespace+"@"+v.Name)
-		w.configsMu.Unlock()
+		w.secretRefCounterMu.RLock()
+		c := w.secretRefCounter[secretKey(v.Name, v.Namespace)]
+		w.secretRefCounterMu.RUnlock()
+		if c == 0 {
+			return
+		}
 
 	default:
 		log.Error().
-			Str("component", "acp_watcher").
 			Str("type", fmt.Sprintf("%T", obj)).
 			Msg("Received delete event of unknown type")
 		return
@@ -228,6 +213,29 @@ func (w *Watcher) OnDelete(obj interface{}) {
 	case w.refresh <- struct{}{}:
 	default:
 	}
+}
+
+func (w *Watcher) makeConfigs() (map[string]*acp.Config, error) {
+	policies, err := w.acps.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("listing ACPs: %w", err)
+	}
+
+	configs := make(map[string]*acp.Config)
+	for _, policy := range policies {
+		config, err := acp.ConfigFromPolicyWithSecret(policy, w.secrets)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("acp_name", policy.Name).
+				Msg("Could not create ACP configuration")
+			continue
+		}
+
+		configs[policy.Name] = config
+	}
+
+	return configs, nil
 }
 
 func (w *Watcher) buildRoutes(ctx context.Context) http.Handler {
@@ -243,7 +251,7 @@ func (w *Watcher) buildRoutes(ctx context.Context) http.Handler {
 
 		route, err := buildRoute(ctx, name, cfg)
 		if err != nil {
-			logger.Error().Err(err).Msg("create ACP handler")
+			logger.Error().Err(err).Msg("Could not Create ACP handler")
 			continue
 		}
 
@@ -272,6 +280,9 @@ func buildRoute(ctx context.Context, name string, cfg *acp.Config) (http.Handler
 	case cfg.OIDCGoogle != nil:
 		return oidc.NewHandler(ctx, &cfg.OIDCGoogle.Config, name)
 
+	case cfg.OAuthIntro != nil:
+		return oauthintro.NewHandler(cfg.OAuthIntro, name)
+
 	default:
 		return nil, fmt.Errorf("unknown handler type for ACP %s", name)
 	}
@@ -294,17 +305,35 @@ func getACPType(cfg *acp.Config) string {
 	case cfg.OIDCGoogle != nil:
 		return "OIDCGoogle"
 
+	case cfg.OAuthIntro != nil:
+		return "OAuth Introspection"
+
 	default:
 		return "unknown"
 	}
 }
 
-func populateSecrets(config *oidc.Config, secret oidcSecret) error {
-	if secret.ClientSecret == "" {
-		return errors.New("clientSecret is missing in secret")
+func secretKey(name, namespace string) string {
+	return name + "@" + namespace
+}
+
+func secretReferences(policy *hubv1alpha1.AccessControlPolicy) []string {
+	var refs []string
+
+	switch {
+	case policy.Spec.OIDC != nil:
+		if policy.Spec.OIDC.Secret != nil {
+			refs = append(refs, secretKey(policy.Spec.OIDC.Secret.Name, policy.Spec.OIDC.Secret.Namespace))
+		}
+
+	case policy.Spec.OIDCGoogle != nil:
+		if policy.Spec.OIDCGoogle.Secret != nil {
+			refs = append(refs, secretKey(policy.Spec.OIDCGoogle.Secret.Name, policy.Spec.OIDCGoogle.Secret.Namespace))
+		}
+
+	case policy.Spec.OAuthIntro != nil:
+		refs = append(refs, secretKey(policy.Spec.OAuthIntro.ClientConfig.Auth.Secret.Name, policy.Spec.OAuthIntro.ClientConfig.Auth.Secret.Namespace))
 	}
 
-	config.ClientSecret = secret.ClientSecret
-
-	return nil
+	return refs
 }

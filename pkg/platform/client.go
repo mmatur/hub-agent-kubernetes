@@ -44,7 +44,7 @@ import (
 
 // APIError represents an error returned by the API.
 type APIError struct {
-	StatusCode int
+	StatusCode int    `json:"statusCode"`
 	Message    string `json:"error"`
 }
 

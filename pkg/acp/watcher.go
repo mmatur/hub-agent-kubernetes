@@ -302,6 +302,45 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 				Refresh:  a.OIDCGoogle.Session.Refresh,
 			}
 		}
+
+	case a.OAuthIntro != nil:
+		spec.OAuthIntro = &hubv1alpha1.AccessControlOAuthIntro{
+			Claims:         a.OAuthIntro.Claims,
+			ForwardHeaders: a.OAuthIntro.ForwardHeaders,
+		}
+
+		spec.OAuthIntro.TokenSource = hubv1alpha1.TokenSource{
+			Header:           a.OAuthIntro.TokenSource.Header,
+			HeaderAuthScheme: a.OAuthIntro.TokenSource.HeaderAuthScheme,
+			Query:            a.OAuthIntro.TokenSource.Query,
+			Cookie:           a.OAuthIntro.TokenSource.Cookie,
+		}
+
+		spec.OAuthIntro.ClientConfig = hubv1alpha1.AccessControlOAuthIntroClientConfig{
+			HTTPClientConfig: hubv1alpha1.HTTPClientConfig{
+				TimeoutSeconds: a.OAuthIntro.ClientConfig.TimeoutSeconds.Int(),
+				MaxRetries:     a.OAuthIntro.ClientConfig.MaxRetries.Int(),
+			},
+			URL:           a.OAuthIntro.ClientConfig.URL,
+			Headers:       a.OAuthIntro.ClientConfig.Headers,
+			TokenTypeHint: a.OAuthIntro.ClientConfig.TokenTypeHint,
+		}
+
+		if a.OAuthIntro.ClientConfig.TLS != nil {
+			spec.OAuthIntro.ClientConfig.HTTPClientConfig.TLS = &hubv1alpha1.HTTPClientConfigTLS{
+				CABundle:           a.OAuthIntro.ClientConfig.TLS.CABundle,
+				InsecureSkipVerify: a.OAuthIntro.ClientConfig.TLS.InsecureSkipVerify,
+			}
+		}
+
+		spec.OAuthIntro.ClientConfig.Auth = hubv1alpha1.AccessControlOAuthIntroClientConfigAuth{
+			Kind: a.OAuthIntro.ClientConfig.Auth.Kind,
+		}
+
+		spec.OAuthIntro.ClientConfig.Auth.Secret = corev1.SecretReference{
+			Name:      a.OAuthIntro.ClientConfig.Auth.Secret.Name,
+			Namespace: a.OAuthIntro.ClientConfig.Auth.Secret.Namespace,
+		}
 	}
 
 	return spec

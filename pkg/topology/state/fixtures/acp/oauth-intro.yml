@@ -1,0 +1,30 @@
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: my-acp
+spec:
+  oAuthIntro:
+    clientConfig:
+      url: https://idp.auth.svc.cluster.local/oauth2/introspect
+      auth:
+        kind: Bearer
+        secret:
+          name: my-acp-auth
+          namespace: default
+      headers:
+        Request-Host: '{{ .Request.Host }}'
+      tokenTypeHint: access_token
+      tls:
+        caBundle: <bundle>
+        insecureSkipVerify: false
+      timeoutSeconds: 15
+      maxRetries: 3
+    tokenSource:
+      header: Authorization
+      headerAuthScheme: Bearer # Only valid if name == Authorization.
+      query: token
+      cookie: token
+    claims: Equals(`group`, `dev`)
+    forwardHeaders:
+      Group: group

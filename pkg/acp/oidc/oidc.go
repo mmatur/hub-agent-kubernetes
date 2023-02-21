@@ -56,25 +56,25 @@ type IDTokenVerifier interface {
 // See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 type StateData struct {
 	// RedirectID is used to prevent CSRF and XSRF attacks.
-	RedirectID string
+	RedirectID string `json:"redirectId"`
 	// Nonce is used to mitigate replay attacks.
-	Nonce string
+	Nonce string `json:"nonce"`
 	// OriginURL is the actual resource initially requested by the client.
-	OriginURL string
+	OriginURL string `json:"originUrl"`
 	// CodeVerifier is used to generate code challenges when using PKCE.
 	// It is only set when using PKCE.
-	CodeVerifier string
+	CodeVerifier string `json:"codeVerifier"`
 }
 
 // SessionData is the state of the session.
 type SessionData struct {
-	AccessToken  string
-	TokenType    string
-	RefreshToken string
-	IDToken      string
+	AccessToken  string `json:"accessToken"`
+	TokenType    string `json:"tokenType"`
+	RefreshToken string `json:"refreshToken"`
+	IDToken      string `json:"idToken"`
 
 	// Expiry is the expiration time of the access token.
-	Expiry time.Time
+	Expiry time.Time `json:"expiry"`
 }
 
 // IsExpired determines if the current access token is expired.
@@ -139,7 +139,7 @@ func NewHandler(ctx context.Context, cfg *Config, name string) (*Handler, error)
 		}
 	}
 
-	block, err := aes.NewCipher([]byte(cfg.Key))
+	block, err := aes.NewCipher([]byte(cfg.SessionKey))
 	if err != nil {
 		return nil, fmt.Errorf("new cipher: %w", err)
 	}

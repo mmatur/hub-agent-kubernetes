@@ -21,8 +21,12 @@ import (
 	"strings"
 
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
+	"github.com/traefik/hub-agent-kubernetes/pkg/optional"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+const redactedValue = "redacted"
 
 func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, error) {
 	policies, err := f.hub.Hub().V1alpha1().AccessControlPolicies().Lister().List(labels.Everything())
@@ -37,30 +41,14 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 		}
 
 		switch {
-		case policy.Spec.JWT != nil:
-			acp.Method = "jwt"
-			acp.JWT = &AccessControlPolicyJWT{
-				SigningSecretBase64Encoded: policy.Spec.JWT.SigningSecretBase64Encoded,
-				PublicKey:                  policy.Spec.JWT.PublicKey,
-				JWKsFile:                   policy.Spec.JWT.JWKsFile,
-				JWKsURL:                    policy.Spec.JWT.JWKsURL,
-				StripAuthorizationHeader:   policy.Spec.JWT.StripAuthorizationHeader,
-				ForwardHeaders:             policy.Spec.JWT.ForwardHeaders,
-				TokenQueryKey:              policy.Spec.JWT.TokenQueryKey,
-				Claims:                     policy.Spec.JWT.Claims,
-			}
-
-			if policy.Spec.JWT.SigningSecret != "" {
-				acp.JWT.SigningSecret = "redacted"
-			}
 		case policy.Spec.BasicAuth != nil:
 			acp.Method = "basicAuth"
-			acp.BasicAuth = &AccessControlPolicyBasicAuth{
-				Users:                    redactPasswords(policy.Spec.BasicAuth.Users),
-				Realm:                    policy.Spec.BasicAuth.Realm,
-				StripAuthorizationHeader: policy.Spec.BasicAuth.StripAuthorizationHeader,
-				ForwardUsernameHeader:    policy.Spec.BasicAuth.ForwardUsernameHeader,
-			}
+			acp.BasicAuth = makeAccessControlBasicAuth(policy.Spec.BasicAuth)
+
+		case policy.Spec.JWT != nil:
+			acp.Method = "jwt"
+			acp.JWT = makeAccessControlPolicyJWT(policy.Spec.JWT)
+
 		case policy.Spec.APIKey != nil:
 			acp.Method = "apiKey"
 			acp.APIKey = &AccessControlPolicyAPIKey{
@@ -70,80 +58,19 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 				Keys:           redactKeys(policy.Spec.APIKey.Keys),
 				ForwardHeaders: policy.Spec.APIKey.ForwardHeaders,
 			}
+
 		case policy.Spec.OIDC != nil:
 			acp.Method = "oidc"
-			acp.OIDC = &AccessControlPolicyOIDC{
-				Issuer:         policy.Spec.OIDC.Issuer,
-				ClientID:       policy.Spec.OIDC.ClientID,
-				RedirectURL:    policy.Spec.OIDC.RedirectURL,
-				LogoutURL:      policy.Spec.OIDC.LogoutURL,
-				Scopes:         policy.Spec.OIDC.Scopes,
-				AuthParams:     policy.Spec.OIDC.AuthParams,
-				ForwardHeaders: policy.Spec.OIDC.ForwardHeaders,
-				Claims:         policy.Spec.OIDC.Claims,
-			}
+			acp.OIDC = makeAccessControlOIDC(policy.Spec.OIDC)
 
-			if policy.Spec.OIDC.Secret != nil {
-				acp.OIDC.Secret = &SecretReference{
-					Name:      policy.Spec.OIDC.Secret.Name,
-					Namespace: policy.Spec.OIDC.Secret.Namespace,
-				}
-			}
-
-			if policy.Spec.OIDC.StateCookie != nil {
-				acp.OIDC.StateCookie = &AuthStateCookie{
-					Path:     policy.Spec.OIDC.StateCookie.Path,
-					Domain:   policy.Spec.OIDC.StateCookie.Domain,
-					SameSite: policy.Spec.OIDC.StateCookie.SameSite,
-					Secure:   policy.Spec.OIDC.StateCookie.Secure,
-				}
-			}
-
-			if policy.Spec.OIDC.Session != nil {
-				acp.OIDC.Session = &AuthSession{
-					Path:     policy.Spec.OIDC.Session.Path,
-					Domain:   policy.Spec.OIDC.Session.Domain,
-					SameSite: policy.Spec.OIDC.Session.SameSite,
-					Secure:   policy.Spec.OIDC.Session.Secure,
-					Refresh:  policy.Spec.OIDC.Session.Refresh,
-				}
-			}
 		case policy.Spec.OIDCGoogle != nil:
 			acp.Method = "oidcGoogle"
-			acp.OIDCGoogle = &AccessControlPolicyOIDCGoogle{
-				ClientID:       policy.Spec.OIDCGoogle.ClientID,
-				RedirectURL:    policy.Spec.OIDCGoogle.RedirectURL,
-				LogoutURL:      policy.Spec.OIDCGoogle.LogoutURL,
-				AuthParams:     policy.Spec.OIDCGoogle.AuthParams,
-				ForwardHeaders: policy.Spec.OIDCGoogle.ForwardHeaders,
-				Emails:         policy.Spec.OIDCGoogle.Emails,
-			}
+			acp.OIDCGoogle = makeAccessControlOIDCGoogle(policy.Spec.OIDCGoogle)
 
-			if policy.Spec.OIDCGoogle.Secret != nil {
-				acp.OIDCGoogle.Secret = &SecretReference{
-					Name:      policy.Spec.OIDCGoogle.Secret.Name,
-					Namespace: policy.Spec.OIDCGoogle.Secret.Namespace,
-				}
-			}
+		case policy.Spec.OAuthIntro != nil:
+			acp.Method = "oAuthIntro"
+			acp.OAuthIntro = makeAccessControlPolicyOAuthIntro(policy.Spec.OAuthIntro)
 
-			if policy.Spec.OIDCGoogle.StateCookie != nil {
-				acp.OIDCGoogle.StateCookie = &AuthStateCookie{
-					Path:     policy.Spec.OIDCGoogle.StateCookie.Path,
-					Domain:   policy.Spec.OIDCGoogle.StateCookie.Domain,
-					SameSite: policy.Spec.OIDCGoogle.StateCookie.SameSite,
-					Secure:   policy.Spec.OIDCGoogle.StateCookie.Secure,
-				}
-			}
-
-			if policy.Spec.OIDCGoogle.Session != nil {
-				acp.OIDCGoogle.Session = &AuthSession{
-					Path:     policy.Spec.OIDCGoogle.Session.Path,
-					Domain:   policy.Spec.OIDCGoogle.Session.Domain,
-					SameSite: policy.Spec.OIDCGoogle.Session.SameSite,
-					Secure:   policy.Spec.OIDCGoogle.Session.Secure,
-					Refresh:  policy.Spec.OIDCGoogle.Session.Refresh,
-				}
-			}
 		default:
 			continue
 		}
@@ -152,6 +79,156 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 	}
 
 	return result, nil
+}
+
+func makeAccessControlBasicAuth(cfg *hubv1alpha1.AccessControlPolicyBasicAuth) *AccessControlPolicyBasicAuth {
+	return &AccessControlPolicyBasicAuth{
+		Users:                    redactPasswords(cfg.Users),
+		Realm:                    cfg.Realm,
+		StripAuthorizationHeader: cfg.StripAuthorizationHeader,
+		ForwardUsernameHeader:    cfg.ForwardUsernameHeader,
+	}
+}
+
+func makeAccessControlPolicyJWT(cfg *hubv1alpha1.AccessControlPolicyJWT) *AccessControlPolicyJWT {
+	policy := &AccessControlPolicyJWT{
+		SigningSecretBase64Encoded: cfg.SigningSecretBase64Encoded,
+		PublicKey:                  cfg.PublicKey,
+		JWKsFile:                   cfg.JWKsFile,
+		JWKsURL:                    cfg.JWKsURL,
+		StripAuthorizationHeader:   cfg.StripAuthorizationHeader,
+		ForwardHeaders:             cfg.ForwardHeaders,
+		TokenQueryKey:              cfg.TokenQueryKey,
+		Claims:                     cfg.Claims,
+	}
+
+	if cfg.SigningSecret != "" {
+		policy.SigningSecret = redactedValue
+	}
+
+	return policy
+}
+
+func makeAccessControlOIDC(cfg *hubv1alpha1.AccessControlPolicyOIDC) *AccessControlPolicyOIDC {
+	policy := &AccessControlPolicyOIDC{
+		Issuer:         cfg.Issuer,
+		ClientID:       cfg.ClientID,
+		RedirectURL:    cfg.RedirectURL,
+		LogoutURL:      cfg.LogoutURL,
+		Scopes:         cfg.Scopes,
+		AuthParams:     cfg.AuthParams,
+		ForwardHeaders: cfg.ForwardHeaders,
+		Claims:         cfg.Claims,
+	}
+
+	if cfg.Secret != nil {
+		policy.Secret = &SecretReference{
+			Name:      cfg.Secret.Name,
+			Namespace: cfg.Secret.Namespace,
+		}
+	}
+
+	if cfg.StateCookie != nil {
+		policy.StateCookie = &AuthStateCookie{
+			Path:     cfg.StateCookie.Path,
+			Domain:   cfg.StateCookie.Domain,
+			SameSite: cfg.StateCookie.SameSite,
+			Secure:   cfg.StateCookie.Secure,
+		}
+	}
+
+	if cfg.Session != nil {
+		policy.Session = &AuthSession{
+			Path:     cfg.Session.Path,
+			Domain:   cfg.Session.Domain,
+			SameSite: cfg.Session.SameSite,
+			Secure:   cfg.Session.Secure,
+			Refresh:  cfg.Session.Refresh,
+		}
+	}
+
+	return policy
+}
+
+func makeAccessControlOIDCGoogle(cfg *hubv1alpha1.AccessControlPolicyOIDCGoogle) *AccessControlPolicyOIDCGoogle {
+	policy := &AccessControlPolicyOIDCGoogle{
+		ClientID:       cfg.ClientID,
+		RedirectURL:    cfg.RedirectURL,
+		LogoutURL:      cfg.LogoutURL,
+		AuthParams:     cfg.AuthParams,
+		ForwardHeaders: cfg.ForwardHeaders,
+		Emails:         cfg.Emails,
+	}
+
+	if cfg.Secret != nil {
+		policy.Secret = &SecretReference{
+			Name:      cfg.Secret.Name,
+			Namespace: cfg.Secret.Namespace,
+		}
+	}
+
+	if cfg.StateCookie != nil {
+		policy.StateCookie = &AuthStateCookie{
+			Path:     cfg.StateCookie.Path,
+			Domain:   cfg.StateCookie.Domain,
+			SameSite: cfg.StateCookie.SameSite,
+			Secure:   cfg.StateCookie.Secure,
+		}
+	}
+
+	if cfg.Session != nil {
+		policy.Session = &AuthSession{
+			Path:     cfg.Session.Path,
+			Domain:   cfg.Session.Domain,
+			SameSite: cfg.Session.SameSite,
+			Secure:   cfg.Session.Secure,
+			Refresh:  cfg.Session.Refresh,
+		}
+	}
+
+	return policy
+}
+
+func makeAccessControlPolicyOAuthIntro(cfg *hubv1alpha1.AccessControlOAuthIntro) *AccessControlPolicyOAuthIntro {
+	policy := &AccessControlPolicyOAuthIntro{
+		Claims:         cfg.Claims,
+		ForwardHeaders: cfg.ForwardHeaders,
+	}
+
+	policy.ClientConfig = ClientConfig{
+		Config: httpclient.Config{
+			TimeoutSeconds: optional.NewInt(cfg.ClientConfig.TimeoutSeconds),
+			MaxRetries:     optional.NewInt(cfg.ClientConfig.MaxRetries),
+		},
+		URL:           cfg.ClientConfig.URL,
+		Headers:       cfg.ClientConfig.Headers,
+		TokenTypeHint: cfg.ClientConfig.TokenTypeHint,
+	}
+
+	policy.ClientConfig.Auth = ClientConfigAuth{
+		Kind: cfg.ClientConfig.Auth.Kind,
+	}
+
+	policy.ClientConfig.Auth.Secret = SecretReference{
+		Name:      cfg.ClientConfig.Auth.Secret.Name,
+		Namespace: cfg.ClientConfig.Auth.Secret.Namespace,
+	}
+
+	if cfg.ClientConfig.TLS != nil {
+		policy.ClientConfig.TLS = &httpclient.ConfigTLS{
+			CABundle:           cfg.ClientConfig.TLS.CABundle,
+			InsecureSkipVerify: cfg.ClientConfig.TLS.InsecureSkipVerify,
+		}
+	}
+
+	policy.TokenSource = TokenSource{
+		Header:           cfg.TokenSource.Header,
+		HeaderAuthScheme: cfg.TokenSource.HeaderAuthScheme,
+		Query:            cfg.TokenSource.Query,
+		Cookie:           cfg.TokenSource.Cookie,
+	}
+
+	return policy
 }
 
 func redactPasswords(rawUsers []string) string {
@@ -163,7 +240,7 @@ func redactPasswords(rawUsers []string) string {
 			continue
 		}
 
-		users = append(users, u[:i]+":redacted")
+		users = append(users, u[:i]+":"+redactedValue)
 	}
 
 	return strings.Join(users, ",")

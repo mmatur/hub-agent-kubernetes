@@ -33,10 +33,10 @@ type Users []string
 
 // Config configures a basic auth ACP handler.
 type Config struct {
-	Users                    Users
-	Realm                    string
-	StripAuthorizationHeader bool
-	ForwardUsernameHeader    string
+	Users                    Users  `json:"users,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	StripAuthorizationHeader bool   `json:"stripAuthorizationHeader,omitempty"`
+	ForwardUsernameHeader    string `json:"forwardUsernameHeader,omitempty"`
 }
 
 // Handler is a basic auth ACP Handler.

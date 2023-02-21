@@ -15,35 +15,41 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-package main
+package httpclient
 
 import (
-	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestReadKey(t *testing.T) {
-	cliCtx := &cli.Context{Context: context.Background()}
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "hub-secret",
-			Namespace: "default",
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"key": []byte("my-key"),
-		},
-	}
+func Test_newHTTPClient_WithProxyEnvVars(t *testing.T) {
+	testProxyServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		_, err := rw.Write([]byte(`PROXIED`))
+		require.NoError(t, err)
+	}))
+	defer testProxyServer.Close()
 
-	clientSetHub := kubemock.NewSimpleClientset(secret)
+	os.Clearenv()
 
-	key, err := readKey(cliCtx, clientSetHub)
+	t.Setenv("HTTP_PROXY", testProxyServer.URL)
+
+	client, err := NewWithLogger(Config{}, zerolog.New(io.Discard))
 	require.NoError(t, err)
-	require.Equal(t, "5e78863ed1ffb9fc66b1d61634b126bf", key)
+
+	resp, err := client.Get("http://foo.bar")
+	require.NoError(t, err)
+
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte(`PROXIED`), body)
 }

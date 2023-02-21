@@ -32,9 +32,9 @@ type Config struct {
 	LogoutURL   string            `json:"logoutUrl,omitempty"`
 	Scopes      []string          `json:"scopes,omitempty"`
 	AuthParams  map[string]string `json:"authParams,omitempty"`
-	Key         string            `json:"-"`
 	StateCookie *AuthStateCookie  `json:"stateCookie,omitempty"`
 	Session     *AuthSession      `json:"session,omitempty"`
+	SessionKey  string            `json:"-"`
 
 	// ForwardHeaders defines headers that should be added to the request and populated with values extracted from the ID token.
 	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
@@ -106,15 +106,15 @@ func (cfg *Config) Validate() error {
 		return errors.New("missing client secret")
 	}
 
-	if cfg.Key == "" {
-		return errors.New("missing key")
+	if cfg.SessionKey == "" {
+		return errors.New("missing session key")
 	}
 
-	switch len(cfg.Key) {
+	switch len(cfg.SessionKey) {
 	case 16, 24, 32:
 		break
 	default:
-		return errors.New("key must be 16, 24 or 32 characters long")
+		return errors.New("session key must be 16, 24 or 32 characters long")
 	}
 
 	if cfg.RedirectURL == "" {

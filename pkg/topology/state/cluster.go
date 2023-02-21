@@ -19,6 +19,7 @@ package state
 
 import (
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 )
@@ -121,6 +122,7 @@ type AccessControlPolicy struct {
 	BasicAuth  *AccessControlPolicyBasicAuth  `json:"basicAuth,omitempty"`
 	OIDC       *AccessControlPolicyOIDC       `json:"oidc,omitempty"`
 	OIDCGoogle *AccessControlPolicyOIDCGoogle `json:"oidcGoogle,omitempty"`
+	OAuthIntro *AccessControlPolicyOAuthIntro `json:"oAuthIntro,omitempty"`
 }
 
 // AccessControlPolicyJWT describes the settings for JWT authentication within an access control policy.
@@ -214,6 +216,38 @@ type AuthSession struct {
 	SameSite string `json:"sameSite,omitempty"`
 	Secure   bool   `json:"secure,omitempty"`
 	Refresh  *bool  `json:"refresh,omitempty"`
+}
+
+// AccessControlPolicyOAuthIntro holds the OAuth 2.0 token introspection configuration.
+type AccessControlPolicyOAuthIntro struct {
+	ClientConfig   ClientConfig      `json:"clientConfig,omitempty"`
+	TokenSource    TokenSource       `json:"tokenSource,omitempty"`
+	Claims         string            `json:"claims,omitempty"`
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+}
+
+// ClientConfig configures the HTTP client of the OAuth 2.0 Token Introspection ACP handler.
+type ClientConfig struct {
+	httpclient.Config
+
+	URL           string            `json:"url,omitempty"`
+	Auth          ClientConfigAuth  `json:"auth,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	TokenTypeHint string            `json:"tokenTypeHint,omitempty"`
+}
+
+// ClientConfigAuth configures authentication to the Authorization Server.
+type ClientConfigAuth struct {
+	Kind   string          `json:"kind"`
+	Secret SecretReference `json:"secret"`
+}
+
+// TokenSource describes where to find a token in an HTTP request.
+type TokenSource struct {
+	Header           string `json:"header,omitempty"`
+	HeaderAuthScheme string `json:"headerAuthScheme,omitempty"`
+	Query            string `json:"query,omitempty"`
+	Cookie           string `json:"cookie,omitempty"`
 }
 
 // EdgeIngress holds the definition of an EdgeIngress configuration.

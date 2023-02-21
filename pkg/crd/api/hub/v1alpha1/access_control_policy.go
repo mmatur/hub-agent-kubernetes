@@ -52,6 +52,7 @@ type AccessControlPolicySpec struct {
 	APIKey     *AccessControlPolicyAPIKey     `json:"apiKey,omitempty"`
 	OIDC       *AccessControlPolicyOIDC       `json:"oidc,omitempty"`
 	OIDCGoogle *AccessControlPolicyOIDCGoogle `json:"oidcGoogle,omitempty"`
+	OAuthIntro *AccessControlOAuthIntro       `json:"oAuthIntro,omitempty"`
 }
 
 // Hash return AccessControlPolicySpec hash.
@@ -168,6 +169,80 @@ type Session struct {
 	Domain   string `json:"domain,omitempty"`
 	Path     string `json:"path,omitempty"`
 	Refresh  *bool  `json:"refresh,omitempty"`
+}
+
+// AccessControlOAuthIntro configures an OAuth 2.0 Token Introspection access control policy.
+type AccessControlOAuthIntro struct {
+	// +kubebuilder:validation:Required
+	ClientConfig AccessControlOAuthIntroClientConfig `json:"clientConfig"`
+	// +kubebuilder:validation:Required
+	TokenSource    TokenSource       `json:"tokenSource"`
+	Claims         string            `json:"claims,omitempty"`
+	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
+}
+
+// AccessControlOAuthIntroClientConfig configures the OAuth 2.0 client for issuing token introspection requests.
+type AccessControlOAuthIntroClientConfig struct {
+	HTTPClientConfig `json:",inline"`
+
+	// URL of the Authorization Server.
+	// +kubebuilder:validation:Required
+	URL string `json:"url"`
+	// Auth configures the required authentication to the Authorization Server.
+	// +kubebuilder:validation:Required
+	Auth AccessControlOAuthIntroClientConfigAuth `json:"auth"`
+	// Headers to set when sending requests to the Authorization Server.
+	Headers map[string]string `json:"headers,omitempty"`
+	// TokenTypeHint is a hint to pass to the Authorization Server.
+	// See https://tools.ietf.org/html/rfc7662#section-2.1 for more information.
+	TokenTypeHint string `json:"tokenTypeHint,omitempty"`
+}
+
+// AccessControlOAuthIntroClientConfigAuth configures authentication to the Authorization Server.
+type AccessControlOAuthIntroClientConfigAuth struct {
+	// Kind sets the kind of authentication that can be used to authenticate requests.
+	// The content of the referenced depends on this kind.
+	// +kubebuilder:validation:Enum:=Basic;Bearer;Header;Query
+	// +kubebuilder:validation:Required
+	Kind string `json:"kind"`
+	// Secret is the reference to the Kubernetes secrets containing sensitive authentication data.
+	// +kubebuilder:validation:Required
+	Secret corev1.SecretReference `json:"secret"`
+}
+
+// HTTPClientConfig configures HTTP clients.
+type HTTPClientConfig struct {
+	// TLS configures TLS communication with the Authorization Server.
+	TLS *HTTPClientConfigTLS `json:"tls,omitempty"`
+	// TimeoutSeconds configures the maximum amount of seconds to wait before giving up on requests.
+	// +kubebuilder:default:=5
+	TimeoutSeconds int `json:"timeoutSeconds,omitempty"`
+	// MaxRetries defines the number of retries for introspection requests.
+	// +kubebuilder:default:=3
+	MaxRetries int `json:"maxRetries,omitempty"`
+}
+
+// HTTPClientConfigTLS configures TLS for HTTP clients.
+type HTTPClientConfigTLS struct {
+	// CABundle sets the CA bundle used to sign the Authorization Server certificate.
+	CABundle string `json:"caBundle,omitempty"`
+	// InsecureSkipVerify skips the Authorization Server certificate validation.
+	// For testing purposes only, do not use in production.
+	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
+}
+
+// TokenSource describes how to extract tokens from HTTP requests.
+// If multiple sources are set, the order is the following: header > query > cookie.
+type TokenSource struct {
+	// Header is the name of a header.
+	Header string `json:"header,omitempty"`
+	// HeaderAuthScheme sets an optional auth scheme when Header is set to "Authorization".
+	// If set, this scheme is removed from the token, and all requests not including it are dropped.
+	HeaderAuthScheme string `json:"headerAuthScheme,omitempty"`
+	// Query is the name of a query parameter.
+	Query string `json:"query,omitempty"`
+	// Cookie is the name of a cookie.
+	Cookie string `json:"cookie,omitempty"`
 }
 
 // AccessControlPolicyStatus is the status of the access control policy.

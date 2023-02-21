@@ -161,7 +161,6 @@ linters:
     - ireturn
     - contextcheck
     - errchkjson
-    - musttag
 
 issues:
   exclude-use-default: false
@@ -252,23 +251,13 @@ issues:
       text: "cyclomatic complexity 16 of func `(.*).run` is high"
       linters:
         - gocyclo
-    # Reducing cyclomatic complexity would reduce readability.
-    - path: cmd/agent/controller.go
-      text: "cyclomatic complexity 17 of func `(.*).run` is high"
+    # Intended.
+    - path: pkg/httpclient/client.go
+      text: "G402: TLS InsecureSkipVerify may be true"
+    - path: pkg/acp/config.go
+      text: "exported fields should be annotated with the \"json\" tag"
       linters:
-        - gocyclo
-    - path: cmd/agent/webhook_admission.go
-      text: "Function 'setupAdmissionHandlers' has too many statements"
-      linters:
-        - funlen
-    # Reducing cyclomatic complexity would reduce readability.
-    - path: cmd/agent/auth_server.go
-      text: "cyclomatic complexity 16 of func `(.*).run` is high"
-      linters:
-        - gocyclo
-    # Reducing complexity would reduce readability.
-    - path: pkg/acp/apikey/api_key.go
-      text: "(.*) has complex nested blocks \\(complexity: 5\\)"
+        - musttag
     - path: portal/embed.go
       linters:
         - gochecknoglobals

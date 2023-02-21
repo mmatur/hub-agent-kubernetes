@@ -26,6 +26,8 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
+	"github.com/traefik/hub-agent-kubernetes/pkg/optional"
 	kubemock "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -147,6 +149,50 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 							Secure:   true,
 						},
 						Emails: []string{"powpow@example.com"},
+					},
+				},
+			},
+		},
+		{
+			desc:    "OAuth 2.0 token introspection",
+			fixture: "fixtures/acp/oauth-intro.yml",
+			want: map[string]*AccessControlPolicy{
+				"my-acp": {
+					Name:   "my-acp",
+					Method: "oAuthIntro",
+					OAuthIntro: &AccessControlPolicyOAuthIntro{
+						ClientConfig: ClientConfig{
+							URL: "https://idp.auth.svc.cluster.local/oauth2/introspect",
+							Auth: ClientConfigAuth{
+								Kind: "Bearer",
+								Secret: SecretReference{
+									Name:      "my-acp-auth",
+									Namespace: "default",
+								},
+							},
+							Headers: map[string]string{
+								"Request-Host": "{{ .Request.Host }}",
+							},
+							TokenTypeHint: "access_token",
+							Config: httpclient.Config{
+								TLS: &httpclient.ConfigTLS{
+									CABundle:           "<bundle>",
+									InsecureSkipVerify: false,
+								},
+								TimeoutSeconds: optional.NewInt(15),
+								MaxRetries:     optional.NewInt(3),
+							},
+						},
+						TokenSource: TokenSource{
+							Header:           "Authorization",
+							HeaderAuthScheme: "Bearer",
+							Query:            "token",
+							Cookie:           "token",
+						},
+						Claims: "Equals(`group`, `dev`)",
+						ForwardHeaders: map[string]string{
+							"Group": "group",
+						},
 					},
 				},
 			},

@@ -19,7 +19,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	stdlog "log"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/auth"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
@@ -35,7 +35,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -90,17 +89,17 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kube client set: %w", err)
 	}
 
-	key, err := readKey(cliCtx, kubeClientSet)
-	if err != nil {
-		return fmt.Errorf("read key: %w", err)
-	}
-
 	switcher := auth.NewHandlerSwitcher()
-	acpWatcher := auth.NewWatcher(switcher, key)
-
+	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	if _, errInformer := hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher); errInformer != nil {
-		return fmt.Errorf("add ACP watcher: %w", errInformer)
+	acpWatcher := auth.NewWatcher(
+		switcher,
+		hubInformer.Hub().V1alpha1().AccessControlPolicies().Lister(),
+		acp.NewKubeSecretValueGetter(kubeInformer.Core().V1().Secrets().Lister()),
+	)
+
+	if _, err = hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer().AddEventHandler(acpWatcher); err != nil {
+		return fmt.Errorf("add ACP watcher: %w", err)
 	}
 
 	hubInformer.Start(cliCtx.Context.Done())
@@ -111,9 +110,8 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		}
 	}
 
-	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
-	if _, errInformer := kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(acpWatcher); errInformer != nil {
-		return fmt.Errorf("add secret watcher: %w", errInformer)
+	if _, err = kubeInformer.Core().V1().Secrets().Informer().AddEventHandler(acpWatcher); err != nil {
+		return fmt.Errorf("add secret watcher: %w", err)
 	}
 
 	kubeInformer.Start(cliCtx.Context.Done())
@@ -172,21 +170,4 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 	}
 
 	return nil
-}
-
-func readKey(cliCtx *cli.Context, client clientset.Interface) (string, error) {
-	ctx, cancel := context.WithTimeout(cliCtx.Context, 5*time.Second)
-	defer cancel()
-
-	secret, err := client.CoreV1().Secrets(currentNamespace()).Get(ctx, "hub-secret", metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("get secret: %w", err)
-	}
-
-	key, found := secret.Data["key"]
-	if !found {
-		return "", errors.New("key not found")
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256(key))[:32], nil
 }
