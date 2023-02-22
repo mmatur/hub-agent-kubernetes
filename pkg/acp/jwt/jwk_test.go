@@ -24,10 +24,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
-	"gopkg.in/square/go-jose.v2"
 )
 
 func TestContentKeySet_FetchesKeySet(t *testing.T) {
