@@ -19,11 +19,8 @@ package platform
 
 import (
 	"context"
-	"os"
-	"os/signal"
 	"reflect"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -53,17 +50,10 @@ func (w *ConfigWatcher) Run(ctx context.Context) {
 	t := time.NewTicker(w.interval)
 	defer t.Stop()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGHUP)
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-sigCh:
-			if err := w.reload(ctx); err != nil {
-				log.Error().Err(err).Msg("Unable to reload hub-agent-kubernetes configuration after receiving SIGHUP")
-			}
 		case <-t.C:
 			if err := w.reload(ctx); err != nil {
 				log.Error().Err(err).Msg("Unable to reload hub-agent-kubernetes configuration")

@@ -25,7 +25,6 @@ VERSION:
 COMMANDS:
    controller      Runs the Hub agent controller
    auth-server     Runs the Hub agent authentication server
-   refresh-config  Refresh agent configuration
    tunnel          Runs the Hub agent tunnel
    version         Shows the Hub Agent version information
    help, h         Shows a list of commands or help for one command
@@ -68,19 +67,6 @@ USAGE:
 OPTIONS:
    --listen-addr value  Address on which the auth server listens for auth requests (default: "0.0.0.0:80") [$AUTH_SERVER_LISTEN_ADDR]
    --log-level value    Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
-```
-
-### Refresh Config
-
-```
-NAME:
-   Traefik Hub agent for Kubernetes refresh-config - Refresh agent configuration
-
-USAGE:
-   Traefik Hub agent for Kubernetes refresh-config [command options] [arguments...]
-
-OPTIONS:
-   --log-level value  Log level to use (debug, info, warn, error or fatal) (default: "info") [$LOG_LEVEL]
 ```
 
 ### Tunnel

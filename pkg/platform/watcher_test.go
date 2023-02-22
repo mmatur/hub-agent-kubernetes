@@ -24,8 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -59,56 +57,6 @@ func TestConfigWatcher_Run(t *testing.T) {
 
 	ctx := context.Background()
 	go configWatcher.Run(ctx)
-
-	select {
-	case <-wait:
-	case <-time.After(time.Second):
-		t.Fatal("timed out")
-	}
-
-	assert.Equal(t, cfg, gotCfg)
-}
-
-func TestConfigWatcher_RunHandlesSIGHUP(t *testing.T) {
-	cfg := Config{
-		Metrics: MetricsConfig{Interval: 30 * time.Second},
-	}
-	client := setupClient(t, cfg)
-	configWatcher := NewConfigWatcher(time.Hour, client)
-
-	wait := make(chan struct{})
-	var gotCfg Config
-	var l sync.RWMutex
-	var closed bool
-	listener := func(cfg Config) {
-		gotCfg = cfg
-
-		l.Lock()
-		if !closed {
-			close(wait)
-			closed = true
-		}
-		l.Unlock()
-	}
-	configWatcher.AddListener(listener)
-
-	ctx := context.Background()
-	go configWatcher.Run(ctx)
-
-	go func() {
-		for {
-			l.RLock()
-			if closed {
-				l.RUnlock()
-				return
-			}
-			l.RUnlock()
-
-			pid := os.Getpid()
-			err := syscall.Kill(pid, syscall.SIGHUP)
-			require.NoError(t, err)
-		}
-	}()
 
 	select {
 	case <-wait:

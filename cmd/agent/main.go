@@ -50,7 +50,6 @@ func run() error {
 		Commands: []*cli.Command{
 			newControllerCmd().build(),
 			newAuthServerCmd().build(),
-			newRefreshConfigCmd().build(),
 			newTunnelCmd().build(),
 			newVersionCmd().build(),
 			newDevPortalCmd().build(),

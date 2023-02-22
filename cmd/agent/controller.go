@@ -20,8 +20,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/ettle/strcase"
@@ -46,7 +44,6 @@ import (
 )
 
 const (
-	pidFilePath           = "/var/run/hub-agent-kubernetes.pid"
 	flagPlatformURL       = "platform-url"
 	flagToken             = "token"
 	flagTraefikMetricsURL = "traefik.metrics-url"
@@ -100,10 +97,6 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	logger.Setup(cliCtx.String(flagLogLevel), cliCtx.String(flagLogFormat))
 
 	version.Log()
-
-	if err := writePID(); err != nil {
-		return fmt.Errorf("write pid: %w", err)
-	}
 
 	platformURL, token := cliCtx.String(flagPlatformURL), cliCtx.String(flagToken)
 
@@ -275,23 +268,4 @@ func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interfa
 	}
 
 	return cfg, nil
-}
-
-func writePID() error {
-	f, err := os.OpenFile(pidFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-
-	pid := os.Getpid()
-	if _, err = f.WriteString(strconv.Itoa(pid)); err != nil {
-		_ = f.Close()
-		return err
-	}
-
-	if err = f.Close(); err != nil {
-		return fmt.Errorf("close: %w", err)
-	}
-
-	return nil
 }
