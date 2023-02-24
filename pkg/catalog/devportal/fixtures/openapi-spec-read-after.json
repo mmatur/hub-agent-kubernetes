@@ -11,7 +11,17 @@
   ],
   "paths": {
     "/users/{id}": {
+      "servers": [
+        {
+          "url": "https://generated.hub.domain/prefix/path-custom"
+        }
+      ],
       "get": {
+        "servers": [
+          {
+            "url": "https://generated.hub.domain/prefix/path-method"
+          }
+        ],
         "operationId": "getUserItem",
         "tags": [
           "User"

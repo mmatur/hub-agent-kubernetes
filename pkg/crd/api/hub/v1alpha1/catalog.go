@@ -59,8 +59,7 @@ type CatalogService struct {
 	Port       int    `json:"port"`
 	PathPrefix string `json:"pathPrefix"`
 	// +optional
-	OpenAPISpecURL      string `json:"openApiSpecUrl,omitempty"`
-	OpenAPISpecBasePath string `json:"openApiSpecBasePath,omitempty"`
+	OpenAPISpecURL string `json:"openApiSpecUrl,omitempty"`
 }
 
 // CatalogStatus is the status of a Catalog.

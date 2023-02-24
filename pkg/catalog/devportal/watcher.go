@@ -24,6 +24,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -229,9 +230,7 @@ func (w *Watcher) buildRoutes() http.Handler {
 	router := chi.NewRouter()
 	for name, cfg := range w.catalogs {
 		cfg := cfg
-		path := "/api/" + name
-
-		router.Mount(path, w.buildRoute(name, &cfg))
+		router.Mount("/api/"+name, w.buildRoute(name, &cfg))
 	}
 
 	router.Get("/", func(rw http.ResponseWriter, req *http.Request) {
@@ -274,13 +273,11 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 
 	urlByName := map[string]string{}
 	pathPrefixByName := map[string]string{}
-	oasBasePathByName := map[string]string{}
 	for _, service := range c.Services {
 		key := service.Name + "@" + service.Namespace
 		services = append(services, key)
 		urlByName[key] = service.OpenAPISpecURL
 		pathPrefixByName[key] = service.PathPrefix
-		oasBasePathByName[key] = service.OpenAPISpecBasePath
 	}
 
 	router := chi.NewRouter()
@@ -356,7 +353,7 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 			return
 		}
 
-		if err := overrideServersAndSecurity(&oas, c, pathPrefixByName[svcName], oasBasePathByName[svcName]); err != nil {
+		if err := overrideServersAndSecurity(&oas, c, pathPrefixByName[svcName]); err != nil {
 			log.Error().Err(err).
 				Str("catalog_name", name).
 				Str("service_name", svcName).
@@ -380,38 +377,41 @@ func (w *Watcher) buildRoute(name string, c *catalog.Catalog) http.Handler {
 	return router
 }
 
-func overrideServersAndSecurity(oas *openapi3.T, c *catalog.Catalog, servicePathPrefix, oasBasePath string) error {
-	basePath := oasBasePath
-
-	if basePath == "" && len(oas.Servers) != 0 {
-		u, err := url.Parse(oas.Servers[0].URL)
-		if err != nil {
-			return fmt.Errorf("parse url: %w", err)
-		}
-		basePath = u.Path
-	}
-
-	if basePath == "/" {
-		basePath = ""
-	}
-
-	oas.Servers = nil
+func overrideServersAndSecurity(oas *openapi3.T, c *catalog.Catalog, servicePathPrefix string) error {
+	var domains []string
 	for _, domain := range c.CustomDomains {
-		oas.Servers = append(oas.Servers, &openapi3.Server{URL: "https://" + domain.Name + servicePathPrefix + basePath})
+		domains = append(domains, domain.Name)
 	}
 
-	if len(oas.Servers) == 0 {
-		oas.Servers = append(oas.Servers, &openapi3.Server{URL: "https://" + c.Domain + servicePathPrefix + basePath})
+	if len(domains) == 0 {
+		domains = append(domains, c.Domain)
 	}
 
+	var err error
+	oas.Servers, err = serversWithDomains(oas.Servers, domains, servicePathPrefix)
+	if err != nil {
+		return fmt.Errorf("unable to build oas servers: %w", err)
+	}
 	oas.Security = nil
 
 	for i := range oas.Paths {
-		oas.Paths[i].Servers = nil
+		if len(oas.Paths[i].Servers) > 0 {
+			oas.Paths[i].Servers, err = serversWithDomains(oas.Paths[i].Servers, domains, servicePathPrefix)
+			if err != nil {
+				return fmt.Errorf("unable to build path servers: %w", err)
+			}
+		}
 
 		for method := range oas.Paths[i].Operations() {
 			operation := oas.Paths[i].GetOperation(method)
-			operation.Servers = nil
+
+			if len(*operation.Servers) > 0 {
+				servers, err := serversWithDomains(*operation.Servers, domains, servicePathPrefix)
+				if err != nil {
+					return fmt.Errorf("unable to build operation servers: %w", err)
+				}
+				operation.Servers = &servers
+			}
 			operation.Security = nil
 
 			oas.Paths[i].SetOperation(method, operation)
@@ -419,4 +419,43 @@ func overrideServersAndSecurity(oas *openapi3.T, c *catalog.Catalog, servicePath
 	}
 
 	return nil
+}
+
+func serversWithDomains(servers openapi3.Servers, domains []string, prefix string) (openapi3.Servers, error) {
+	baseServer := &openapi3.Server{}
+	if len(servers) != 0 {
+		baseServer = servers[0]
+	}
+
+	pathS, err := pathServers(servers)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get path servers: %w", err)
+	}
+
+	var mergedServers openapi3.Servers
+	for _, domain := range domains {
+		s := *baseServer
+		s.URL = "https://" + domain + path.Join(prefix, pathS)
+
+		mergedServers = append(mergedServers, &s)
+	}
+
+	return mergedServers, nil
+}
+
+func pathServers(servers openapi3.Servers) (string, error) {
+	if len(servers) == 0 {
+		return "", nil
+	}
+
+	if servers[0].URL == "" {
+		return "", nil
+	}
+
+	u, err := url.Parse(servers[0].URL)
+	if err != nil {
+		return "", fmt.Errorf("parse url: %w", err)
+	}
+
+	return u.Path, nil
 }

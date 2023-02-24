@@ -12,10 +12,10 @@
   ],
   "paths": {
     "/users/{id}": {
-      "servers": [{"url":  "path-server.com"}],
+      "servers": [{"url":  "/path-custom"}],
       "get": {
         "security": [{"secure": []}],
-        "servers": [{"url": "method-server.com"}],
+        "servers": [{"url": "/path-method"}],
         "operationId": "getUserItem",
         "tags": [
           "User"

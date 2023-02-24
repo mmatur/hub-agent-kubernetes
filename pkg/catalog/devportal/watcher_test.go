@@ -291,88 +291,33 @@ func TestWatcher_OnUpdate_getSpec(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	catalog.Spec.Services = append(catalog.Spec.Services, hubv1alpha1.CatalogService{
-		Name:                "svc2",
-		Namespace:           "ns",
-		Port:                80,
-		PathPrefix:          "/prefix",
-		OpenAPISpecBasePath: "/base-path",
-	},
-		hubv1alpha1.CatalogService{
-			Name:                "svc3",
-			Namespace:           "ns",
-			Port:                80,
-			PathPrefix:          "/prefix",
-			OpenAPISpecBasePath: "/",
-		})
-
-	serviceStatuses := []hubv1alpha1.CatalogServiceStatus{
-		{
+	catalog.Status.CustomDomains = []string{"customdomain.com", "secondcustomdomain.com"}
+	catalog.Status.Services = append(catalog.Status.Services,
+		hubv1alpha1.CatalogServiceStatus{
 			Name:           "svc",
 			Namespace:      "ns",
 			OpenAPISpecURL: srv.URL,
 		},
-		{
-			Name:           "svc2",
-			Namespace:      "ns",
-			OpenAPISpecURL: srv.URL,
-		},
-		{
-			Name:           "svc3",
-			Namespace:      "ns",
-			OpenAPISpecURL: srv.URL,
-		},
-	}
-	catalog.Status.CustomDomains = []string{"customdomain.com", "secondcustomdomain.com"}
-	catalog.Status.Services = append(catalog.Status.Services, serviceStatuses...)
+	)
 	catalog.Status.Domain = generatedDomain
 
 	watcher.OnUpdate(nil, catalog)
 
 	time.Sleep(10 * time.Millisecond)
 
-	testCases := []struct {
-		desc         string
-		path         string
-		wantSpecFile string
-	}{
-		{
-			desc:         "get Open API spec with custom domains and guessed base path",
-			path:         "/api/my-catalog/services/svc@ns",
-			wantSpecFile: "openapi-spec-read-after-custom-domain-and-guessed-base-path.json",
-		},
-		{
-			desc:         "get Open API spec with custom domains and given base path",
-			path:         "/api/my-catalog/services/svc2@ns",
-			wantSpecFile: "openapi-spec-read-after-custom-domain-and-base-path.json",
-		},
-		{
-			desc:         "get Open API spec with custom domains and no guessed base path",
-			path:         "/api/my-catalog/services/svc3@ns",
-			wantSpecFile: "openapi-spec-read-after-custom-domain-and-no-guessed-base-path.json",
-		},
-	}
+	wantSpec, err := os.ReadFile("./fixtures/openapi-spec-read-after-custom-domain.json")
+	require.NoError(t, err)
 
-	for _, test := range testCases {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/api/my-catalog/services/svc@ns", http.NoBody)
 
-			wantSpec, err := os.ReadFile("./fixtures/" + test.wantSpecFile)
-			require.NoError(t, err)
+	switcher.ServeHTTP(rw, req)
 
-			rw := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "http://localhost"+test.path, nil)
+	resp, err := io.ReadAll(rw.Body)
+	require.NoError(t, err)
 
-			switcher.ServeHTTP(rw, req)
-
-			resp, err := io.ReadAll(rw.Body)
-			require.NoError(t, err)
-
-			assert.Equal(t, http.StatusOK, rw.Code)
-			assert.JSONEq(t, string(wantSpec), string(resp))
-		})
-	}
+	assert.Equal(t, http.StatusOK, rw.Code)
+	assert.JSONEq(t, string(wantSpec), string(resp))
 }
 
 func TestWatcher_OnDelete(t *testing.T) {

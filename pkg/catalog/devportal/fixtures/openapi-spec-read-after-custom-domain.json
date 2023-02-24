@@ -6,15 +6,31 @@
   },
   "servers": [
     {
-      "url": "https://customdomain.com/prefix/base-path"
+      "url": "https://customdomain.com/prefix/api/v3"
     },
     {
-      "url": "https://secondcustomdomain.com/prefix/base-path"
+      "url": "https://secondcustomdomain.com/prefix/api/v3"
     }
   ],
   "paths": {
     "/users/{id}": {
+      "servers": [
+        {
+          "url": "https://customdomain.com/prefix/path-custom"
+        },
+        {
+          "url": "https://secondcustomdomain.com/prefix/path-custom"
+        }
+      ],
       "get": {
+        "servers": [
+          {
+            "url": "https://customdomain.com/prefix/path-method"
+          },
+          {
+            "url": "https://secondcustomdomain.com/prefix/path-method"
+          }
+        ],
         "operationId": "getUserItem",
         "tags": [
           "User"
