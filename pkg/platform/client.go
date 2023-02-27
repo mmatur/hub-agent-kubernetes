@@ -34,7 +34,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
-	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
+	"github.com/traefik/hub-agent-kubernetes/pkg/api"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
@@ -90,20 +90,20 @@ type UpdateEdgeIngressReq struct {
 	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
-// CreateCatalogReq is the request for creating a catalog.
-type CreateCatalogReq struct {
-	Name          string            `json:"name"`
-	Description   string            `json:"description"`
-	CustomDomains []string          `json:"customDomains"`
-	Services      []catalog.Service `json:"services"`
+// CreatePortalReq is the request for creating a portal.
+type CreatePortalReq struct {
+	Name             string   `json:"name"`
+	Description      string   `json:"description"`
+	CustomDomains    []string `json:"customDomains"`
+	APICustomDomains []string `json:"apiCustomDomains"`
 }
 
-// UpdateCatalogReq is a request for updating a catalog.
-type UpdateCatalogReq struct {
-	Description     string            `json:"description"`
-	DevPortalDomain string            `json:"devPortalDomain"`
-	CustomDomains   []string          `json:"customDomains"`
-	Services        []catalog.Service `json:"services"`
+// UpdatePortalReq is a request for updating a portal.
+type UpdatePortalReq struct {
+	Description      string   `json:"description"`
+	HubDomain        string   `json:"hubDomain"`
+	CustomDomains    []string `json:"customDomains"`
+	APICustomDomains []string `json:"apiCustomDomains"`
 }
 
 // Command defines patch operation to apply on the cluster.
@@ -713,14 +713,14 @@ func (c *Client) DeleteACP(ctx context.Context, oldVersion, name string) error {
 	}
 }
 
-// CreateCatalog creates a catalog.
-func (c *Client) CreateCatalog(ctx context.Context, createReq *CreateCatalogReq) (*catalog.Catalog, error) {
+// CreatePortal creates a portal.
+func (c *Client) CreatePortal(ctx context.Context, createReq *CreatePortalReq) (*api.Portal, error) {
 	body, err := json.Marshal(createReq)
 	if err != nil {
-		return nil, fmt.Errorf("marshal catalog request: %w", err)
+		return nil, fmt.Errorf("marshal portal request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs"))
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals"))
 	if err != nil {
 		return nil, fmt.Errorf("parse endpoint: %w", err)
 	}
@@ -741,12 +741,12 @@ func (c *Client) CreateCatalog(ctx context.Context, createReq *CreateCatalogReq)
 
 	switch resp.StatusCode {
 	case http.StatusCreated:
-		var c catalog.Catalog
+		var p api.Portal
 
-		if err = json.NewDecoder(resp.Body).Decode(&c); err != nil {
-			return nil, fmt.Errorf("failed to decode catalog: %w", err)
+		if err = json.NewDecoder(resp.Body).Decode(&p); err != nil {
+			return nil, fmt.Errorf("failed to decode portal: %w", err)
 		}
-		return &c, nil
+		return &p, nil
 	default:
 		all, _ := io.ReadAll(resp.Body)
 
@@ -759,9 +759,9 @@ func (c *Client) CreateCatalog(ctx context.Context, createReq *CreateCatalogReq)
 	}
 }
 
-// GetCatalogs fetches the Catalogs available for this agent.
-func (c *Client) GetCatalogs(ctx context.Context) ([]catalog.Catalog, error) {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs"))
+// GetPortals fetches the portals available for this agent.
+func (c *Client) GetPortals(ctx context.Context) ([]api.Portal, error) {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals"))
 	if err != nil {
 		return nil, fmt.Errorf("parse endpoint: %w", err)
 	}
@@ -791,22 +791,22 @@ func (c *Client) GetCatalogs(ctx context.Context) ([]catalog.Catalog, error) {
 		return nil, apiErr
 	}
 
-	var catalogs []catalog.Catalog
-	if err = json.NewDecoder(resp.Body).Decode(&catalogs); err != nil {
+	var portals []api.Portal
+	if err = json.NewDecoder(resp.Body).Decode(&portals); err != nil {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 
-	return catalogs, nil
+	return portals, nil
 }
 
-// UpdateCatalog updates a catalog.
-func (c *Client) UpdateCatalog(ctx context.Context, name, lastKnownVersion string, updateReq *UpdateCatalogReq) (*catalog.Catalog, error) {
+// UpdatePortal updates a portal.
+func (c *Client) UpdatePortal(ctx context.Context, name, lastKnownVersion string, updateReq *UpdatePortalReq) (*api.Portal, error) {
 	body, err := json.Marshal(updateReq)
 	if err != nil {
-		return nil, fmt.Errorf("marshal catalog request: %w", err)
+		return nil, fmt.Errorf("marshal portal request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs", name))
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals", name))
 	if err != nil {
 		return nil, fmt.Errorf("parse endpoint: %w", err)
 	}
@@ -828,12 +828,12 @@ func (c *Client) UpdateCatalog(ctx context.Context, name, lastKnownVersion strin
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var c catalog.Catalog
+		var p api.Portal
 
-		if err = json.NewDecoder(resp.Body).Decode(&c); err != nil {
-			return nil, fmt.Errorf("failed to decode catalog: %w", err)
+		if err = json.NewDecoder(resp.Body).Decode(&p); err != nil {
+			return nil, fmt.Errorf("failed to decode portal: %w", err)
 		}
-		return &c, nil
+		return &p, nil
 	default:
 		all, _ := io.ReadAll(resp.Body)
 
@@ -846,9 +846,9 @@ func (c *Client) UpdateCatalog(ctx context.Context, name, lastKnownVersion strin
 	}
 }
 
-// DeleteCatalog deletes a catalog.
-func (c *Client) DeleteCatalog(ctx context.Context, name, lastKnownVersion string) error {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "catalogs", name))
+// DeletePortal deletes a portal.
+func (c *Client) DeletePortal(ctx context.Context, name, lastKnownVersion string) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals", name))
 	if err != nil {
 		return fmt.Errorf("parse endpoint: %w", err)
 	}

@@ -1,0 +1,25 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIPortal
+metadata:
+  name: new-portal
+spec:
+  customDomains:
+    - "hello.example.com"
+    - "welcome.example.com"
+    - "not-verified.example.com"
+  apiCustomDomains:
+    - "api.hello.example.com"
+    - "api.welcome.example.com"
+    - "api.not-verified.example.com"
+status:
+  version: version-1
+  apiHubDomain: brave-lion-123.hub-traefik.io
+  customDomains:
+    - hello.example.com
+    - welcome.example.com
+  apiCustomDomains:
+    - api.hello.example.com
+    - api.welcome.example.com
+  urls: "https://hello.example.com,https://welcome.example.com"
+  apiUrls: "https://api.hello.example.com,https://api.welcome.example.com,https://brave-lion-123.hub-traefik.io"
+  hash: "X9iqVdHyJeBBx7cckdjNbp9vm6o="

@@ -191,7 +191,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	})
 
 	group.Go(func() error {
-		errWh := webhookAdmission(ctx, cliCtx, platformClient, topoWatch)
+		errWh := webhookAdmission(ctx, cliCtx, platformClient)
 		if errWh != nil {
 			log.Error().Err(errWh).Msg("webhook stopped")
 		}

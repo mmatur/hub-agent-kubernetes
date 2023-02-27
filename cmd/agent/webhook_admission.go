@@ -36,8 +36,8 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/reviewer"
-	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
-	catalogadmission "github.com/traefik/hub-agent-kubernetes/pkg/catalog/admission"
+	"github.com/traefik/hub-agent-kubernetes/pkg/api"
+	apiadmission "github.com/traefik/hub-agent-kubernetes/pkg/api/admission"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
@@ -49,7 +49,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
-	"github.com/traefik/hub-agent-kubernetes/pkg/topology"
 	"github.com/urfave/cli/v2"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
@@ -67,7 +66,7 @@ const (
 	flagACPServerKey                      = "acp-server.key"
 	flagACPServerAuthServerAddr           = "acp-server.auth-server-addr"
 	flagIngressClassName                  = "ingress-class-name"
-	flagTraefikCatalogEntryPoint          = "traefik.catalog.entryPoint"
+	flagTraefikAPIEntryPoint              = "traefik.api.entryPoint"
 	flagTraefikTunnelEntryPoint           = "traefik.tunnel.entryPoint"
 	flagTraefikTunnelEntryPointDeprecated = "traefik.entryPoint"
 	flagDevPortalServiceName              = "dev-portal.service-name"
@@ -124,9 +123,9 @@ func admissionFlags() []cli.Flag {
 			Value:   "traefik-hub",
 		},
 		&cli.StringFlag{
-			Name:    flagTraefikCatalogEntryPoint,
-			Usage:   "The entry point used by Traefik to expose catalog APIs",
-			EnvVars: []string{strcase.ToSNAKE(flagTraefikCatalogEntryPoint)},
+			Name:    flagTraefikAPIEntryPoint,
+			Usage:   "The entry point used by Traefik to expose APIs",
+			EnvVars: []string{strcase.ToSNAKE(flagTraefikAPIEntryPoint)},
 			Value:   "websecure",
 		},
 		&cli.StringFlag{
@@ -144,7 +143,7 @@ func admissionFlags() []cli.Flag {
 	}
 }
 
-func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client, topoWatch *topology.Watcher) error {
+func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client) error {
 	var (
 		listenAddr     = cliCtx.String(flagACPServerListenAddr)
 		certFile       = cliCtx.String(flagACPServerCertificate)
@@ -171,19 +170,19 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		CertSyncInterval:        time.Hour,
 	}
 
-	catalogWatcherCfg := &catalog.WatcherConfig{
-		IngressClassName:         cliCtx.String(flagIngressClassName),
-		AgentNamespace:           currentNamespace(),
-		TraefikCatalogEntryPoint: cliCtx.String(flagTraefikCatalogEntryPoint),
-		TraefikTunnelEntryPoint:  cliCtx.String(flagTraefikTunnelEntryPoint),
-		DevPortalServiceName:     cliCtx.String(flagDevPortalServiceName),
-		DevPortalPort:            cliCtx.Int(flagDevPortalPort),
-		CatalogSyncInterval:      time.Minute,
-		CertSyncInterval:         time.Hour,
-		CertRetryInterval:        time.Minute,
+	apiWatcherCfg := &api.WatcherConfig{
+		IngressClassName:        cliCtx.String(flagIngressClassName),
+		AgentNamespace:          currentNamespace(),
+		TraefikAPIEntryPoint:    cliCtx.String(flagTraefikAPIEntryPoint),
+		TraefikTunnelEntryPoint: cliCtx.String(flagTraefikTunnelEntryPoint),
+		DevPortalServiceName:    cliCtx.String(flagDevPortalServiceName),
+		DevPortalPort:           cliCtx.Int(flagDevPortalPort),
+		APISyncInterval:         time.Minute,
+		CertSyncInterval:        time.Hour,
+		CertRetryInterval:       time.Minute,
 	}
 
-	acpAdmission, edgeIngressAdmission, catalogAdmission, err := setupAdmissionHandlers(ctx, platformClient, topoWatch, authServerAddr, edgeIngressWatcherCfg, catalogWatcherCfg)
+	acpAdmission, edgeIngressAdmission, apiAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, apiWatcherCfg)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -192,8 +191,8 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 
 	router := chi.NewRouter()
 	router.Handle("/edge-ingress", edgeIngressAdmission)
-	if catalogAdmission != nil {
-		router.Handle("/catalog", catalogAdmission)
+	if apiAdmission != nil {
+		router.Handle("/api", apiAdmission)
 	}
 	router.Handle("/ingress", acpAdmission)
 	router.Handle("/acp", webAdmissionACP)
@@ -233,7 +232,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, topoWatch *topology.Watcher, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, catalogWatcherCfg *catalog.WatcherConfig) (acpHdl, edgeIngressHdl, catalogHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, apiWatcherCfg *api.WatcherConfig) (acpHdl, edgeIngressHdl, apiHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -275,18 +274,15 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	catalogAvailable, err := isCatalogAvailable(kubeClientSet)
+	apiAvailable, err := isAPIAvailable(kubeClientSet)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("catalog available: %w", err)
+		return nil, nil, nil, fmt.Errorf("API available: %w", err)
 	}
 
-	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, catalogAvailable)
+	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, apiAvailable)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
-
-	oasRegistry := catalog.NewServiceRegistry()
-	topoWatch.AddListener(oasRegistry.TopologyStateChanged)
 
 	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
 
@@ -298,9 +294,9 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	go acpWatcher.Run(ctx)
 	go ingressUpdater.Run(ctx)
 	go edgeIngressWatcher.Run(ctx)
-	if catalogAvailable {
-		catalogWatcher := catalog.NewWatcher(platformClient, oasRegistry, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, catalogWatcherCfg)
-		go catalogWatcher.Run(ctx)
+	if apiAvailable {
+		apiWatcher := api.NewWatcher(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, apiWatcherCfg)
+		go apiWatcher.Run(ctx)
 	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
@@ -314,12 +310,12 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		traefikReviewer,
 	}
 
-	var catalogHandler http.Handler
-	if catalogAvailable {
-		catalogHandler = catalogadmission.NewHandler(platformClient, oasRegistry)
+	var apiHandler http.Handler
+	if apiAvailable {
+		apiHandler = apiadmission.NewHandler(platformClient)
 	}
 
-	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), catalogHandler, nil
+	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), apiHandler, nil
 }
 
 func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
@@ -340,7 +336,7 @@ func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config)
 	return traefikClientSet.TraefikV1alpha1(), nil
 }
 
-func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler, catalogAvailable bool) error {
+func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler, apiAvailable bool) error {
 	if _, err := hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher); err != nil {
 		return fmt.Errorf("add ingressClass event handler: %w", err)
 	}
@@ -351,8 +347,10 @@ func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInforme
 
 	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
-	if catalogAvailable {
-		hubInformer.Hub().V1alpha1().Catalogs().Informer()
+	if apiAvailable {
+		hubInformer.Hub().V1alpha1().APIPortals().Informer()
+		hubInformer.Hub().V1alpha1().APICollections().Informer()
+		hubInformer.Hub().V1alpha1().APIs().Informer()
 	}
 
 	hubInformer.Start(ctx.Done())
@@ -447,7 +445,7 @@ func hasMiddlewareCRD(clientSet discovery.DiscoveryInterface) (bool, error) {
 	return true, nil
 }
 
-func isCatalogAvailable(clientSet discovery.DiscoveryInterface) (bool, error) {
+func isAPIAvailable(clientSet discovery.DiscoveryInterface) (bool, error) {
 	crdList, err := clientSet.ServerResourcesForGroupVersion(hubv1alpha1.SchemeGroupVersion.String())
 	if err != nil {
 		if kerror.IsNotFound(err) {
@@ -460,7 +458,7 @@ func isCatalogAvailable(clientSet discovery.DiscoveryInterface) (bool, error) {
 	log.Info().Interface("crds", crdList.APIResources).Msg("crds list")
 
 	for _, resource := range crdList.APIResources {
-		if resource.Kind == "Catalog" {
+		if resource.Kind == "APIPortal" {
 			return true, nil
 		}
 	}

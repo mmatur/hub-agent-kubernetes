@@ -34,7 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
-	"github.com/traefik/hub-agent-kubernetes/pkg/catalog"
+	"github.com/traefik/hub-agent-kubernetes/pkg/api"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
@@ -593,24 +593,21 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 	}
 }
 
-func TestClient_GetCatalogs(t *testing.T) {
-	wantCatalogs := []catalog.Catalog{
+func TestClient_GetPortals(t *testing.T) {
+	wantPortals := []api.Portal{
 		{
-			WorkspaceID: "workspace-id",
-			ClusterID:   "cluster-id",
-			Name:        "name",
-			Version:     "version",
-			CustomDomains: []catalog.CustomDomain{
+			WorkspaceID:  "workspace-id",
+			ClusterID:    "cluster-id",
+			Name:         "name",
+			Description:  "description",
+			Version:      "version",
+			HubDomain:    "majestic-beaver-123.hub-traefik.io",
+			APIHubDomain: "brave-lion-123.hub-traefik.io",
+			CustomDomains: []api.CustomDomain{
 				{Name: "hello.example.com", Verified: true},
 			},
-			DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
-			Services: []catalog.Service{
-				{
-					Name:       "user",
-					Namespace:  "default",
-					Port:       8080,
-					PathPrefix: "/users",
-				},
+			APICustomDomains: []api.CustomDomain{
+				{Name: "api.hello.example.com", Verified: true},
 			},
 			CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
 			UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
@@ -620,7 +617,7 @@ func TestClient_GetCatalogs(t *testing.T) {
 	var callCount int
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/catalogs", func(rw http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/portals", func(rw http.ResponseWriter, req *http.Request) {
 		callCount++
 
 		if req.Method != http.MethodGet {
@@ -634,7 +631,7 @@ func TestClient_GetCatalogs(t *testing.T) {
 		}
 
 		rw.WriteHeader(http.StatusOK)
-		err := json.NewEncoder(rw).Encode(wantCatalogs)
+		err := json.NewEncoder(rw).Encode(wantPortals)
 		require.NoError(t, err)
 	})
 
@@ -646,52 +643,40 @@ func TestClient_GetCatalogs(t *testing.T) {
 	require.NoError(t, err)
 	c.httpClient = srv.Client()
 
-	gotCatalogs, err := c.GetCatalogs(context.Background())
+	gotPortals, err := c.GetPortals(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, 1, callCount)
-	assert.Equal(t, wantCatalogs, gotCatalogs)
+	assert.Equal(t, wantPortals, gotPortals)
 }
 
-func TestClient_CreateCatalog(t *testing.T) {
+func TestClient_CreatePortal(t *testing.T) {
 	tests := []struct {
 		desc             string
-		createReq        *CreateCatalogReq
-		catalog          *catalog.Catalog
+		createReq        *CreatePortalReq
+		portal           *api.Portal
 		returnStatusCode int
 		wantErr          assert.ErrorAssertionFunc
 	}{
 		{
-			desc: "create catalog",
-			createReq: &CreateCatalogReq{
-				Name:          "name",
-				CustomDomains: []string{"hello.example.com"},
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
-				},
+			desc: "create portal",
+			createReq: &CreatePortalReq{
+				Name:             "name",
+				CustomDomains:    []string{"hello.example.com"},
+				APICustomDomains: []string{"api.hello.example.com"},
 			},
 			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
-			catalog: &catalog.Catalog{
+			portal: &api.Portal{
 				WorkspaceID: "workspace-id",
 				ClusterID:   "cluster-id",
 				Name:        "name",
 				Version:     "version-1",
-				CustomDomains: []catalog.CustomDomain{
+				CustomDomains: []api.CustomDomain{
 					{Name: "hello.example.com", Verified: true},
 				},
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
+				APICustomDomains: []api.CustomDomain{
+					{Name: "api.hello.example.com", Verified: true},
 				},
 				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
 				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
@@ -699,16 +684,8 @@ func TestClient_CreateCatalog(t *testing.T) {
 		},
 		{
 			desc: "error",
-			createReq: &CreateCatalogReq{
+			createReq: &CreatePortalReq{
 				Name: "name",
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
-				},
 			},
 			returnStatusCode: http.StatusConflict,
 			wantErr:          assert.Error,
@@ -726,7 +703,7 @@ func TestClient_CreateCatalog(t *testing.T) {
 			)
 
 			mux := http.NewServeMux()
-			mux.HandleFunc("/catalogs", func(rw http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/portals", func(rw http.ResponseWriter, req *http.Request) {
 				callCount++
 
 				if req.Method != http.MethodPost {
@@ -743,7 +720,7 @@ func TestClient_CreateCatalog(t *testing.T) {
 				require.NoError(t, err)
 
 				rw.WriteHeader(test.returnStatusCode)
-				err = json.NewEncoder(rw).Encode(test.catalog)
+				err = json.NewEncoder(rw).Encode(test.portal)
 				require.NoError(t, err)
 			})
 
@@ -755,76 +732,53 @@ func TestClient_CreateCatalog(t *testing.T) {
 			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			createCatalog, err := c.CreateCatalog(context.Background(), test.createReq)
+			createdPortal, err := c.CreatePortal(context.Background(), test.createReq)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
-			assert.Equal(t, test.catalog, createCatalog)
+			assert.Equal(t, test.portal, createdPortal)
 		})
 	}
 }
 
-func TestClient_UpdateCatalog(t *testing.T) {
+func TestClient_UpdatePortal(t *testing.T) {
 	tests := []struct {
 		desc             string
 		name             string
 		version          string
-		updateReq        *UpdateCatalogReq
-		catalog          *catalog.Catalog
+		updateReq        *UpdatePortalReq
+		portal           *api.Portal
 		returnStatusCode int
 		wantErr          assert.ErrorAssertionFunc
 	}{
 		{
-			desc:    "update catalog",
+			desc:    "update portal",
 			name:    "name",
 			version: "version-1",
-			updateReq: &UpdateCatalogReq{
-				CustomDomains:   []string{"hello.example.com"},
-				DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
-				},
+			updateReq: &UpdatePortalReq{
+				CustomDomains:    []string{"hello.example.com"},
+				APICustomDomains: []string{"api.hello.example.com"},
+				HubDomain:        "majestic-beaver-123.hub-traefik.io",
 			},
 			returnStatusCode: http.StatusOK,
 			wantErr:          assert.NoError,
-			catalog: &catalog.Catalog{
-				WorkspaceID:     "workspace-id",
-				ClusterID:       "cluster-id",
-				Name:            "name",
-				Version:         "version-1",
-				CustomDomains:   []catalog.CustomDomain{{Name: "hello.example.com", Verified: true}},
-				DevPortalDomain: "majestic-beaver-123.hub-traefik.io",
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
-				},
-				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
-				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+			portal: &api.Portal{
+				WorkspaceID:      "workspace-id",
+				ClusterID:        "cluster-id",
+				Name:             "name",
+				Version:          "version-1",
+				CustomDomains:    []api.CustomDomain{{Name: "hello.example.com", Verified: true}},
+				APICustomDomains: []api.CustomDomain{{Name: "api.hello.example.com", Verified: true}},
+				HubDomain:        "majestic-beaver-123.hub-traefik.io",
+				CreatedAt:        time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:        time.Now().UTC().Truncate(time.Millisecond),
 			},
 		},
 		{
-			desc:    "error",
-			version: "version-1",
-			name:    "name",
-			updateReq: &UpdateCatalogReq{
-				Services: []catalog.Service{
-					{
-						Name:       "user",
-						Namespace:  "default",
-						Port:       8080,
-						PathPrefix: "/users",
-					},
-				},
-			},
+			desc:             "error",
+			version:          "version-1",
+			name:             "name",
+			updateReq:        &UpdatePortalReq{},
 			returnStatusCode: http.StatusConflict,
 			wantErr:          assert.Error,
 		},
@@ -842,7 +796,7 @@ func TestClient_UpdateCatalog(t *testing.T) {
 
 			mux := http.NewServeMux()
 
-			mux.HandleFunc("/catalogs/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/portals/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
 				callCount++
 
 				if req.Method != http.MethodPut {
@@ -863,7 +817,7 @@ func TestClient_UpdateCatalog(t *testing.T) {
 				require.NoError(t, err)
 
 				rw.WriteHeader(test.returnStatusCode)
-				err = json.NewEncoder(rw).Encode(test.catalog)
+				err = json.NewEncoder(rw).Encode(test.portal)
 				require.NoError(t, err)
 			})
 
@@ -875,16 +829,16 @@ func TestClient_UpdateCatalog(t *testing.T) {
 			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			updatedCatalog, err := c.UpdateCatalog(context.Background(), test.name, test.version, test.updateReq)
+			updatedPortal, err := c.UpdatePortal(context.Background(), test.name, test.version, test.updateReq)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
-			assert.Equal(t, test.catalog, updatedCatalog)
+			assert.Equal(t, test.portal, updatedPortal)
 		})
 	}
 }
 
-func TestClient_DeleteCatalog(t *testing.T) {
+func TestClient_DeletePortal(t *testing.T) {
 	tests := []struct {
 		desc             string
 		version          string
@@ -893,7 +847,7 @@ func TestClient_DeleteCatalog(t *testing.T) {
 		wantErr          assert.ErrorAssertionFunc
 	}{
 		{
-			desc:             "delete catalog",
+			desc:             "delete portal",
 			version:          "version-1",
 			name:             "name",
 			returnStatusCode: http.StatusNoContent,
@@ -916,7 +870,7 @@ func TestClient_DeleteCatalog(t *testing.T) {
 			var callCount int
 
 			mux := http.NewServeMux()
-			mux.HandleFunc("/catalogs/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+			mux.HandleFunc("/portals/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
 				callCount++
 
 				if req.Method != http.MethodDelete {
@@ -944,7 +898,7 @@ func TestClient_DeleteCatalog(t *testing.T) {
 			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			err = c.DeleteCatalog(context.Background(), test.name, test.version)
+			err = c.DeletePortal(context.Background(), test.name, test.version)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)

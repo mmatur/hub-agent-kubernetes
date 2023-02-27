@@ -27,7 +27,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/catalog/devportal"
+	"github.com/traefik/hub-agent-kubernetes/pkg/api/devportal"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
@@ -82,14 +82,14 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 	}
 
 	switcher := devportal.NewHandlerSwitcher()
-	catalogWatcher, err := devportal.NewWatcher(switcher)
+	portalWatcher, err := devportal.NewWatcher(switcher)
 	if err != nil {
 		return fmt.Errorf("create portal watcher: %w", err)
 	}
 
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	if _, errInformer := hubInformer.Hub().V1alpha1().Catalogs().Informer().AddEventHandler(catalogWatcher); errInformer != nil {
-		return fmt.Errorf("add catalog watcher: %w", errInformer)
+	if _, errInformer := hubInformer.Hub().V1alpha1().APIPortals().Informer().AddEventHandler(portalWatcher); errInformer != nil {
+		return fmt.Errorf("add portal watcher: %w", errInformer)
 	}
 
 	hubInformer.Start(cliCtx.Context.Done())
@@ -100,7 +100,7 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 		}
 	}
 
-	go catalogWatcher.Run(cliCtx.Context)
+	go portalWatcher.Run(cliCtx.Context)
 
 	listenAddr := cliCtx.String(flagListenAddr)
 

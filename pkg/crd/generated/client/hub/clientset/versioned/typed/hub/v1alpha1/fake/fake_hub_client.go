@@ -28,12 +28,20 @@ type FakeHubV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeHubV1alpha1) AccessControlPolicies() v1alpha1.AccessControlPolicyInterface {
-	return &FakeAccessControlPolicies{c}
+func (c *FakeHubV1alpha1) APIs(namespace string) v1alpha1.APIInterface {
+	return &FakeAPIs{c, namespace}
 }
 
-func (c *FakeHubV1alpha1) Catalogs() v1alpha1.CatalogInterface {
-	return &FakeCatalogs{c}
+func (c *FakeHubV1alpha1) APICollections() v1alpha1.APICollectionInterface {
+	return &FakeAPICollections{c}
+}
+
+func (c *FakeHubV1alpha1) APIPortals() v1alpha1.APIPortalInterface {
+	return &FakeAPIPortals{c}
+}
+
+func (c *FakeHubV1alpha1) AccessControlPolicies() v1alpha1.AccessControlPolicyInterface {
+	return &FakeAccessControlPolicies{c}
 }
 
 func (c *FakeHubV1alpha1) EdgeIngresses(namespace string) v1alpha1.EdgeIngressInterface {

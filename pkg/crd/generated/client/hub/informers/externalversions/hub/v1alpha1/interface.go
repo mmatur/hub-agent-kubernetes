@@ -24,10 +24,14 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// APIs returns a APIInformer.
+	APIs() APIInformer
+	// APICollections returns a APICollectionInformer.
+	APICollections() APICollectionInformer
+	// APIPortals returns a APIPortalInformer.
+	APIPortals() APIPortalInformer
 	// AccessControlPolicies returns a AccessControlPolicyInformer.
 	AccessControlPolicies() AccessControlPolicyInformer
-	// Catalogs returns a CatalogInformer.
-	Catalogs() CatalogInformer
 	// EdgeIngresses returns a EdgeIngressInformer.
 	EdgeIngresses() EdgeIngressInformer
 	// IngressClasses returns a IngressClassInformer.
@@ -45,14 +49,24 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// APIs returns a APIInformer.
+func (v *version) APIs() APIInformer {
+	return &aPIInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// APICollections returns a APICollectionInformer.
+func (v *version) APICollections() APICollectionInformer {
+	return &aPICollectionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// APIPortals returns a APIPortalInformer.
+func (v *version) APIPortals() APIPortalInformer {
+	return &aPIPortalInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // AccessControlPolicies returns a AccessControlPolicyInformer.
 func (v *version) AccessControlPolicies() AccessControlPolicyInformer {
 	return &accessControlPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// Catalogs returns a CatalogInformer.
-func (v *version) Catalogs() CatalogInformer {
-	return &catalogInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // EdgeIngresses returns a EdgeIngressInformer.

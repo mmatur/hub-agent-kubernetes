@@ -50,8 +50,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AccessControlPolicyList{},
 		&EdgeIngress{},
 		&EdgeIngressList{},
-		&Catalog{},
-		&CatalogList{},
+		&APIPortal{},
+		&APIPortalList{},
+		&API{},
+		&APIList{},
+		&APICollection{},
+		&APICollectionList{},
 	)
 
 	metav1.AddToGroupVersion(
