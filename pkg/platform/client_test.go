@@ -906,6 +906,50 @@ func TestClient_DeletePortal(t *testing.T) {
 	}
 }
 
+func TestClient_GetACPs(t *testing.T) {
+	wantACPs := []acp.ACP{
+		{
+			Name:    "name",
+			Version: "version-1",
+			Config: acp.Config{
+				JWT: &jwt.Config{
+					PublicKey: "key",
+				},
+			},
+		},
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/acps", func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantACPs)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
+	c.httpClient = srv.Client()
+
+	gotACPs, err := c.GetACPs(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, wantACPs, gotACPs)
+}
+
 func TestClient_CreateACP(t *testing.T) {
 	tests := []struct {
 		desc             string

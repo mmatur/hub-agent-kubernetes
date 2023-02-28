@@ -287,46 +287,6 @@ func (c *Client) GetConfig(ctx context.Context) (Config, error) {
 	return cfg, nil
 }
 
-// GetACPs returns the ACPs related to the agent.
-func (c *Client) GetACPs(ctx context.Context) ([]acp.ACP, error) {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "acps"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
-
-	var acps []acp.ACP
-	if err = json.NewDecoder(resp.Body).Decode(&acps); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
-	}
-
-	return acps, nil
-}
-
 // Ping sends a ping to the platform to inform that the agent is alive.
 func (c *Client) Ping(ctx context.Context) error {
 	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "ping"))
@@ -449,43 +409,22 @@ func (c *Client) CreateEdgeIngress(ctx context.Context, createReq *CreateEdgeIng
 		return nil, fmt.Errorf("marshal edge ingress request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "edge-ingresses"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var e edgeingress.EdgeIngress
+	if err = c.createResource(ctx, "edge-ingresses", body, &e); err != nil {
+		return nil, fmt.Errorf("create edge ingress: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	return &e, nil
+}
+
+// GetEdgeIngresses returns the EdgeIngresses related to the agent.
+func (c *Client) GetEdgeIngresses(ctx context.Context) ([]edgeingress.EdgeIngress, error) {
+	var edgeIngresses []edgeingress.EdgeIngress
+	if err := c.listResource(ctx, "edge-ingresses", &edgeIngresses); err != nil {
+		return nil, fmt.Errorf("list edge ingresses: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusCreated:
-		var edgeIng edgeingress.EdgeIngress
-
-		if err = json.NewDecoder(resp.Body).Decode(&edgeIng); err != nil {
-			return nil, fmt.Errorf("failed to decode edge ingress: %w", err)
-		}
-		return &edgeIng, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return edgeIngresses, nil
 }
 
 // UpdateEdgeIngress updated an edge ingress.
@@ -495,84 +434,21 @@ func (c *Client) UpdateEdgeIngress(ctx context.Context, namespace, name, lastKno
 		return nil, fmt.Errorf("marshal edge ingress request: %w", err)
 	}
 
-	id := name + "@" + namespace
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "edge-ingresses", id))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var e edgeingress.EdgeIngress
+	if err = c.updateResource(ctx, "edge-ingresses", name+"@"+namespace, lastKnownVersion, body, &e); err != nil {
+		return nil, fmt.Errorf("update edge ingress: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", lastKnownVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var edgeIng edgeingress.EdgeIngress
-
-		if err = json.NewDecoder(resp.Body).Decode(&edgeIng); err != nil {
-			return nil, fmt.Errorf("failed to decode edge ingress: %w", err)
-		}
-		return &edgeIng, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return &e, nil
 }
 
 // DeleteEdgeIngress deletes an edge ingress.
 func (c *Client) DeleteEdgeIngress(ctx context.Context, namespace, name, lastKnownVersion string) error {
-	id := name + "@" + namespace
-
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "edge-ingresses", id))
-	if err != nil {
-		return fmt.Errorf("parse endpoint: %w", err)
+	if err := c.deleteResource(ctx, "edge-ingresses", name+"@"+namespace, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete edge ingress: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), http.NoBody)
-	if err != nil {
-		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", lastKnownVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusNoContent:
-		return nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return apiErr
-	}
+	return nil
 }
 
 // CreateACP creates an AccessControlPolicy.
@@ -586,43 +462,22 @@ func (c *Client) CreateACP(ctx context.Context, policy *hubv1alpha1.AccessContro
 		return nil, fmt.Errorf("marshal ACP request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "acps"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var a acp.ACP
+	if err = c.createResource(ctx, "acps", body, &a); err != nil {
+		return nil, fmt.Errorf("create ACP: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	return &a, nil
+}
+
+// GetACPs returns the ACPs related to the agent.
+func (c *Client) GetACPs(ctx context.Context) ([]acp.ACP, error) {
+	var acps []acp.ACP
+	if err := c.listResource(ctx, "acps", &acps); err != nil {
+		return nil, fmt.Errorf("list acps: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusCreated:
-		var a acp.ACP
-		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
-			return nil, fmt.Errorf("failed to decode ACP: %w", err)
-		}
-
-		return &a, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return acps, nil
 }
 
 // UpdateACP updates an AccessControlPolicy.
@@ -636,81 +491,21 @@ func (c *Client) UpdateACP(ctx context.Context, oldVersion string, policy *hubv1
 		return nil, fmt.Errorf("marshal ACP request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "acps", policy.Name))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var a acp.ACP
+	if err = c.updateResource(ctx, "acps", policy.Name, oldVersion, body, &a); err != nil {
+		return nil, fmt.Errorf("update ACP: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", oldVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var a acp.ACP
-		if err = json.NewDecoder(resp.Body).Decode(&a); err != nil {
-			return nil, fmt.Errorf("failed to decode ACP: %w", err)
-		}
-
-		return &a, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return &a, nil
 }
 
 // DeleteACP deletes an AccessControlPolicy.
 func (c *Client) DeleteACP(ctx context.Context, oldVersion, name string) error {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "acps", name))
-	if err != nil {
-		return fmt.Errorf("parse endpoint: %w", err)
+	if err := c.deleteResource(ctx, "acps", name, oldVersion); err != nil {
+		return fmt.Errorf("delete acp: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), http.NoBody)
-	if err != nil {
-		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", oldVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusNoContent:
-		return nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return apiErr
-	}
+	return nil
 }
 
 // CreatePortal creates a portal.
@@ -720,80 +515,19 @@ func (c *Client) CreatePortal(ctx context.Context, createReq *CreatePortalReq) (
 		return nil, fmt.Errorf("marshal portal request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var p api.Portal
+	if err = c.createResource(ctx, "portals", body, &p); err != nil {
+		return nil, fmt.Errorf("create portal: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusCreated:
-		var p api.Portal
-
-		if err = json.NewDecoder(resp.Body).Decode(&p); err != nil {
-			return nil, fmt.Errorf("failed to decode portal: %w", err)
-		}
-		return &p, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return &p, nil
 }
 
 // GetPortals fetches the portals available for this agent.
 func (c *Client) GetPortals(ctx context.Context) ([]api.Portal, error) {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
-
 	var portals []api.Portal
-	if err = json.NewDecoder(resp.Body).Decode(&portals); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
+	if err := c.listResource(ctx, "portals", &portals); err != nil {
+		return nil, fmt.Errorf("list portals: %w", err)
 	}
 
 	return portals, nil
@@ -806,121 +540,21 @@ func (c *Client) UpdatePortal(ctx context.Context, name, lastKnownVersion string
 		return nil, fmt.Errorf("marshal portal request: %w", err)
 	}
 
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals", name))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+	var p api.Portal
+	if err = c.updateResource(ctx, "portals", name, lastKnownVersion, body, &p); err != nil {
+		return nil, fmt.Errorf("update portal: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", lastKnownVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var p api.Portal
-
-		if err = json.NewDecoder(resp.Body).Decode(&p); err != nil {
-			return nil, fmt.Errorf("failed to decode portal: %w", err)
-		}
-		return &p, nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
+	return &p, nil
 }
 
 // DeletePortal deletes a portal.
 func (c *Client) DeletePortal(ctx context.Context, name, lastKnownVersion string) error {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "portals", name))
-	if err != nil {
-		return fmt.Errorf("parse endpoint: %w", err)
+	if err := c.deleteResource(ctx, "portals", name, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete portal: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), http.NoBody)
-	if err != nil {
-		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Last-Known-Version", lastKnownVersion)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request %q: %w", baseURL.String(), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusNoContent:
-		return nil
-	default:
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return apiErr
-	}
-}
-
-// GetEdgeIngresses returns the EdgeIngresses related to the agent.
-func (c *Client) GetEdgeIngresses(ctx context.Context) ([]edgeingress.EdgeIngress, error) {
-	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "edge-ingresses"))
-	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	version.SetUserAgent(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		all, _ := io.ReadAll(resp.Body)
-
-		apiErr := APIError{StatusCode: resp.StatusCode}
-		if err = json.Unmarshal(all, &apiErr); err != nil {
-			apiErr.Message = string(all)
-		}
-
-		return nil, apiErr
-	}
-
-	var edgeIngresses []edgeingress.EdgeIngress
-	if err = json.NewDecoder(resp.Body).Decode(&edgeIngresses); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
-	}
-
-	return edgeIngresses, nil
+	return nil
 }
 
 // GetWildcardCertificate gets a certificate for the workspace.
@@ -1213,5 +847,157 @@ func readBody(resp *http.Response) ([]byte, error) {
 		return io.ReadAll(resp.Body)
 	default:
 		return nil, fmt.Errorf("unsupported content encoding %q", contentEncoding)
+	}
+}
+
+func (c *Client) createResource(ctx context.Context, apiPath string, body []byte, obj any) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, apiPath))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusCreated:
+		if err = json.NewDecoder(resp.Body).Decode(&obj); err != nil {
+			return fmt.Errorf("failed to decode resource from %q: %w", baseURL.String(), err)
+		}
+		return nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+}
+
+func (c *Client) listResource(ctx context.Context, apiPath string, objs any) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, apiPath))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&objs); err != nil {
+		return fmt.Errorf("decode config: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) deleteResource(ctx context.Context, apiPath, name, lastKnownVersion string) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, apiPath, name))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusNoContent:
+		return nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+}
+
+func (c *Client) updateResource(ctx context.Context, apiPath, name, lastKnownVersion string, body []byte, obj any) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, apiPath, name))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build request for %q: %w", baseURL.String(), err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Last-Known-Version", lastKnownVersion)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request %q: %w", baseURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if err = json.NewDecoder(resp.Body).Decode(&obj); err != nil {
+			return fmt.Errorf("failed to decode resource from %q: %w", baseURL.String(), err)
+		}
+
+		return nil
+	default:
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
 	}
 }
