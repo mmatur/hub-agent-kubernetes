@@ -20,6 +20,8 @@ package v1alpha1
 
 type APIExpansion interface{}
 
+type APIAccessExpansion interface{}
+
 type APICollectionExpansion interface{}
 
 type APIPortalExpansion interface{}

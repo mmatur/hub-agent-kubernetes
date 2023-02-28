@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// APIs returns a APIInformer.
 	APIs() APIInformer
+	// APIAccesses returns a APIAccessInformer.
+	APIAccesses() APIAccessInformer
 	// APICollections returns a APICollectionInformer.
 	APICollections() APICollectionInformer
 	// APIPortals returns a APIPortalInformer.
@@ -52,6 +54,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // APIs returns a APIInformer.
 func (v *version) APIs() APIInformer {
 	return &aPIInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// APIAccesses returns a APIAccessInformer.
+func (v *version) APIAccesses() APIAccessInformer {
+	return &aPIAccessInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // APICollections returns a APICollectionInformer.

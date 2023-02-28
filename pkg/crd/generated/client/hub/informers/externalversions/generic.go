@@ -55,6 +55,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=hub.traefik.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("apis"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hub().V1alpha1().APIs().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("apiaccesses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hub().V1alpha1().APIAccesses().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("apicollections"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hub().V1alpha1().APICollections().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("apiportals"):
