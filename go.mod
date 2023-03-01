@@ -26,6 +26,7 @@ require (
 	github.com/urfave/cli/v2 v2.24.4
 	github.com/vulcand/predicate v1.2.0
 	golang.org/x/crypto v0.6.0
+	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
 	golang.org/x/oauth2 v0.5.0
 	golang.org/x/sync v0.1.0
 	gopkg.in/yaml.v3 v3.0.1

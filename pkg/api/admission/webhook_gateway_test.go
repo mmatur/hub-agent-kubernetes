@@ -38,16 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var testPortalSpec = hubv1alpha1.APIPortalSpec{
-	Description:   "My awesome portal",
-	APIGateway:    "gateway-1",
-	CustomDomains: []string{"foo.example.com", "bar.example.com"},
+var testGatewaySpec = hubv1alpha1.APIGatewaySpec{
+	APIAccesses:   []string{"users"},
+	CustomDomains: []string{"api.foo.example.com", "api.bar.example.com"},
 }
 
-func TestHandler_ServeHTTP_createOperation(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_createOperation(t *testing.T) {
 	now := metav1.Now()
 
-	const portalName = "my-portal"
+	const gatewayName = "my-gateway"
 
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
@@ -55,45 +54,53 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Create,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   gatewayName,
+						Labels: map[string]string{"area": "users"},
+					},
+					Spec: testGatewaySpec,
 				}),
 			},
 		},
 		Response: &admv1.AdmissionResponse{},
 	}
-	wantCreateReq := &platform.CreatePortalReq{
-		Name:          portalName,
-		Description:   testPortalSpec.Description,
-		Gateway:       testPortalSpec.APIGateway,
-		CustomDomains: testPortalSpec.CustomDomains,
+	wantCreateReq := &platform.CreateGatewayReq{
+		Name:          gatewayName,
+		Labels:        map[string]string{"area": "users"},
+		Accesses:      []string{"users"},
+		CustomDomains: testGatewaySpec.CustomDomains,
 	}
-	createdPortal := &api.Portal{
+	wantCustomDomains := []api.CustomDomain{
+		{Name: "api.foo.example.com", Verified: true},
+		{Name: "api.bar.example.com", Verified: false},
+	}
+	createdGateway := &api.Gateway{
 		WorkspaceID:   "workspace-id",
 		ClusterID:     "cluster-id",
-		Name:          portalName,
-		Description:   "My awesome portal",
-		Gateway:       "gateway-1",
+		Name:          gatewayName,
+		Labels:        map[string]string{"area": "users"},
+		Accesses:      []string{"users"},
 		Version:       "version-1",
-		CustomDomains: []string{"foo.example.com", "bar.example.com"},
+		HubDomain:     "brave-lion-123.hub-traefik.io",
+		CustomDomains: wantCustomDomains,
 		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
 		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnCreatePortal(wantCreateReq).TypedReturns(createdPortal, nil).Once()
+	client.OnCreateGateway(wantCreateReq).TypedReturns(createdGateway, nil).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 	h.now = func() time.Time { return now.Time }
 
 	b := mustMarshal(t, admissionRev)
@@ -114,12 +121,13 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 		Allowed:   true,
 		PatchType: wantPatchType,
 		Patch: mustMarshal(t, []patch{
-			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
+			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIGatewayStatus{
 				Version:       "version-1",
 				SyncedAt:      now,
-				URLs:          "https://foo.example.com,https://bar.example.com",
-				CustomDomains: []string{"foo.example.com", "bar.example.com"},
-				Hash:          "3ACiTUYBBU60DUwbouDpJNnDHwY=",
+				URLs:          "https://api.foo.example.com,https://brave-lion-123.hub-traefik.io",
+				HubDomain:     "brave-lion-123.hub-traefik.io",
+				CustomDomains: []string{"api.foo.example.com"},
+				Hash:          "oGEXVxJoA7mBnoZ+3239Vw/UGSQ=",
 			}},
 		}),
 	}
@@ -127,8 +135,8 @@ func TestHandler_ServeHTTP_createOperation(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
-	const portalName = "my-portal"
+func TestGatewayHandler_ServeHTTP_createOperationConflict(t *testing.T) {
+	const gatewayName = "my-gateway"
 
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
@@ -136,18 +144,18 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Create,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
+					ObjectMeta: metav1.ObjectMeta{Name: gatewayName},
+					Spec:       testGatewaySpec,
 				}),
 			},
 		},
@@ -155,9 +163,9 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnCreatePortalRaw(mock.Anything).TypedReturns(nil, errors.New("BOOM")).Once()
+	client.OnCreateGatewayRaw(mock.Anything).TypedReturns(nil, errors.New("BOOM")).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -175,44 +183,49 @@ func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "create APIPortal: BOOM",
+			Message: "create APIGateway: BOOM",
 		},
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_updateOperation(t *testing.T) {
 	now := metav1.Now()
 
 	const (
-		portalName = "my-portal"
-		version    = "version-3"
+		gatewayName = "my-gateway"
+		version     = "version-3"
 	)
 
-	newPortal := hubv1alpha1.APIPortal{
+	newGateway := hubv1alpha1.APIGateway{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "APIPortal",
+			Kind:       "APIGateway",
 			APIVersion: "hub.traefik.io/v1alpha1",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: portalName},
-		Spec: hubv1alpha1.APIPortalSpec{
-			Description:   "My updated portal",
-			APIGateway:    "updated-gateway",
-			CustomDomains: []string{"foo.example.com"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   gatewayName,
+			Labels: map[string]string{"area": "products"},
 		},
-		Status: hubv1alpha1.APIPortalStatus{
-			HubDomain: "majestic-beaver-123.hub-traefik.io",
+		Spec: hubv1alpha1.APIGatewaySpec{
+			APIAccesses:   []string{"products"},
+			CustomDomains: []string{"api.new.example.com"},
+		},
+		Status: hubv1alpha1.APIGatewayStatus{
+			HubDomain: "brave-lion-123.hub-traefik.io",
 		},
 	}
-	oldPortal := hubv1alpha1.APIPortal{
+	oldGateway := hubv1alpha1.APIGateway{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "APIPortal",
+			Kind:       "APIGateway",
 			APIVersion: "hub.traefik.io/v1alpha1",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: portalName},
-		Spec:       testPortalSpec,
-		Status: hubv1alpha1.APIPortalStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   gatewayName,
+			Labels: map[string]string{"area": "users"},
+		},
+		Spec: testGatewaySpec,
+		Status: hubv1alpha1.APIGatewayStatus{
 			Version:  version,
 			SyncedAt: metav1.NewTime(now.Time.Add(-time.Hour)),
 		},
@@ -223,43 +236,45 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Update,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, newPortal),
+				Raw: mustMarshal(t, newGateway),
 			},
 			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, oldPortal),
+				Raw: mustMarshal(t, oldGateway),
 			},
 		},
 		Response: &admv1.AdmissionResponse{},
 	}
-	wantUpdateReq := &platform.UpdatePortalReq{
-		Description:   newPortal.Spec.Description,
-		Gateway:       newPortal.Spec.APIGateway,
-		HubDomain:     newPortal.Status.HubDomain,
-		CustomDomains: newPortal.Spec.CustomDomains,
+	wantUpdateReq := &platform.UpdateGatewayReq{
+		Labels:        newGateway.Labels,
+		Accesses:      newGateway.Spec.APIAccesses,
+		CustomDomains: newGateway.Spec.CustomDomains,
 	}
-	updatedPortal := &api.Portal{
+	wantCustomDomains := []api.CustomDomain{
+		{Name: "api.new.example.com", Verified: true},
+	}
+	updatedGateway := &api.Gateway{
 		WorkspaceID:   "workspace-id",
 		ClusterID:     "cluster-id",
-		Name:          portalName,
-		Description:   "my updated portal",
-		Gateway:       "updated-gateway",
+		Name:          gatewayName,
+		Labels:        map[string]string{"area": "products"},
+		Accesses:      []string{"products"},
 		Version:       "version-4",
-		HubDomain:     "majestic-beaver-123.hub-traefik.io",
-		CustomDomains: []string{"foo.example.com"},
+		HubDomain:     "brave-lion-123.hub-traefik.io",
+		CustomDomains: wantCustomDomains,
 		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
 		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnUpdatePortal(portalName, version, wantUpdateReq).
-		TypedReturns(updatedPortal, nil).Once()
+	client.OnUpdateGateway(gatewayName, version, wantUpdateReq).
+		TypedReturns(updatedGateway, nil).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 	h.now = func() time.Time { return now.Time }
 
 	b := mustMarshal(t, admissionRev)
@@ -280,13 +295,13 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 		Allowed:   true,
 		PatchType: wantPatchType,
 		Patch: mustMarshal(t, []patch{
-			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
+			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIGatewayStatus{
 				Version:       "version-4",
 				SyncedAt:      now,
-				HubDomain:     "majestic-beaver-123.hub-traefik.io",
-				CustomDomains: []string{"foo.example.com"},
-				URLs:          "https://foo.example.com,https://majestic-beaver-123.hub-traefik.io",
-				Hash:          "TjL6MndxqoGfzTG02DVD+bvkn3k=",
+				HubDomain:     "brave-lion-123.hub-traefik.io",
+				CustomDomains: []string{"api.new.example.com"},
+				URLs:          "https://api.new.example.com,https://brave-lion-123.hub-traefik.io",
+				Hash:          "LiUOfnP7nvnIp5wWi4OybvUYBVE=",
 			}},
 		}),
 	}
@@ -294,10 +309,10 @@ func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 	const (
-		portalName = "my-portal"
-		version    = "version-3"
+		gatewayName = "my-gateway"
+		version     = "version-3"
 	)
 
 	admissionRev := admv1.AdmissionReview{
@@ -306,31 +321,37 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Update,
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec: hubv1alpha1.APIPortalSpec{
-						CustomDomains: []string{"foo.example.com"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   gatewayName,
+						Labels: map[string]string{"area": "products"},
+					},
+					Spec: hubv1alpha1.APIGatewaySpec{
+						CustomDomains: []string{"api.foo.example.com"},
 					},
 				}),
 			},
 			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   gatewayName,
+						Labels: map[string]string{"area": "users"},
+					},
+					Spec: testGatewaySpec,
+					Status: hubv1alpha1.APIGatewayStatus{
 						Version:  version,
 						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
 					},
@@ -341,10 +362,10 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnUpdatePortalRaw(mock.Anything, mock.Anything, mock.Anything).
+	client.OnUpdateGatewayRaw(mock.Anything, mock.Anything, mock.Anything).
 		TypedReturns(nil, errors.New("BOOM")).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -362,17 +383,17 @@ func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "update APIPortal: BOOM",
+			Message: "update APIGateway: BOOM",
 		},
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_deleteOperation(t *testing.T) {
 	const (
-		portalName = "my-portal"
-		version    = "version-3"
+		gatewayName = "my-gateway"
+		version     = "version-3"
 	)
 
 	admissionRev := admv1.AdmissionReview{
@@ -381,19 +402,22 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Delete,
 			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   gatewayName,
+						Labels: map[string]string{"area": "users"},
+					},
+					Spec: testGatewaySpec,
+					Status: hubv1alpha1.APIGatewayStatus{
 						Version:  version,
 						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
 					},
@@ -404,9 +428,9 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnDeletePortal(portalName, version).TypedReturns(nil).Once()
+	client.OnDeleteGateway(gatewayName, version).TypedReturns(nil).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -427,10 +451,10 @@ func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 	const (
-		portalName = "my-portal"
-		version    = "version-3"
+		gatewayName = "my-gateway"
+		version     = "version-3"
 	)
 
 	admissionRev := admv1.AdmissionReview{
@@ -439,19 +463,22 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
-			Name:      portalName,
+			Name:      gatewayName,
 			Operation: admv1.Delete,
 			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
+				Raw: mustMarshal(t, hubv1alpha1.APIGateway{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
+						Kind:       "APIGateway",
 						APIVersion: "hub.traefik.io/v1alpha1",
 					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   gatewayName,
+						Labels: map[string]string{"area": "users"},
+					},
+					Spec: testGatewaySpec,
+					Status: hubv1alpha1.APIGatewayStatus{
 						Version:  version,
 						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
 					},
@@ -462,9 +489,9 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 	}
 
 	client := newPlatformClientMock(t)
-	client.OnDeletePortalRaw(mock.Anything, mock.Anything).TypedReturns(errors.New("BOOM")).Once()
+	client.OnDeleteGatewayRaw(mock.Anything, mock.Anything).TypedReturns(errors.New("BOOM")).Once()
 
-	h := NewHandler(client)
+	h := NewGatewayHandler(client)
 
 	b := mustMarshal(t, admissionRev)
 	rec := httptest.NewRecorder()
@@ -482,14 +509,14 @@ func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
 		Allowed: false,
 		Result: &metav1.Status{
 			Status:  "Failure",
-			Message: "delete APIPortal: BOOM",
+			Message: "delete APIGateway: BOOM",
 		},
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_notAPortal(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_notAGateway(t *testing.T) {
 	b := mustMarshal(t, admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
@@ -508,7 +535,7 @@ func TestHandler_ServeHTTP_notAPortal(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	})
 
-	h := NewHandler(nil)
+	h := NewGatewayHandler(nil)
 
 	rec := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
@@ -532,14 +559,14 @@ func TestHandler_ServeHTTP_notAPortal(t *testing.T) {
 	assert.Equal(t, &wantResp, gotAr.Response)
 }
 
-func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
+func TestGatewayHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 	b := mustMarshal(t, admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
+				Kind:    "APIGateway",
 			},
 			Name:      "whoami",
 			Namespace: "default",
@@ -551,7 +578,7 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 		Response: &admv1.AdmissionResponse{},
 	})
 
-	h := NewHandler(nil)
+	h := NewGatewayHandler(nil)
 
 	rec := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
@@ -573,13 +600,4 @@ func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func mustMarshal(t *testing.T, obj interface{}) []byte {
-	t.Helper()
-
-	b, err := json.Marshal(obj)
-	require.NoError(t, err)
-
-	return b
 }

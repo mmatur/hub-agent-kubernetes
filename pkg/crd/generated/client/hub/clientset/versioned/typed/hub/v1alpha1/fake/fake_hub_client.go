@@ -40,6 +40,10 @@ func (c *FakeHubV1alpha1) APICollections() v1alpha1.APICollectionInterface {
 	return &FakeAPICollections{c}
 }
 
+func (c *FakeHubV1alpha1) APIGateways() v1alpha1.APIGatewayInterface {
+	return &FakeAPIGateways{c}
+}
+
 func (c *FakeHubV1alpha1) APIPortals() v1alpha1.APIPortalInterface {
 	return &FakeAPIPortals{c}
 }

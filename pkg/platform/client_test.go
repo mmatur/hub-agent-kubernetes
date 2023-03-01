@@ -596,21 +596,16 @@ func TestClient_DeleteEdgeIngress(t *testing.T) {
 func TestClient_GetPortals(t *testing.T) {
 	wantPortals := []api.Portal{
 		{
-			WorkspaceID:  "workspace-id",
-			ClusterID:    "cluster-id",
-			Name:         "name",
-			Description:  "description",
-			Version:      "version",
-			HubDomain:    "majestic-beaver-123.hub-traefik.io",
-			APIHubDomain: "brave-lion-123.hub-traefik.io",
-			CustomDomains: []api.CustomDomain{
-				{Name: "hello.example.com", Verified: true},
-			},
-			APICustomDomains: []api.CustomDomain{
-				{Name: "api.hello.example.com", Verified: true},
-			},
-			CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-			UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+			WorkspaceID:   "workspace-id",
+			ClusterID:     "cluster-id",
+			Name:          "name",
+			Description:   "description",
+			Gateway:       "gateway-1",
+			Version:       "version",
+			HubDomain:     "majestic-beaver-123.hub-traefik.io",
+			CustomDomains: []string{"hello.example.com"},
+			CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+			UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 		},
 	}
 
@@ -661,25 +656,23 @@ func TestClient_CreatePortal(t *testing.T) {
 		{
 			desc: "create portal",
 			createReq: &CreatePortalReq{
-				Name:             "name",
-				CustomDomains:    []string{"hello.example.com"},
-				APICustomDomains: []string{"api.hello.example.com"},
+				Name:          "name",
+				Description:   "My awesome portal",
+				Gateway:       "gateway-1",
+				CustomDomains: []string{"hello.example.com"},
 			},
 			returnStatusCode: http.StatusCreated,
 			wantErr:          assert.NoError,
 			portal: &api.Portal{
-				WorkspaceID: "workspace-id",
-				ClusterID:   "cluster-id",
-				Name:        "name",
-				Version:     "version-1",
-				CustomDomains: []api.CustomDomain{
-					{Name: "hello.example.com", Verified: true},
-				},
-				APICustomDomains: []api.CustomDomain{
-					{Name: "api.hello.example.com", Verified: true},
-				},
-				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
-				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+				WorkspaceID:   "workspace-id",
+				ClusterID:     "cluster-id",
+				Name:          "name",
+				Description:   "My awesome portal",
+				Gateway:       "gateway-1",
+				Version:       "version-1",
+				CustomDomains: []string{"hello.example.com"},
+				CreatedAt:     time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 			},
 		},
 		{
@@ -756,22 +749,24 @@ func TestClient_UpdatePortal(t *testing.T) {
 			name:    "name",
 			version: "version-1",
 			updateReq: &UpdatePortalReq{
-				CustomDomains:    []string{"hello.example.com"},
-				APICustomDomains: []string{"api.hello.example.com"},
-				HubDomain:        "majestic-beaver-123.hub-traefik.io",
+				Description:   "My updated description",
+				Gateway:       "gateway-1",
+				HubDomain:     "majestic-beaver-123.hub-traefik.io",
+				CustomDomains: []string{"hello.example.com"},
 			},
 			returnStatusCode: http.StatusOK,
 			wantErr:          assert.NoError,
 			portal: &api.Portal{
-				WorkspaceID:      "workspace-id",
-				ClusterID:        "cluster-id",
-				Name:             "name",
-				Version:          "version-1",
-				CustomDomains:    []api.CustomDomain{{Name: "hello.example.com", Verified: true}},
-				APICustomDomains: []api.CustomDomain{{Name: "api.hello.example.com", Verified: true}},
-				HubDomain:        "majestic-beaver-123.hub-traefik.io",
-				CreatedAt:        time.Now().UTC().Truncate(time.Millisecond),
-				UpdatedAt:        time.Now().UTC().Truncate(time.Millisecond),
+				WorkspaceID:   "workspace-id",
+				ClusterID:     "cluster-id",
+				Name:          "name",
+				Description:   "My updated description",
+				Gateway:       "gateway-1",
+				Version:       "version-1",
+				CustomDomains: []string{"hello.example.com"},
+				HubDomain:     "majestic-beaver-123.hub-traefik.io",
+				CreatedAt:     time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 			},
 		},
 		{
@@ -899,6 +894,317 @@ func TestClient_DeletePortal(t *testing.T) {
 			c.httpClient = srv.Client()
 
 			err = c.DeletePortal(context.Background(), test.name, test.version)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func TestClient_GetGateways(t *testing.T) {
+	wantGateways := []api.Gateway{
+		{
+			WorkspaceID: "workspace-id",
+			ClusterID:   "cluster-id",
+			Name:        "gateway-1",
+			Labels:      map[string]string{"area": "users"},
+			Accesses:    []string{"users"},
+			Version:     "version",
+			HubDomain:   "brave-lion-123.hub-traefik.io",
+			CustomDomains: []api.CustomDomain{
+				{Name: "api.hello.example.com", Verified: true},
+			},
+			CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
+			UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+		},
+	}
+
+	var callCount int
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/gateways", func(rw http.ResponseWriter, req *http.Request) {
+		callCount++
+
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantGateways)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
+	c.httpClient = srv.Client()
+
+	gotGateways, err := c.GetGateways(context.Background())
+	require.NoError(t, err)
+
+	require.Equal(t, 1, callCount)
+	assert.Equal(t, wantGateways, gotGateways)
+}
+
+func TestClient_CreateGateway(t *testing.T) {
+	tests := []struct {
+		desc             string
+		createReq        *CreateGatewayReq
+		gateway          *api.Gateway
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create gateway",
+			createReq: &CreateGatewayReq{
+				Name:          "gateway-1",
+				Labels:        map[string]string{"area": "users"},
+				Accesses:      []string{"users"},
+				CustomDomains: []string{"api.hello.example.com"},
+			},
+			returnStatusCode: http.StatusCreated,
+			wantErr:          assert.NoError,
+			gateway: &api.Gateway{
+				WorkspaceID: "workspace-id",
+				ClusterID:   "cluster-id",
+				Name:        "gateway-1",
+				Labels:      map[string]string{"area": "users"},
+				Accesses:    []string{"users"},
+				Version:     "version-1",
+				CustomDomains: []api.CustomDomain{
+					{Name: "api.hello.example.com", Verified: true},
+				},
+				CreatedAt: time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc: "error",
+			createReq: &CreateGatewayReq{
+				Name: "gateway-1",
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/gateways", func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.gateway)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			createdGateway, err := c.CreateGateway(context.Background(), test.createReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.gateway, createdGateway)
+		})
+	}
+}
+
+func TestClient_UpdateGatway(t *testing.T) {
+	tests := []struct {
+		desc             string
+		name             string
+		version          string
+		updateReq        *UpdateGatewayReq
+		gateway          *api.Gateway
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:    "update gateway",
+			name:    "gateway-1",
+			version: "version-1",
+			updateReq: &UpdateGatewayReq{
+				Labels:        map[string]string{"area": "products"},
+				Accesses:      []string{"products"},
+				CustomDomains: []string{"api.hello.example.com"},
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			gateway: &api.Gateway{
+				WorkspaceID:   "workspace-id",
+				ClusterID:     "cluster-id",
+				Name:          "gateway-1",
+				Labels:        map[string]string{"area": "products"},
+				Accesses:      []string{"products"},
+				Version:       "version-1",
+				CustomDomains: []api.CustomDomain{{Name: "api.hello.example.com", Verified: true}},
+				HubDomain:     "brave-lion-123.hub-traefik.io",
+				CreatedAt:     time.Now().UTC().Truncate(time.Millisecond),
+				UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
+			},
+		},
+		{
+			desc:             "error",
+			version:          "version-1",
+			name:             "gateway-1",
+			updateReq:        &UpdateGatewayReq{},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				callCount int
+				callWith  hubv1alpha1.EdgeIngress
+			)
+
+			mux := http.NewServeMux()
+
+			mux.HandleFunc("/gateways/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&callWith)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				err = json.NewEncoder(rw).Encode(test.gateway)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			updatedGateway, err := c.UpdateGateway(context.Background(), test.name, test.version, test.updateReq)
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+			assert.Equal(t, test.gateway, updatedGateway)
+		})
+	}
+}
+
+func TestClient_DeleteGateway(t *testing.T) {
+	tests := []struct {
+		desc             string
+		version          string
+		name             string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "delete gateway",
+			version:          "version-1",
+			name:             "gateway-1",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "error",
+			version:          "version-1",
+			name:             "gateway-1",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/gateways/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != test.version {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			err = c.DeleteGateway(context.Background(), test.name, test.version)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)

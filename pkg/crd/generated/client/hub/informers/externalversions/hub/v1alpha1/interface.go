@@ -30,6 +30,8 @@ type Interface interface {
 	APIAccesses() APIAccessInformer
 	// APICollections returns a APICollectionInformer.
 	APICollections() APICollectionInformer
+	// APIGateways returns a APIGatewayInformer.
+	APIGateways() APIGatewayInformer
 	// APIPortals returns a APIPortalInformer.
 	APIPortals() APIPortalInformer
 	// AccessControlPolicies returns a AccessControlPolicyInformer.
@@ -64,6 +66,11 @@ func (v *version) APIAccesses() APIAccessInformer {
 // APICollections returns a APICollectionInformer.
 func (v *version) APICollections() APICollectionInformer {
 	return &aPICollectionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// APIGateways returns a APIGatewayInformer.
+func (v *version) APIGateways() APIGatewayInformer {
+	return &aPIGatewayInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // APIPortals returns a APIPortalInformer.

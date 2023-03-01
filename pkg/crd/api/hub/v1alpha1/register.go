@@ -50,6 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AccessControlPolicyList{},
 		&EdgeIngress{},
 		&EdgeIngressList{},
+		&APIGateway{},
+		&APIGatewayList{},
 		&APIPortal{},
 		&APIPortalList{},
 		&API{},

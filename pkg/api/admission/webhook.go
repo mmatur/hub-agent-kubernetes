@@ -37,6 +37,9 @@ type PlatformClient interface {
 	CreatePortal(ctx context.Context, req *platform.CreatePortalReq) (*api.Portal, error)
 	UpdatePortal(ctx context.Context, name, lastKnownVersion string, req *platform.UpdatePortalReq) (*api.Portal, error)
 	DeletePortal(ctx context.Context, name, lastKnownVersion string) error
+	CreateGateway(ctx context.Context, createReq *platform.CreateGatewayReq) (*api.Gateway, error)
+	UpdateGateway(ctx context.Context, name, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) (*api.Gateway, error)
+	DeleteGateway(ctx context.Context, name, lastKnownVersion string) error
 }
 
 // Handler is an HTTP handler that can be used as a Kubernetes Mutating Admission Controller.
@@ -141,10 +144,10 @@ func (h *Handler) reviewCreateOperation(ctx context.Context, p *hubv1alpha1.APIP
 	log.Ctx(ctx).Info().Msg("Creating APIPortal resource")
 
 	createReq := &platform.CreatePortalReq{
-		Name:             p.Name,
-		Description:      p.Spec.Description,
-		CustomDomains:    p.Spec.CustomDomains,
-		APICustomDomains: p.Spec.APICustomDomains,
+		Name:          p.Name,
+		Description:   p.Spec.Description,
+		Gateway:       p.Spec.APIGateway,
+		CustomDomains: p.Spec.CustomDomains,
 	}
 
 	createdPortal, err := h.platform.CreatePortal(ctx, createReq)
@@ -159,10 +162,10 @@ func (h *Handler) reviewUpdateOperation(ctx context.Context, oldPortal, newPorta
 	log.Ctx(ctx).Info().Msg("Updating APIPortal resource")
 
 	updateReq := &platform.UpdatePortalReq{
-		Description:      newPortal.Spec.Description,
-		HubDomain:        newPortal.Status.HubDomain,
-		CustomDomains:    newPortal.Spec.CustomDomains,
-		APICustomDomains: newPortal.Spec.APICustomDomains,
+		Description:   newPortal.Spec.Description,
+		Gateway:       newPortal.Spec.APIGateway,
+		HubDomain:     newPortal.Status.HubDomain,
+		CustomDomains: newPortal.Spec.CustomDomains,
 	}
 
 	updatedPortal, err := h.platform.UpdatePortal(ctx, oldPortal.Name, oldPortal.Status.Version, updateReq)

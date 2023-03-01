@@ -24,6 +24,8 @@ type APIAccessExpansion interface{}
 
 type APICollectionExpansion interface{}
 
+type APIGatewayExpansion interface{}
+
 type APIPortalExpansion interface{}
 
 type AccessControlPolicyExpansion interface{}

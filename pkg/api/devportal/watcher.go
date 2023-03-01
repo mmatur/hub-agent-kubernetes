@@ -175,31 +175,14 @@ func (w *Watcher) updatePortalsFromCRD(p *hubv1alpha1.APIPortal) {
 	w.portalsMu.Lock()
 	defer w.portalsMu.Unlock()
 
-	var verifiedCustomDomains []api.CustomDomain
-	for _, customDomain := range p.Status.CustomDomains {
-		verifiedCustomDomains = append(verifiedCustomDomains, api.CustomDomain{
-			Name:     customDomain,
-			Verified: true,
-		})
-	}
-
-	var verifiedAPICustomDomains []api.CustomDomain
-	for _, customDomain := range p.Status.APICustomDomains {
-		verifiedAPICustomDomains = append(verifiedAPICustomDomains, api.CustomDomain{
-			Name:     customDomain,
-			Verified: true,
-		})
-	}
-
 	hubDomain := p.Status.HubDomain
 
 	pc := api.Portal{
-		Name:             p.Name,
-		Description:      p.Spec.Description,
-		HubDomain:        hubDomain,
-		APIHubDomain:     p.Status.HubDomain,
-		CustomDomains:    verifiedCustomDomains,
-		APICustomDomains: verifiedAPICustomDomains,
+		Name:          p.Name,
+		Description:   p.Spec.Description,
+		Gateway:       p.Spec.APIGateway,
+		HubDomain:     hubDomain,
+		CustomDomains: p.Spec.CustomDomains,
 	}
 
 	w.portals[p.Name] = pc
@@ -224,9 +207,8 @@ func (w *Watcher) buildRoutes() http.Handler {
 	defer w.portalsMu.RUnlock()
 
 	router := chi.NewRouter()
-	for name, cfg := range w.portals {
-		cfg := cfg
-		router.Mount("/api/"+name, w.buildRoute(name, &cfg))
+	for name := range w.portals {
+		router.Mount("/api/"+name, w.buildRoute(name))
 	}
 
 	router.Get("/", func(rw http.ResponseWriter, req *http.Request) {
@@ -264,12 +246,12 @@ func (w *Watcher) buildRoutes() http.Handler {
 	return router
 }
 
-func (w *Watcher) buildRoute(name string, p *api.Portal) http.Handler {
+func (w *Watcher) buildRoute(name string) http.Handler {
 	var apis []string
 
 	urlByName := map[string]string{}
 	pathPrefixByName := map[string]string{}
-	// TODO: fill apis, urlByName, pathPrefixByName and oasBasePathByName from portal APIs
+	// TODO: fill apis, urlByName, pathPrefixByName and oasBasePathByName from portal APIAccesses
 
 	router := chi.NewRouter()
 	router.Get("/apis", func(rw http.ResponseWriter, req *http.Request) {
@@ -344,7 +326,7 @@ func (w *Watcher) buildRoute(name string, p *api.Portal) http.Handler {
 			return
 		}
 
-		if err := overrideServersAndSecurity(&oas, p, pathPrefixByName[apiName]); err != nil {
+		if err := overrideServersAndSecurity(&oas, pathPrefixByName[apiName]); err != nil {
 			log.Error().Err(err).
 				Str("api_portal_name", name).
 				Str("api_name", apiName).
@@ -368,15 +350,9 @@ func (w *Watcher) buildRoute(name string, p *api.Portal) http.Handler {
 	return router
 }
 
-func overrideServersAndSecurity(oas *openapi3.T, p *api.Portal, apiPathPrefix string) error {
+func overrideServersAndSecurity(oas *openapi3.T, apiPathPrefix string) error {
 	var domains []string
-	for _, domain := range p.APICustomDomains {
-		domains = append(domains, domain.Name)
-	}
-
-	if len(domains) == 0 {
-		domains = append(domains, p.APIHubDomain)
-	}
+	// TODO: fill domains with gateways custom domains or hub domain
 
 	var err error
 	oas.Servers, err = serversWithDomains(oas.Servers, domains, apiPathPrefix)

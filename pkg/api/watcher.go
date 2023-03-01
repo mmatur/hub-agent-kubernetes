@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -189,16 +188,14 @@ func (w *Watcher) syncCertificates(ctx context.Context) error {
 
 func (w *Watcher) setupCertificates(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	apisNamespaces := make(map[string]struct{})
-	// TODO: fill apisNamespaces from portal APIs
+	// TODO: fill apisNamespaces from portal APIAccesses
 
 	if len(portal.Status.CustomDomains) == 0 {
 		return nil
 	}
 
-	cert, err := w.platform.GetCertificateByDomains(ctx, portal.Status.APICustomDomains)
-	if err != nil {
-		return fmt.Errorf("get certificate by domains %q: %w", strings.Join(portal.Status.APICustomDomains, ","), err)
-	}
+	var cert edgeingress.Certificate
+	// TODO: fill cert with the certificate for gateways custom domains
 
 	secretName, err := getCustomDomainSecretName(portal.Name)
 	if err != nil {

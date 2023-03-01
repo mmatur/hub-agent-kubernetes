@@ -182,7 +182,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		CertRetryInterval:       time.Minute,
 	}
 
-	acpAdmission, edgeIngressAdmission, apiAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, apiWatcherCfg)
+	acpAdmission, edgeIngressAdmission, apiAdmission, gatewayAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, apiWatcherCfg)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -193,6 +193,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	router.Handle("/edge-ingress", edgeIngressAdmission)
 	if apiAdmission != nil {
 		router.Handle("/api", apiAdmission)
+		router.Handle("/api-gateway", gatewayAdmission)
 	}
 	router.Handle("/ingress", acpAdmission)
 	router.Handle("/acp", webAdmissionACP)
@@ -232,33 +233,33 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, apiWatcherCfg *api.WatcherConfig) (acpHdl, edgeIngressHdl, apiHdl http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, apiWatcherCfg *api.WatcherConfig) (acpHdl, edgeIngressHdl, apiHdl, gatewayHdl http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
 	kubeClientSet, err := clientset.NewForConfig(config)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
 
 	if err = initIngressClass(ctx, kubeClientSet, edgeIngressWatcherCfg.IngressClassName); err != nil {
-		return nil, nil, nil, fmt.Errorf("initialize ingressClass: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("initialize ingressClass: %w", err)
 	}
 
 	hubClientSet, err := hubclientset.NewForConfig(config)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create Hub client set: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("create Hub client set: %w", err)
 	}
 	traefikClientSet, err := createTraefikClientSet(kubeClientSet, config)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create Traefik client set: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("create Traefik client set: %w", err)
 	}
 
 	kubeVers, err := kubeClientSet.Discovery().ServerVersion()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("detect Kubernetes version: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 
 	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
@@ -271,24 +272,24 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	err = startKubeInformer(ctx, kubeVers.GitVersion, kubeInformer, ingClassWatcher)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
 	apiAvailable, err := isAPIAvailable(kubeClientSet)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("API available: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("API available: %w", err)
 	}
 
 	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, apiAvailable)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
 	acpWatcher := acp.NewWatcher(time.Minute, platformClient, hubClientSet, hubInformer)
 
 	edgeIngressWatcher, err := edgeingress.NewWatcher(platformClient, hubClientSet, kubeClientSet, traefikClientSet, hubInformer, edgeIngressWatcherCfg)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("create edge ingress watcher: %w", err)
 	}
 
 	go acpWatcher.Run(ctx)
@@ -310,12 +311,13 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		traefikReviewer,
 	}
 
-	var apiHandler http.Handler
+	var apiHandler, gatewayHandler http.Handler
 	if apiAvailable {
 		apiHandler = apiadmission.NewHandler(platformClient)
+		gatewayHandler = apiadmission.NewGatewayHandler(platformClient)
 	}
 
-	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), apiHandler, nil
+	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), apiHandler, gatewayHandler, nil
 }
 
 func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {

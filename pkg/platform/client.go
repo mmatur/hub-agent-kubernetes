@@ -92,18 +92,33 @@ type UpdateEdgeIngressReq struct {
 
 // CreatePortalReq is the request for creating a portal.
 type CreatePortalReq struct {
-	Name             string   `json:"name"`
-	Description      string   `json:"description"`
-	CustomDomains    []string `json:"customDomains"`
-	APICustomDomains []string `json:"apiCustomDomains"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	Gateway       string   `json:"gateway"`
+	CustomDomains []string `json:"customDomains"`
 }
 
 // UpdatePortalReq is a request for updating a portal.
 type UpdatePortalReq struct {
-	Description      string   `json:"description"`
-	HubDomain        string   `json:"hubDomain"`
-	CustomDomains    []string `json:"customDomains"`
-	APICustomDomains []string `json:"apiCustomDomains"`
+	Description   string   `json:"description"`
+	Gateway       string   `json:"gateway"`
+	HubDomain     string   `json:"hubDomain"`
+	CustomDomains []string `json:"customDomains"`
+}
+
+// CreateGatewayReq is the request for creating a gateway.
+type CreateGatewayReq struct {
+	Name          string            `json:"name"`
+	Labels        map[string]string `json:"labels"`
+	Accesses      []string          `json:"accesses"`
+	CustomDomains []string          `json:"customDomains"`
+}
+
+// UpdateGatewayReq is a request for updating a gateway.
+type UpdateGatewayReq struct {
+	Labels        map[string]string `json:"labels"`
+	Accesses      []string          `json:"accesses"`
+	CustomDomains []string          `json:"customDomains"`
 }
 
 // Command defines patch operation to apply on the cluster.
@@ -552,6 +567,55 @@ func (c *Client) UpdatePortal(ctx context.Context, name, lastKnownVersion string
 func (c *Client) DeletePortal(ctx context.Context, name, lastKnownVersion string) error {
 	if err := c.deleteResource(ctx, "portals", name, lastKnownVersion); err != nil {
 		return fmt.Errorf("delete portal: %w", err)
+	}
+
+	return nil
+}
+
+// CreateGateway creates a gateway.
+func (c *Client) CreateGateway(ctx context.Context, createReq *CreateGatewayReq) (*api.Gateway, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal gateway request: %w", err)
+	}
+
+	var g api.Gateway
+	if err = c.createResource(ctx, "gateways", body, &g); err != nil {
+		return nil, fmt.Errorf("create gateway: %w", err)
+	}
+
+	return &g, nil
+}
+
+// GetGateways fetches the gateways available for this agent.
+func (c *Client) GetGateways(ctx context.Context) ([]api.Gateway, error) {
+	var gateways []api.Gateway
+	if err := c.listResource(ctx, "gateways", &gateways); err != nil {
+		return nil, fmt.Errorf("list gateways: %w", err)
+	}
+
+	return gateways, nil
+}
+
+// UpdateGateway updates a gateway.
+func (c *Client) UpdateGateway(ctx context.Context, name, lastKnownVersion string, updateReq *UpdateGatewayReq) (*api.Gateway, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal gateway request: %w", err)
+	}
+
+	var g api.Gateway
+	if err = c.updateResource(ctx, "gateways", name, lastKnownVersion, body, &g); err != nil {
+		return nil, fmt.Errorf("update gateway: %w", err)
+	}
+
+	return &g, nil
+}
+
+// DeleteGateway deletes a gateway.
+func (c *Client) DeleteGateway(ctx context.Context, name, lastKnownVersion string) error {
+	if err := c.deleteResource(ctx, "gateways", name, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete gateway: %w", err)
 	}
 
 	return nil

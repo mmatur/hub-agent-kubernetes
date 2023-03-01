@@ -29,6 +29,7 @@ type HubV1alpha1Interface interface {
 	APIsGetter
 	APIAccessesGetter
 	APICollectionsGetter
+	APIGatewaysGetter
 	APIPortalsGetter
 	AccessControlPoliciesGetter
 	EdgeIngressesGetter
@@ -50,6 +51,10 @@ func (c *HubV1alpha1Client) APIAccesses(namespace string) APIAccessInterface {
 
 func (c *HubV1alpha1Client) APICollections() APICollectionInterface {
 	return newAPICollections(c)
+}
+
+func (c *HubV1alpha1Client) APIGateways() APIGatewayInterface {
+	return newAPIGateways(c)
 }
 
 func (c *HubV1alpha1Client) APIPortals() APIPortalInterface {

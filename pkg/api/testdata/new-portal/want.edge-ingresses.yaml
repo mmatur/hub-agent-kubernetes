@@ -16,4 +16,3 @@ spec:
   customDomains:
     - hello.example.com
     - welcome.example.com
-    - not-verified.example.com

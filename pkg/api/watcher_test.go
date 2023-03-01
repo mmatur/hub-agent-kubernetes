@@ -76,18 +76,11 @@ func Test_WatcherRun(t *testing.T) {
 		{
 			desc: "new portal present on the platform needs to be created on the cluster",
 			platformPortal: Portal{
-				Name:         "new-portal",
-				Version:      "version-1",
-				APIHubDomain: "brave-lion-123.hub-traefik.io",
-				CustomDomains: []CustomDomain{
-					{Name: "hello.example.com", Verified: true},
-					{Name: "welcome.example.com", Verified: true},
-					{Name: "not-verified.example.com", Verified: false},
-				},
-				APICustomDomains: []CustomDomain{
-					{Name: "api.hello.example.com", Verified: true},
-					{Name: "api.welcome.example.com", Verified: true},
-					{Name: "api.not-verified.example.com", Verified: false},
+				Name:    "new-portal",
+				Version: "version-1",
+				CustomDomains: []string{
+					"hello.example.com",
+					"welcome.example.com",
 				},
 			},
 			wantPortals:       "testdata/new-portal/want.portals.yaml",
@@ -163,21 +156,6 @@ func Test_WatcherRun(t *testing.T) {
 					Certificate: []byte("cert"),
 					PrivateKey:  []byte("private"),
 				}, nil)
-
-			var wantAPICustomDomains []string
-			for _, customDomain := range test.platformPortal.APICustomDomains {
-				if customDomain.Verified {
-					wantAPICustomDomains = append(wantAPICustomDomains, customDomain.Name)
-				}
-			}
-
-			if len(wantAPICustomDomains) > 0 {
-				client.OnGetCertificateByDomains(wantAPICustomDomains).
-					TypedReturns(edgeingress.Certificate{
-						Certificate: []byte("cert"),
-						PrivateKey:  []byte("private"),
-					}, nil)
-			}
 
 			w := NewWatcher(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
 				IngressClassName:        "ingress-class",

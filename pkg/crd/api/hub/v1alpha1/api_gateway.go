@@ -25,45 +25,44 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// APIPortal defines a portal that exposes APIs.
+// APIGateway defines a gateway that exposes APIs.
 // +kubebuilder:printcolumn:name="URLs",type=string,JSONPath=`.status.urls`
 // +kubebuilder:resource:scope=Cluster
-type APIPortal struct {
+type APIGateway struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// The desired behavior of this APIPortal.
-	Spec APIPortalSpec `json:"spec,omitempty"`
+	// The desired behavior of this APIGateway.
+	Spec APIGatewaySpec `json:"spec,omitempty"`
 
-	// The current status of this APIPortal.
+	// The current status of this APIGateway.
 	// +optional
-	Status APIPortalStatus `json:"status,omitempty"`
+	Status APIGatewayStatus `json:"status,omitempty"`
 }
 
-// APIPortalSpec configures an APIPortal.
-type APIPortalSpec struct {
+// APIGatewaySpec configures an APIGateway.
+type APIGatewaySpec struct {
 	// +optional
-	Description string `json:"description,omitempty"`
-	APIGateway  string `json:"gateway"`
-	// CustomDomains are the custom domains under which the portal will be exposed.
+	APIAccesses []string `json:"apiAccesses,omitempty"`
+	// CustomDomains are the custom domains under which the gateway will be exposed.
 	// +optional
 	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
-// APIPortalStatus is the status of an APIPortal.
-type APIPortalStatus struct {
+// APIGatewayStatus is the status of an APIGateway.
+type APIGatewayStatus struct {
 	Version  string      `json:"version,omitempty"`
 	SyncedAt metav1.Time `json:"syncedAt,omitempty"`
 
-	// URLs are the URLs for accessing the APIPortal WebUI.
+	// URLs are the URLs for accessing the APIGateway.
 	URLs string `json:"urls"`
 
-	// HubDomain is the hub generated domain of the APIPortal WebUI.
+	// HubDomain is the hub generated domain of the APIGateway.
 	// +optional
 	HubDomain string `json:"hubDomain"`
 
-	// CustomDomains are the custom domains for accessing the exposed APIPortal WebUI.
+	// CustomDomains are the custom domains for accessing the exposed APIGateway.
 	// +optional
 	CustomDomains []string `json:"customDomains,omitempty"`
 
@@ -73,11 +72,11 @@ type APIPortalStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// APIPortalList defines a list of APIPortals.
-type APIPortalList struct {
+// APIGatewayList defines a list of APIGateway.
+type APIGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	Items []APIPortal `json:"items"`
+	Items []APIGateway `json:"items"`
 }

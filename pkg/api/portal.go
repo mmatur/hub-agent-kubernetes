@@ -29,19 +29,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Portal is a WebUI and a unified API that expose a set of APIs.
+// Portal is a WebUI that exposes a set of OpenAPI specs.
 type Portal struct {
 	WorkspaceID string `json:"workspaceId"`
 	ClusterID   string `json:"clusterId"`
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
+	Gateway     string `json:"gateway"`
 
 	Version string `json:"version"`
 
-	HubDomain        string         `json:"hubDomain,omitempty"`
-	CustomDomains    []CustomDomain `json:"customDomains"`
-	APIHubDomain     string         `json:"apiHubDomain"`
-	APICustomDomains []CustomDomain `json:"apiCustomDomains"`
+	HubDomain     string   `json:"hubDomain,omitempty"`
+	CustomDomains []string `json:"customDomains,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -55,47 +54,19 @@ type CustomDomain struct {
 
 // Resource builds the v1alpha1 APIPortal resource.
 func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
-	var customDomains []string
-	for _, domain := range p.CustomDomains {
-		customDomains = append(customDomains, domain.Name)
-	}
-
-	var apiCustomDomains []string
-	for _, domain := range p.APICustomDomains {
-		apiCustomDomains = append(apiCustomDomains, domain.Name)
-	}
-
 	spec := hubv1alpha1.APIPortalSpec{
-		Description:      p.Description,
-		CustomDomains:    customDomains,
-		APICustomDomains: apiCustomDomains,
+		Description:   p.Description,
+		APIGateway:    p.Gateway,
+		CustomDomains: p.CustomDomains,
 	}
 
 	var urls []string
-	var verifiedCustomDomains []string
 	for _, customDomain := range p.CustomDomains {
-		if !customDomain.Verified {
-			continue
-		}
-
-		urls = append(urls, "https://"+customDomain.Name)
-		verifiedCustomDomains = append(verifiedCustomDomains, customDomain.Name)
+		urls = append(urls, "https://"+customDomain)
 	}
 	if p.HubDomain != "" {
 		urls = append(urls, "https://"+p.HubDomain)
 	}
-
-	var apiUrls []string
-	var verifiedAPICustomDomains []string
-	for _, customDomain := range p.APICustomDomains {
-		if !customDomain.Verified {
-			continue
-		}
-
-		apiUrls = append(apiUrls, "https://"+customDomain.Name)
-		verifiedAPICustomDomains = append(verifiedAPICustomDomains, customDomain.Name)
-	}
-	apiUrls = append(apiUrls, "https://"+p.APIHubDomain)
 
 	portal := &hubv1alpha1.APIPortal{
 		TypeMeta: metav1.TypeMeta{
@@ -105,14 +76,11 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 		ObjectMeta: metav1.ObjectMeta{Name: p.Name},
 		Spec:       spec,
 		Status: hubv1alpha1.APIPortalStatus{
-			Version:          p.Version,
-			SyncedAt:         metav1.Now(),
-			HubDomain:        p.HubDomain,
-			APIHubDomain:     p.APIHubDomain,
-			CustomDomains:    verifiedCustomDomains,
-			APICustomDomains: verifiedAPICustomDomains,
-			URLs:             strings.Join(urls, ","),
-			APIURLs:          strings.Join(apiUrls, ","),
+			Version:       p.Version,
+			SyncedAt:      metav1.Now(),
+			HubDomain:     p.HubDomain,
+			CustomDomains: p.CustomDomains,
+			URLs:          strings.Join(urls, ","),
 		},
 	}
 
@@ -127,21 +95,19 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 }
 
 type portalHash struct {
-	Description      string   `json:"description,omitempty"`
-	CustomDomains    []string `json:"customDomains,omitempty"`
-	APICustomDomains []string `json:"apiCustomDomains,omitempty"`
-	HubDomain        string   `json:"hubDomain"`
-	APIHubDomain     string   `json:"apiHubDomain"`
+	Description   string   `json:"description,omitempty"`
+	Gateway       string   `json:"gateway"`
+	HubDomain     string   `json:"hubDomain,omitempty"`
+	CustomDomains []string `json:"customDomains,omitempty"`
 }
 
 // HashPortal generates the hash of the APIPortal.
 func HashPortal(p *hubv1alpha1.APIPortal) (string, error) {
 	ph := portalHash{
-		Description:      p.Spec.Description,
-		CustomDomains:    p.Spec.CustomDomains,
-		APICustomDomains: p.Spec.APICustomDomains,
-		HubDomain:        p.Status.HubDomain,
-		APIHubDomain:     p.Status.APIHubDomain,
+		Description:   p.Spec.Description,
+		Gateway:       p.Spec.APIGateway,
+		HubDomain:     p.Status.HubDomain,
+		CustomDomains: p.Spec.CustomDomains,
 	}
 
 	b, err := json.Marshal(ph)
