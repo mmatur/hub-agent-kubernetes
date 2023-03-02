@@ -1437,7 +1437,7 @@ func TestClient_UpdateACP(t *testing.T) {
 					return
 				}
 
-				if req.Header.Get("Last-Known-Version") != "oldVersion" {
+				if req.Header.Get("Last-Known-Version") != "oldVersionACP" {
 					http.Error(rw, "Invalid token", http.StatusUnauthorized)
 					return
 				}
@@ -1465,7 +1465,7 @@ func TestClient_UpdateACP(t *testing.T) {
 			require.NoError(t, err)
 			c.httpClient = srv.Client()
 
-			updatedACP, err := c.UpdateACP(context.Background(), "oldVersion", test.policy)
+			updatedACP, err := c.UpdateACP(context.Background(), "oldVersionACP", test.policy)
 			test.wantErr(t, err)
 
 			require.Equal(t, 1, callCount)
@@ -2259,6 +2259,321 @@ func TestClient_SendCommandReports(t *testing.T) {
 			}
 
 			assert.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func TestClient_GetAPIs(t *testing.T) {
+	wantAPIs := []api.API{
+		{
+			Name:       "name",
+			Namespace:  "ns",
+			PathPrefix: "prefix",
+			Service: api.Service{
+				Name: "service",
+				Port: 80,
+			},
+			Version: "version-1",
+		},
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/apis", func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantAPIs)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
+	c.httpClient = srv.Client()
+
+	gotAPIs, err := c.GetAPIs(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, wantAPIs, gotAPIs)
+}
+
+func TestClient_CreateAPI(t *testing.T) {
+	tests := []struct {
+		desc             string
+		req              *CreateAPIReq
+		api              *api.API
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create API",
+			req: &CreateAPIReq{
+				Name:       "name",
+				Namespace:  "ns",
+				Labels:     map[string]string{"a": "b"},
+				PathPrefix: "prefix",
+				Service: Service{
+					Name: "svc",
+					Port: 80,
+				},
+			},
+			returnStatusCode: http.StatusCreated,
+			wantErr:          assert.NoError,
+			api: &api.API{
+				Name:      "name",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				PathPrefix: "prefix",
+				Service: api.Service{
+					Name: "svc",
+					Port: 80,
+				},
+				Version: "version-1",
+			},
+		},
+		{
+			desc: "error",
+			req: &CreateAPIReq{
+				Name:       "name",
+				Namespace:  "ns",
+				Labels:     map[string]string{"a": "b"},
+				PathPrefix: "prefix",
+				Service: Service{
+					Name: "svc",
+					Port: 80,
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var gotReq CreateAPIReq
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/apis", func(rw http.ResponseWriter, req *http.Request) {
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&gotReq)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				err = json.NewEncoder(rw).Encode(test.api)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			createdAPI, err := c.CreateAPI(context.Background(), test.req)
+			test.wantErr(t, err)
+
+			assert.Equal(t, *test.req, gotReq)
+			assert.Equal(t, test.api, createdAPI)
+		})
+	}
+}
+
+func TestClient_UpdateAPI(t *testing.T) {
+	tests := []struct {
+		desc             string
+		req              *UpdateAPIReq
+		api              *api.API
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "update API",
+			req: &UpdateAPIReq{
+				Labels:     map[string]string{"a": "b"},
+				PathPrefix: "prefix",
+				Service: Service{
+					Name: "svc",
+					Port: 80,
+				},
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			api: &api.API{
+				Name:      "name",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				PathPrefix: "prefix",
+				Service: api.Service{
+					Name: "svc",
+					Port: 80,
+				},
+				Version: "version-1",
+			},
+		},
+		{
+			desc: "conflict",
+			req: &UpdateAPIReq{
+				Labels:     map[string]string{"a": "b"},
+				PathPrefix: "prefix",
+				Service: Service{
+					Name: "svc",
+					Port: 80,
+				},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var gotReq UpdateAPIReq
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/apis/name@ns", func(rw http.ResponseWriter, req *http.Request) {
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				if req.Header.Get("Last-Known-Version") != "oldVersionAPI" {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&gotReq)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				err = json.NewEncoder(rw).Encode(test.api)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			updatedAPI, err := c.UpdateAPI(context.Background(), "ns", "name", "oldVersionAPI", test.req)
+			test.wantErr(t, err)
+
+			assert.Equal(t, *test.req, gotReq)
+			assert.Equal(t, test.api, updatedAPI)
+		})
+	}
+}
+
+func TestClient_DeleteAPI(t *testing.T) {
+	tests := []struct {
+		desc             string
+		name             string
+		namespace        string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "delete API",
+			name:             "name",
+			namespace:        "ns",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "error",
+			name:             "name",
+			namespace:        "ns",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+			mux := http.NewServeMux()
+			mux.HandleFunc("/apis/"+test.name+"@"+test.namespace, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != "oldVersion" {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			err = c.DeleteAPI(context.Background(), test.namespace, test.name, "oldVersion")
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
 		})
 	}
 }

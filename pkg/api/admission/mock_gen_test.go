@@ -8,18 +8,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/traefik/hub-agent-kubernetes/pkg/api"
-	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
+	"k8s.io/api/admission/v1"
 )
 
-// platformClientMock mock of PlatformClient.
-type platformClientMock struct{ mock.Mock }
+// reviewerMock mock of Reviewer.
+type reviewerMock struct{ mock.Mock }
 
-// newPlatformClientMock creates a new platformClientMock.
-func newPlatformClientMock(tb testing.TB) *platformClientMock {
+// newReviewerMock creates a new reviewerMock.
+func newReviewerMock(tb testing.TB) *reviewerMock {
 	tb.Helper()
 
-	m := &platformClientMock{}
+	m := &reviewerMock{}
 	m.Mock.Test(tb)
 
 	tb.Cleanup(func() { m.AssertExpectations(tb) })
@@ -27,798 +26,201 @@ func newPlatformClientMock(tb testing.TB) *platformClientMock {
 	return m
 }
 
-func (_m *platformClientMock) CreateGateway(_ context.Context, createReq *platform.CreateGatewayReq) (*api.Gateway, error) {
-	_ret := _m.Called(createReq)
-
-	if _rf, ok := _ret.Get(0).(func(*platform.CreateGatewayReq) (*api.Gateway, error)); ok {
-		return _rf(createReq)
-	}
-
-	_ra0, _ := _ret.Get(0).(*api.Gateway)
-	_rb1 := _ret.Error(1)
-
-	return _ra0, _rb1
-}
-
-func (_m *platformClientMock) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return &platformClientCreateGatewayCall{Call: _m.Mock.On("CreateGateway", createReq), Parent: _m}
-}
-
-func (_m *platformClientMock) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return &platformClientCreateGatewayCall{Call: _m.Mock.On("CreateGateway", createReq), Parent: _m}
-}
-
-type platformClientCreateGatewayCall struct {
-	*mock.Call
-	Parent *platformClientMock
-}
-
-func (_c *platformClientCreateGatewayCall) Panic(msg string) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) Once() *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) Twice() *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) Times(i int) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) WaitUntil(w <-chan time.Time) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) After(d time.Duration) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) Run(fn func(args mock.Arguments)) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) Maybe() *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) TypedReturns(a *api.Gateway, b error) *platformClientCreateGatewayCall {
-	_c.Call = _c.Return(a, b)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) ReturnsFn(fn func(*platform.CreateGatewayReq) (*api.Gateway, error)) *platformClientCreateGatewayCall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) TypedRun(fn func(*platform.CreateGatewayReq)) *platformClientCreateGatewayCall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_createReq, _ := args.Get(0).(*platform.CreateGatewayReq)
-		fn(_createReq)
-	})
-	return _c
-}
-
-func (_c *platformClientCreateGatewayCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
-}
-
-func (_c *platformClientCreateGatewayCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
-}
-
-func (_c *platformClientCreateGatewayCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreateGatewayCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreateGatewayCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientCreateGatewayCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientCreateGatewayCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientCreateGatewayCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientCreateGatewayCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreateGatewayCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreateGatewayCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientCreateGatewayCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
-}
-
-func (_m *platformClientMock) CreatePortal(_ context.Context, req *platform.CreatePortalReq) (*api.Portal, error) {
+func (_m *reviewerMock) CanReview(req *v1.AdmissionRequest) bool {
 	_ret := _m.Called(req)
 
-	if _rf, ok := _ret.Get(0).(func(*platform.CreatePortalReq) (*api.Portal, error)); ok {
+	if _rf, ok := _ret.Get(0).(func(*v1.AdmissionRequest) bool); ok {
 		return _rf(req)
 	}
 
-	_ra0, _ := _ret.Get(0).(*api.Portal)
-	_rb1 := _ret.Error(1)
+	_ra0 := _ret.Bool(0)
 
-	return _ra0, _rb1
+	return _ra0
 }
 
-func (_m *platformClientMock) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return &platformClientCreatePortalCall{Call: _m.Mock.On("CreatePortal", req), Parent: _m}
+func (_m *reviewerMock) OnCanReview(req *v1.AdmissionRequest) *reviewerCanReviewCall {
+	return &reviewerCanReviewCall{Call: _m.Mock.On("CanReview", req), Parent: _m}
 }
 
-func (_m *platformClientMock) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return &platformClientCreatePortalCall{Call: _m.Mock.On("CreatePortal", req), Parent: _m}
+func (_m *reviewerMock) OnCanReviewRaw(req interface{}) *reviewerCanReviewCall {
+	return &reviewerCanReviewCall{Call: _m.Mock.On("CanReview", req), Parent: _m}
 }
 
-type platformClientCreatePortalCall struct {
+type reviewerCanReviewCall struct {
 	*mock.Call
-	Parent *platformClientMock
+	Parent *reviewerMock
 }
 
-func (_c *platformClientCreatePortalCall) Panic(msg string) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Panic(msg string) *reviewerCanReviewCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) Once() *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Once() *reviewerCanReviewCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) Twice() *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Twice() *reviewerCanReviewCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) Times(i int) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Times(i int) *reviewerCanReviewCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) WaitUntil(w <-chan time.Time) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) WaitUntil(w <-chan time.Time) *reviewerCanReviewCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) After(d time.Duration) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) After(d time.Duration) *reviewerCanReviewCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) Run(fn func(args mock.Arguments)) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Run(fn func(args mock.Arguments)) *reviewerCanReviewCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) Maybe() *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) Maybe() *reviewerCanReviewCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) TypedReturns(a *api.Portal, b error) *platformClientCreatePortalCall {
-	_c.Call = _c.Return(a, b)
+func (_c *reviewerCanReviewCall) TypedReturns(a bool) *reviewerCanReviewCall {
+	_c.Call = _c.Return(a)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) ReturnsFn(fn func(*platform.CreatePortalReq) (*api.Portal, error)) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) ReturnsFn(fn func(*v1.AdmissionRequest) bool) *reviewerCanReviewCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) TypedRun(fn func(*platform.CreatePortalReq)) *platformClientCreatePortalCall {
+func (_c *reviewerCanReviewCall) TypedRun(fn func(*v1.AdmissionRequest)) *reviewerCanReviewCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_req, _ := args.Get(0).(*platform.CreatePortalReq)
+		_req, _ := args.Get(0).(*v1.AdmissionRequest)
 		fn(_req)
 	})
 	return _c
 }
 
-func (_c *platformClientCreatePortalCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
+func (_c *reviewerCanReviewCall) OnCanReview(req *v1.AdmissionRequest) *reviewerCanReviewCall {
+	return _c.Parent.OnCanReview(req)
 }
 
-func (_c *platformClientCreatePortalCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
+func (_c *reviewerCanReviewCall) OnReview(req *v1.AdmissionRequest) *reviewerReviewCall {
+	return _c.Parent.OnReview(req)
 }
 
-func (_c *platformClientCreatePortalCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
+func (_c *reviewerCanReviewCall) OnCanReviewRaw(req interface{}) *reviewerCanReviewCall {
+	return _c.Parent.OnCanReviewRaw(req)
 }
 
-func (_c *platformClientCreatePortalCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
+func (_c *reviewerCanReviewCall) OnReviewRaw(req interface{}) *reviewerReviewCall {
+	return _c.Parent.OnReviewRaw(req)
 }
 
-func (_c *platformClientCreatePortalCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
+func (_m *reviewerMock) Review(_ context.Context, req *v1.AdmissionRequest) ([]byte, error) {
+	_ret := _m.Called(req)
 
-func (_c *platformClientCreatePortalCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientCreatePortalCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientCreatePortalCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientCreatePortalCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreatePortalCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientCreatePortalCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientCreatePortalCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
-}
-
-func (_m *platformClientMock) DeleteGateway(_ context.Context, name string, lastKnownVersion string) error {
-	_ret := _m.Called(name, lastKnownVersion)
-
-	if _rf, ok := _ret.Get(0).(func(string, string) error); ok {
-		return _rf(name, lastKnownVersion)
+	if _rf, ok := _ret.Get(0).(func(*v1.AdmissionRequest) ([]byte, error)); ok {
+		return _rf(req)
 	}
 
-	_ra0 := _ret.Error(0)
-
-	return _ra0
-}
-
-func (_m *platformClientMock) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return &platformClientDeleteGatewayCall{Call: _m.Mock.On("DeleteGateway", name, lastKnownVersion), Parent: _m}
-}
-
-func (_m *platformClientMock) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return &platformClientDeleteGatewayCall{Call: _m.Mock.On("DeleteGateway", name, lastKnownVersion), Parent: _m}
-}
-
-type platformClientDeleteGatewayCall struct {
-	*mock.Call
-	Parent *platformClientMock
-}
-
-func (_c *platformClientDeleteGatewayCall) Panic(msg string) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) Once() *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) Twice() *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) Times(i int) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) WaitUntil(w <-chan time.Time) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) After(d time.Duration) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) Run(fn func(args mock.Arguments)) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) Maybe() *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) TypedReturns(a error) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Return(a)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) ReturnsFn(fn func(string, string) error) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) TypedRun(fn func(string, string)) *platformClientDeleteGatewayCall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_name := args.String(0)
-		_lastKnownVersion := args.String(1)
-		fn(_name, _lastKnownVersion)
-	})
-	return _c
-}
-
-func (_c *platformClientDeleteGatewayCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientDeleteGatewayCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
-}
-
-func (_m *platformClientMock) DeletePortal(_ context.Context, name string, lastKnownVersion string) error {
-	_ret := _m.Called(name, lastKnownVersion)
-
-	if _rf, ok := _ret.Get(0).(func(string, string) error); ok {
-		return _rf(name, lastKnownVersion)
-	}
-
-	_ra0 := _ret.Error(0)
-
-	return _ra0
-}
-
-func (_m *platformClientMock) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return &platformClientDeletePortalCall{Call: _m.Mock.On("DeletePortal", name, lastKnownVersion), Parent: _m}
-}
-
-func (_m *platformClientMock) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return &platformClientDeletePortalCall{Call: _m.Mock.On("DeletePortal", name, lastKnownVersion), Parent: _m}
-}
-
-type platformClientDeletePortalCall struct {
-	*mock.Call
-	Parent *platformClientMock
-}
-
-func (_c *platformClientDeletePortalCall) Panic(msg string) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) Once() *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) Twice() *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) Times(i int) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) WaitUntil(w <-chan time.Time) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) After(d time.Duration) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) Run(fn func(args mock.Arguments)) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) Maybe() *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) TypedReturns(a error) *platformClientDeletePortalCall {
-	_c.Call = _c.Return(a)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) ReturnsFn(fn func(string, string) error) *platformClientDeletePortalCall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) TypedRun(fn func(string, string)) *platformClientDeletePortalCall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_name := args.String(0)
-		_lastKnownVersion := args.String(1)
-		fn(_name, _lastKnownVersion)
-	})
-	return _c
-}
-
-func (_c *platformClientDeletePortalCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
-}
-
-func (_c *platformClientDeletePortalCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
-}
-
-func (_c *platformClientDeletePortalCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeletePortalCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeletePortalCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientDeletePortalCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientDeletePortalCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientDeletePortalCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientDeletePortalCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeletePortalCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientDeletePortalCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientDeletePortalCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
-}
-
-func (_m *platformClientMock) UpdateGateway(_ context.Context, name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) (*api.Gateway, error) {
-	_ret := _m.Called(name, lastKnownVersion, updateReq)
-
-	if _rf, ok := _ret.Get(0).(func(string, string, *platform.UpdateGatewayReq) (*api.Gateway, error)); ok {
-		return _rf(name, lastKnownVersion, updateReq)
-	}
-
-	_ra0, _ := _ret.Get(0).(*api.Gateway)
+	_ra0, _ := _ret.Get(0).([]byte)
 	_rb1 := _ret.Error(1)
 
 	return _ra0, _rb1
 }
 
-func (_m *platformClientMock) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return &platformClientUpdateGatewayCall{Call: _m.Mock.On("UpdateGateway", name, lastKnownVersion, updateReq), Parent: _m}
+func (_m *reviewerMock) OnReview(req *v1.AdmissionRequest) *reviewerReviewCall {
+	return &reviewerReviewCall{Call: _m.Mock.On("Review", req), Parent: _m}
 }
 
-func (_m *platformClientMock) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return &platformClientUpdateGatewayCall{Call: _m.Mock.On("UpdateGateway", name, lastKnownVersion, updateReq), Parent: _m}
+func (_m *reviewerMock) OnReviewRaw(req interface{}) *reviewerReviewCall {
+	return &reviewerReviewCall{Call: _m.Mock.On("Review", req), Parent: _m}
 }
 
-type platformClientUpdateGatewayCall struct {
+type reviewerReviewCall struct {
 	*mock.Call
-	Parent *platformClientMock
+	Parent *reviewerMock
 }
 
-func (_c *platformClientUpdateGatewayCall) Panic(msg string) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Panic(msg string) *reviewerReviewCall {
 	_c.Call = _c.Call.Panic(msg)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) Once() *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Once() *reviewerReviewCall {
 	_c.Call = _c.Call.Once()
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) Twice() *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Twice() *reviewerReviewCall {
 	_c.Call = _c.Call.Twice()
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) Times(i int) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Times(i int) *reviewerReviewCall {
 	_c.Call = _c.Call.Times(i)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) WaitUntil(w <-chan time.Time) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) WaitUntil(w <-chan time.Time) *reviewerReviewCall {
 	_c.Call = _c.Call.WaitUntil(w)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) After(d time.Duration) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) After(d time.Duration) *reviewerReviewCall {
 	_c.Call = _c.Call.After(d)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) Run(fn func(args mock.Arguments)) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Run(fn func(args mock.Arguments)) *reviewerReviewCall {
 	_c.Call = _c.Call.Run(fn)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) Maybe() *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) Maybe() *reviewerReviewCall {
 	_c.Call = _c.Call.Maybe()
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) TypedReturns(a *api.Gateway, b error) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) TypedReturns(a []byte, b error) *reviewerReviewCall {
 	_c.Call = _c.Return(a, b)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) ReturnsFn(fn func(string, string, *platform.UpdateGatewayReq) (*api.Gateway, error)) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) ReturnsFn(fn func(*v1.AdmissionRequest) ([]byte, error)) *reviewerReviewCall {
 	_c.Call = _c.Return(fn)
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) TypedRun(fn func(string, string, *platform.UpdateGatewayReq)) *platformClientUpdateGatewayCall {
+func (_c *reviewerReviewCall) TypedRun(fn func(*v1.AdmissionRequest)) *reviewerReviewCall {
 	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_name := args.String(0)
-		_lastKnownVersion := args.String(1)
-		_updateReq, _ := args.Get(2).(*platform.UpdateGatewayReq)
-		fn(_name, _lastKnownVersion, _updateReq)
+		_req, _ := args.Get(0).(*v1.AdmissionRequest)
+		fn(_req)
 	})
 	return _c
 }
 
-func (_c *platformClientUpdateGatewayCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
+func (_c *reviewerReviewCall) OnCanReview(req *v1.AdmissionRequest) *reviewerCanReviewCall {
+	return _c.Parent.OnCanReview(req)
 }
 
-func (_c *platformClientUpdateGatewayCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
+func (_c *reviewerReviewCall) OnReview(req *v1.AdmissionRequest) *reviewerReviewCall {
+	return _c.Parent.OnReview(req)
 }
 
-func (_c *platformClientUpdateGatewayCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
+func (_c *reviewerReviewCall) OnCanReviewRaw(req interface{}) *reviewerCanReviewCall {
+	return _c.Parent.OnCanReviewRaw(req)
 }
 
-func (_c *platformClientUpdateGatewayCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientUpdateGatewayCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
-}
-
-func (_m *platformClientMock) UpdatePortal(_ context.Context, name string, lastKnownVersion string, req *platform.UpdatePortalReq) (*api.Portal, error) {
-	_ret := _m.Called(name, lastKnownVersion, req)
-
-	if _rf, ok := _ret.Get(0).(func(string, string, *platform.UpdatePortalReq) (*api.Portal, error)); ok {
-		return _rf(name, lastKnownVersion, req)
-	}
-
-	_ra0, _ := _ret.Get(0).(*api.Portal)
-	_rb1 := _ret.Error(1)
-
-	return _ra0, _rb1
-}
-
-func (_m *platformClientMock) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return &platformClientUpdatePortalCall{Call: _m.Mock.On("UpdatePortal", name, lastKnownVersion, req), Parent: _m}
-}
-
-func (_m *platformClientMock) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return &platformClientUpdatePortalCall{Call: _m.Mock.On("UpdatePortal", name, lastKnownVersion, req), Parent: _m}
-}
-
-type platformClientUpdatePortalCall struct {
-	*mock.Call
-	Parent *platformClientMock
-}
-
-func (_c *platformClientUpdatePortalCall) Panic(msg string) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) Once() *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) Twice() *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) Times(i int) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) WaitUntil(w <-chan time.Time) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) After(d time.Duration) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) Run(fn func(args mock.Arguments)) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) Maybe() *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) TypedReturns(a *api.Portal, b error) *platformClientUpdatePortalCall {
-	_c.Call = _c.Return(a, b)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) ReturnsFn(fn func(string, string, *platform.UpdatePortalReq) (*api.Portal, error)) *platformClientUpdatePortalCall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) TypedRun(fn func(string, string, *platform.UpdatePortalReq)) *platformClientUpdatePortalCall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_name := args.String(0)
-		_lastKnownVersion := args.String(1)
-		_req, _ := args.Get(2).(*platform.UpdatePortalReq)
-		fn(_name, _lastKnownVersion, _req)
-	})
-	return _c
-}
-
-func (_c *platformClientUpdatePortalCall) OnCreateGateway(createReq *platform.CreateGatewayReq) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGateway(createReq)
-}
-
-func (_c *platformClientUpdatePortalCall) OnCreatePortal(req *platform.CreatePortalReq) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortal(req)
-}
-
-func (_c *platformClientUpdatePortalCall) OnDeleteGateway(name string, lastKnownVersion string) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGateway(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdatePortalCall) OnDeletePortal(name string, lastKnownVersion string) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortal(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdatePortalCall) OnUpdateGateway(name string, lastKnownVersion string, updateReq *platform.UpdateGatewayReq) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGateway(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientUpdatePortalCall) OnUpdatePortal(name string, lastKnownVersion string, req *platform.UpdatePortalReq) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortal(name, lastKnownVersion, req)
-}
-
-func (_c *platformClientUpdatePortalCall) OnCreateGatewayRaw(createReq interface{}) *platformClientCreateGatewayCall {
-	return _c.Parent.OnCreateGatewayRaw(createReq)
-}
-
-func (_c *platformClientUpdatePortalCall) OnCreatePortalRaw(req interface{}) *platformClientCreatePortalCall {
-	return _c.Parent.OnCreatePortalRaw(req)
-}
-
-func (_c *platformClientUpdatePortalCall) OnDeleteGatewayRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeleteGatewayCall {
-	return _c.Parent.OnDeleteGatewayRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdatePortalCall) OnDeletePortalRaw(name interface{}, lastKnownVersion interface{}) *platformClientDeletePortalCall {
-	return _c.Parent.OnDeletePortalRaw(name, lastKnownVersion)
-}
-
-func (_c *platformClientUpdatePortalCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *platformClientUpdateGatewayCall {
-	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
-}
-
-func (_c *platformClientUpdatePortalCall) OnUpdatePortalRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *platformClientUpdatePortalCall {
-	return _c.Parent.OnUpdatePortalRaw(name, lastKnownVersion, req)
+func (_c *reviewerReviewCall) OnReviewRaw(req interface{}) *reviewerReviewCall {
+	return _c.Parent.OnReviewRaw(req)
 }

@@ -14,7 +14,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-
 package admission
 
 import (
@@ -25,551 +24,179 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/traefik/hub-agent-kubernetes/pkg/api"
-	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	admv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var testPortalSpec = hubv1alpha1.APIPortalSpec{
-	Description:   "My awesome portal",
-	APIGateway:    "gateway-1",
-	CustomDomains: []string{"foo.example.com", "bar.example.com"},
+func TestHandler_ServeHTTP(t *testing.T) {
+	typePatch := admv1.PatchTypeJSONPatch
+
+	tests := []struct {
+		desc string
+
+		request        *admv1.AdmissionRequest
+		mock           func(tb testing.TB, req *admv1.AdmissionRequest) *reviewerMock
+		wantResponse   *admv1.AdmissionResponse
+		wantCodeStatus int
+	}{
+		{
+			desc:           "return 422 if there is not request",
+			wantCodeStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			desc: "return a not allowed response if no reviewer is found",
+			request: &admv1.AdmissionRequest{
+				UID: "id",
+				Kind: metav1.GroupVersionKind{
+					Group:   "hub.traefik.io",
+					Version: "v1alpha1",
+					Kind:    "Unknown",
+				},
+			},
+			mock: func(tb testing.TB, req *admv1.AdmissionRequest) *reviewerMock {
+				tb.Helper()
+
+				return newReviewerMock(tb).
+					OnCanReview(req).TypedReturns(false).Once().
+					Parent
+			},
+			wantResponse: &admv1.AdmissionResponse{
+				UID:     "id",
+				Allowed: false,
+				Result: &metav1.Status{
+					Status:  "Failure",
+					Message: "unsupported resource hub.traefik.io/v1alpha1, Kind=Unknown",
+				},
+			},
+			wantCodeStatus: http.StatusOK,
+		},
+		{
+			desc: "return a not allowed response if reviewer is broken",
+			request: &admv1.AdmissionRequest{
+				UID: "id",
+				Kind: metav1.GroupVersionKind{
+					Group:   "hub.traefik.io",
+					Version: "v1alpha1",
+					Kind:    "known",
+				},
+			},
+			mock: func(tb testing.TB, req *admv1.AdmissionRequest) *reviewerMock {
+				tb.Helper()
+
+				return newReviewerMock(tb).
+					OnCanReview(req).TypedReturns(true).Once().
+					OnReview(req).TypedReturns(nil, errors.New("boom")).Once().
+					Parent
+			},
+			wantResponse: &admv1.AdmissionResponse{
+				UID:     "id",
+				Allowed: false,
+				Result: &metav1.Status{
+					Status:  "Failure",
+					Message: "boom",
+				},
+			},
+			wantCodeStatus: http.StatusOK,
+		},
+		{
+			desc: "return a patch response when reviewer is found",
+			request: &admv1.AdmissionRequest{
+				UID: "id",
+				Kind: metav1.GroupVersionKind{
+					Group:   "hub.traefik.io",
+					Version: "v1alpha1",
+					Kind:    "known",
+				},
+			},
+			mock: func(tb testing.TB, req *admv1.AdmissionRequest) *reviewerMock {
+				tb.Helper()
+
+				return newReviewerMock(tb).
+					OnCanReview(req).TypedReturns(true).Once().
+					OnReview(req).TypedReturns([]byte("patch"), nil).Once().
+					Parent
+			},
+			wantResponse: &admv1.AdmissionResponse{
+				UID:       "id",
+				Allowed:   true,
+				PatchType: &typePatch,
+				Patch:     []byte("patch"),
+			},
+			wantCodeStatus: http.StatusOK,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			b := mustMarshal(t, admv1.AdmissionReview{Request: test.request})
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
+			require.NoError(t, err)
+
+			rec := httptest.NewRecorder()
+
+			var rev Reviewer
+			if test.mock != nil {
+				rev = test.mock(t, test.request)
+			}
+			h := NewHandler([]Reviewer{rev})
+			h.ServeHTTP(rec, req)
+
+			assert.Equal(t, test.wantCodeStatus, rec.Code)
+
+			if test.wantCodeStatus == http.StatusOK {
+				var gotAr admv1.AdmissionReview
+				err = json.NewDecoder(rec.Body).Decode(&gotAr)
+				require.NoError(t, err)
+
+				assert.Equal(t, test.wantResponse, gotAr.Response)
+			}
+		})
+	}
 }
 
-func TestHandler_ServeHTTP_createOperation(t *testing.T) {
-	now := metav1.Now()
-
-	const portalName = "my-portal"
-
+func TestHandler_ServeHTTP_reviewer(t *testing.T) {
 	admissionRev := admv1.AdmissionReview{
 		Request: &admv1.AdmissionRequest{
 			UID: "id",
 			Kind: metav1.GroupVersionKind{
 				Group:   "hub.traefik.io",
 				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Create,
-			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-				}),
+				Kind:    "known",
 			},
 		},
 		Response: &admv1.AdmissionResponse{},
 	}
-	wantCreateReq := &platform.CreatePortalReq{
-		Name:          portalName,
-		Description:   testPortalSpec.Description,
-		Gateway:       testPortalSpec.APIGateway,
-		CustomDomains: testPortalSpec.CustomDomains,
-	}
-	createdPortal := &api.Portal{
-		WorkspaceID:   "workspace-id",
-		ClusterID:     "cluster-id",
-		Name:          portalName,
-		Description:   "My awesome portal",
-		Gateway:       "gateway-1",
-		Version:       "version-1",
-		CustomDomains: []string{"foo.example.com", "bar.example.com"},
-		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnCreatePortal(wantCreateReq).TypedReturns(createdPortal, nil).Once()
-
-	h := NewHandler(client)
-	h.now = func() time.Time { return now.Time }
-
 	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
 	require.NoError(t, err)
 
+	rec := httptest.NewRecorder()
+
+	rev := newReviewerMock(t).
+		OnCanReview(admissionRev.Request).TypedReturns(true).Once().
+		OnReview(admissionRev.Request).TypedReturns([]byte("patch"), nil).Once().
+		Parent
+	h := NewHandler([]Reviewer{rev})
+
 	h.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 
 	var gotAr admv1.AdmissionReview
 	err = json.NewDecoder(rec.Body).Decode(&gotAr)
 	require.NoError(t, err)
 
-	jsonPatch := admv1.PatchTypeJSONPatch
-	wantPatchType := &jsonPatch
+	typePatch := admv1.PatchTypeJSONPatch
 	wantResp := admv1.AdmissionResponse{
 		UID:       "id",
 		Allowed:   true,
-		PatchType: wantPatchType,
-		Patch: mustMarshal(t, []patch{
-			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
-				Version:       "version-1",
-				SyncedAt:      now,
-				URLs:          "https://foo.example.com,https://bar.example.com",
-				CustomDomains: []string{"foo.example.com", "bar.example.com"},
-				Hash:          "3ACiTUYBBU60DUwbouDpJNnDHwY=",
-			}},
-		}),
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_createOperationConflict(t *testing.T) {
-	const portalName = "my-portal"
-
-	admissionRev := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Create,
-			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-				}),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnCreatePortalRaw(mock.Anything).TypedReturns(nil, errors.New("BOOM")).Once()
-
-	h := NewHandler(client)
-
-	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: "create APIPortal: BOOM",
-		},
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_updateOperation(t *testing.T) {
-	now := metav1.Now()
-
-	const (
-		portalName = "my-portal"
-		version    = "version-3"
-	)
-
-	newPortal := hubv1alpha1.APIPortal{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "APIPortal",
-			APIVersion: "hub.traefik.io/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{Name: portalName},
-		Spec: hubv1alpha1.APIPortalSpec{
-			Description:   "My updated portal",
-			APIGateway:    "updated-gateway",
-			CustomDomains: []string{"foo.example.com"},
-		},
-		Status: hubv1alpha1.APIPortalStatus{
-			HubDomain: "majestic-beaver-123.hub-traefik.io",
-		},
-	}
-	oldPortal := hubv1alpha1.APIPortal{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "APIPortal",
-			APIVersion: "hub.traefik.io/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{Name: portalName},
-		Spec:       testPortalSpec,
-		Status: hubv1alpha1.APIPortalStatus{
-			Version:  version,
-			SyncedAt: metav1.NewTime(now.Time.Add(-time.Hour)),
-		},
-	}
-	admissionRev := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Update,
-			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, newPortal),
-			},
-			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, oldPortal),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	}
-	wantUpdateReq := &platform.UpdatePortalReq{
-		Description:   newPortal.Spec.Description,
-		Gateway:       newPortal.Spec.APIGateway,
-		HubDomain:     newPortal.Status.HubDomain,
-		CustomDomains: newPortal.Spec.CustomDomains,
-	}
-	updatedPortal := &api.Portal{
-		WorkspaceID:   "workspace-id",
-		ClusterID:     "cluster-id",
-		Name:          portalName,
-		Description:   "my updated portal",
-		Gateway:       "updated-gateway",
-		Version:       "version-4",
-		HubDomain:     "majestic-beaver-123.hub-traefik.io",
-		CustomDomains: []string{"foo.example.com"},
-		CreatedAt:     time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
-		UpdatedAt:     time.Now().UTC().Truncate(time.Millisecond),
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnUpdatePortal(portalName, version, wantUpdateReq).
-		TypedReturns(updatedPortal, nil).Once()
-
-	h := NewHandler(client)
-	h.now = func() time.Time { return now.Time }
-
-	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	jsonPatch := admv1.PatchTypeJSONPatch
-	wantPatchType := &jsonPatch
-	wantResp := admv1.AdmissionResponse{
-		UID:       "id",
-		Allowed:   true,
-		PatchType: wantPatchType,
-		Patch: mustMarshal(t, []patch{
-			{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
-				Version:       "version-4",
-				SyncedAt:      now,
-				HubDomain:     "majestic-beaver-123.hub-traefik.io",
-				CustomDomains: []string{"foo.example.com"},
-				URLs:          "https://foo.example.com,https://majestic-beaver-123.hub-traefik.io",
-				Hash:          "TjL6MndxqoGfzTG02DVD+bvkn3k=",
-			}},
-		}),
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_updateOperationConflict(t *testing.T) {
-	const (
-		portalName = "my-portal"
-		version    = "version-3"
-	)
-
-	admissionRev := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Update,
-			Object: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec: hubv1alpha1.APIPortalSpec{
-						CustomDomains: []string{"foo.example.com"},
-					},
-				}),
-			},
-			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
-						Version:  version,
-						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
-					},
-				}),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnUpdatePortalRaw(mock.Anything, mock.Anything, mock.Anything).
-		TypedReturns(nil, errors.New("BOOM")).Once()
-
-	h := NewHandler(client)
-
-	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: "update APIPortal: BOOM",
-		},
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_deleteOperation(t *testing.T) {
-	const (
-		portalName = "my-portal"
-		version    = "version-3"
-	)
-
-	admissionRev := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Delete,
-			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
-						Version:  version,
-						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
-					},
-				}),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnDeletePortal(portalName, version).TypedReturns(nil).Once()
-
-	h := NewHandler(client)
-
-	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: true,
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_deleteOperationConflict(t *testing.T) {
-	const (
-		portalName = "my-portal"
-		version    = "version-3"
-	)
-
-	admissionRev := admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      portalName,
-			Operation: admv1.Delete,
-			OldObject: runtime.RawExtension{
-				Raw: mustMarshal(t, hubv1alpha1.APIPortal{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "APIPortal",
-						APIVersion: "hub.traefik.io/v1alpha1",
-					},
-					ObjectMeta: metav1.ObjectMeta{Name: portalName},
-					Spec:       testPortalSpec,
-					Status: hubv1alpha1.APIPortalStatus{
-						Version:  version,
-						SyncedAt: metav1.NewTime(time.Now().Add(-time.Hour)),
-					},
-				}),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	}
-
-	client := newPlatformClientMock(t)
-	client.OnDeletePortalRaw(mock.Anything, mock.Anything).TypedReturns(errors.New("BOOM")).Once()
-
-	h := NewHandler(client)
-
-	b := mustMarshal(t, admissionRev)
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: "delete APIPortal: BOOM",
-		},
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_notAPortal(t *testing.T) {
-	b := mustMarshal(t, admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "core",
-				Version: "v1",
-				Kind:    "Ingress",
-			},
-			Name:      "my-ingress",
-			Namespace: "default",
-			Operation: admv1.Create,
-			Object: runtime.RawExtension{
-				Raw: []byte("{}"),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	})
-
-	h := NewHandler(nil)
-
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: "unsupported resource core/v1, Kind=Ingress",
-		},
-	}
-
-	assert.Equal(t, &wantResp, gotAr.Response)
-}
-
-func TestHandler_ServeHTTP_unsupportedOperation(t *testing.T) {
-	b := mustMarshal(t, admv1.AdmissionReview{
-		Request: &admv1.AdmissionRequest{
-			UID: "id",
-			Kind: metav1.GroupVersionKind{
-				Group:   "hub.traefik.io",
-				Version: "v1alpha1",
-				Kind:    "APIPortal",
-			},
-			Name:      "whoami",
-			Namespace: "default",
-			Operation: admv1.Connect,
-			Object: runtime.RawExtension{
-				Raw: []byte("{}"),
-			},
-		},
-		Response: &admv1.AdmissionResponse{},
-	})
-
-	h := NewHandler(nil)
-
-	rec := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", bytes.NewBuffer(b))
-	require.NoError(t, err)
-
-	h.ServeHTTP(rec, req)
-
-	var gotAr admv1.AdmissionReview
-	err = json.NewDecoder(rec.Body).Decode(&gotAr)
-	require.NoError(t, err)
-
-	wantResp := admv1.AdmissionResponse{
-		UID:     "id",
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  "Failure",
-			Message: `unsupported operation "CONNECT"`,
-		},
+		PatchType: &typePatch,
+		Patch:     []byte("patch"),
 	}
 
 	assert.Equal(t, &wantResp, gotAr.Response)

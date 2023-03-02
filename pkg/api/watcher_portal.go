@@ -55,6 +55,8 @@ type PlatformClient interface {
 	GetPortals(ctx context.Context) ([]Portal, error)
 	GetWildcardCertificate(ctx context.Context) (edgeingress.Certificate, error)
 	GetCertificateByDomains(ctx context.Context, domains []string) (edgeingress.Certificate, error)
+
+	GetAPIs(ctx context.Context) ([]API, error)
 }
 
 // WatcherConfig holds the watcher configuration.
@@ -71,8 +73,8 @@ type WatcherConfig struct {
 	CertRetryInterval time.Duration
 }
 
-// Watcher watches hub portals and sync them with the cluster.
-type Watcher struct {
+// WatcherPortal watches hub portals and sync them with the cluster.
+type WatcherPortal struct {
 	config *WatcherConfig
 
 	wildCardCertMu sync.RWMutex
@@ -89,9 +91,9 @@ type Watcher struct {
 	traefikClientSet v1alpha1.TraefikV1alpha1Interface
 }
 
-// NewWatcher returns a new Watcher.
-func NewWatcher(client PlatformClient, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherConfig) *Watcher {
-	return &Watcher{
+// NewWatcherPortal returns a new WatcherPortal.
+func NewWatcherPortal(client PlatformClient, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherConfig) *WatcherPortal {
+	return &WatcherPortal{
 		config: config,
 
 		platform: client,
@@ -106,8 +108,8 @@ func NewWatcher(client PlatformClient, kubeClientSet clientset.Interface, kubeIn
 	}
 }
 
-// Run runs Watcher.
-func (w *Watcher) Run(ctx context.Context) {
+// Run runs WatcherPortal.
+func (w *WatcherPortal) Run(ctx context.Context) {
 	t := time.NewTicker(w.config.APISyncInterval)
 	defer t.Stop()
 
@@ -145,7 +147,7 @@ func (w *Watcher) Run(ctx context.Context) {
 	}
 }
 
-func (w *Watcher) syncCertificates(ctx context.Context) error {
+func (w *WatcherPortal) syncCertificates(ctx context.Context) error {
 	wildcardCert, err := w.platform.GetWildcardCertificate(ctx)
 	if err != nil {
 		return fmt.Errorf("get wildcardCert: %w", err)
@@ -186,7 +188,7 @@ func (w *Watcher) syncCertificates(ctx context.Context) error {
 	return nil
 }
 
-func (w *Watcher) setupCertificates(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) setupCertificates(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	apisNamespaces := make(map[string]struct{})
 	// TODO: fill apisNamespaces from portal APIAccesses
 
@@ -211,7 +213,7 @@ func (w *Watcher) setupCertificates(ctx context.Context, portal *hubv1alpha1.API
 	return nil
 }
 
-func (w *Watcher) upsertSecret(ctx context.Context, cert edgeingress.Certificate, name, namespace string, p *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) upsertSecret(ctx context.Context, cert edgeingress.Certificate, name, namespace string, p *hubv1alpha1.APIPortal) error {
 	secret, err := w.kubeClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get secret: %w", err)
@@ -300,7 +302,7 @@ func appendOwnerReference(references []metav1.OwnerReference, ref metav1.OwnerRe
 	return append(references, ref)
 }
 
-func (w *Watcher) syncPortals(ctx context.Context) {
+func (w *WatcherPortal) syncPortals(ctx context.Context) {
 	platformPortals, err := w.platform.GetPortals(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to fetch APIPortals")
@@ -345,7 +347,7 @@ func (w *Watcher) syncPortals(ctx context.Context) {
 	w.cleanPortals(ctx, portalsByName)
 }
 
-func (w *Watcher) createPortal(ctx context.Context, portal *Portal) error {
+func (w *WatcherPortal) createPortal(ctx context.Context, portal *Portal) error {
 	obj, err := portal.Resource()
 	if err != nil {
 		return fmt.Errorf("build APIPortal resource: %w", err)
@@ -363,7 +365,7 @@ func (w *Watcher) createPortal(ctx context.Context, portal *Portal) error {
 	return w.syncChildResources(ctx, obj)
 }
 
-func (w *Watcher) updatePortal(ctx context.Context, oldPortal *hubv1alpha1.APIPortal, newPortal *Portal) error {
+func (w *WatcherPortal) updatePortal(ctx context.Context, oldPortal *hubv1alpha1.APIPortal, newPortal *Portal) error {
 	obj, err := newPortal.Resource()
 	if err != nil {
 		return fmt.Errorf("build APIPortal resource: %w", err)
@@ -385,7 +387,7 @@ func (w *Watcher) updatePortal(ctx context.Context, oldPortal *hubv1alpha1.APIPo
 	return w.syncChildResources(ctx, obj)
 }
 
-func (w *Watcher) cleanPortals(ctx context.Context, portals map[string]*hubv1alpha1.APIPortal) {
+func (w *WatcherPortal) cleanPortals(ctx context.Context, portals map[string]*hubv1alpha1.APIPortal) {
 	for _, portal := range portals {
 		// Foreground propagation allow us to delete all resources owned by the APIPortal.
 		policy := metav1.DeletePropagationForeground
@@ -406,7 +408,7 @@ func (w *Watcher) cleanPortals(ctx context.Context, portals map[string]*hubv1alp
 	}
 }
 
-func (w *Watcher) syncChildResources(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) syncChildResources(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	if err := w.setupCertificates(ctx, portal); err != nil {
 		return fmt.Errorf("unable to setup APIPortal certificates: %w", err)
 	}
@@ -426,7 +428,7 @@ func (w *Watcher) syncChildResources(ctx context.Context, portal *hubv1alpha1.AP
 	return nil
 }
 
-func (w *Watcher) upsertPortalEdgeIngress(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	ingName, err := getEdgeIngressPortalName(portal.Name)
 	if err != nil {
 		return fmt.Errorf("get edge ingress name: %w", err)
@@ -485,7 +487,7 @@ func (w *Watcher) upsertPortalEdgeIngress(ctx context.Context, portal *hubv1alph
 	return nil
 }
 
-func (w *Watcher) upsertIngresses(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) upsertIngresses(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	apisByNamespace := make(map[string][]hubv1alpha1.API)
 	// TODO: fill apisByNamespace from portal APIs
 
@@ -519,7 +521,7 @@ func (w *Watcher) upsertIngresses(ctx context.Context, portal *hubv1alpha1.APIPo
 	return nil
 }
 
-func (w *Watcher) setupStripPrefixMiddleware(ctx context.Context, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, namespace string) (string, error) {
+func (w *WatcherPortal) setupStripPrefixMiddleware(ctx context.Context, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, namespace string) (string, error) {
 	name, err := getStripPrefixMiddlewareName(portal.Name)
 	if err != nil {
 		return "", fmt.Errorf("get stripPrefix middleware name: %w", err)
@@ -565,7 +567,7 @@ func (w *Watcher) setupStripPrefixMiddleware(ctx context.Context, portal *hubv1a
 	return traefikMiddlewareName, nil
 }
 
-func (w *Watcher) upsertIngress(ctx context.Context, ingress *netv1.Ingress) error {
+func (w *WatcherPortal) upsertIngress(ctx context.Context, ingress *netv1.Ingress) error {
 	existingIngress, err := w.kubeClientSet.NetworkingV1().Ingresses(ingress.Namespace).Get(ctx, ingress.Name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get ingress: %w", err)
@@ -599,7 +601,7 @@ func (w *Watcher) upsertIngress(ctx context.Context, ingress *netv1.Ingress) err
 }
 
 // cleanupIngresses deletes the ingresses from namespaces that are no longer referenced in the APIPortal.
-func (w *Watcher) cleanupIngresses(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) cleanupIngresses(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
 	managedByHub, err := labels.NewRequirement("app.kubernetes.io/managed-by", selection.Equals, []string{"traefik-hub"})
 	if err != nil {
 		return fmt.Errorf("create managed by hub requirement: %w", err)
@@ -691,7 +693,7 @@ func (w *Watcher) cleanupIngresses(ctx context.Context, portal *hubv1alpha1.APIP
 	return nil
 }
 
-func (w *Watcher) buildHubDomainIngress(namespace string, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
+func (w *WatcherPortal) buildHubDomainIngress(namespace string, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	name, err := getHubDomainIngressName(portal.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get hub domain ingress name: %w", err)
@@ -707,7 +709,7 @@ func (w *Watcher) buildHubDomainIngress(namespace string, portal *hubv1alpha1.AP
 	}, nil
 }
 
-func (w *Watcher) buildCustomDomainsIngress(namespace string, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
+func (w *WatcherPortal) buildCustomDomainsIngress(namespace string, portal *hubv1alpha1.APIPortal, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	ingressName, err := getCustomDomainsIngressName(portal.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get custom domains ingress name: %w", err)
@@ -728,7 +730,7 @@ func (w *Watcher) buildCustomDomainsIngress(namespace string, portal *hubv1alpha
 	}, nil
 }
 
-func (w *Watcher) buildIngressObjectMeta(namespace, name string, portal *hubv1alpha1.APIPortal, entrypoint, traefikMiddlewareName string) metav1.ObjectMeta {
+func (w *WatcherPortal) buildIngressObjectMeta(namespace, name string, portal *hubv1alpha1.APIPortal, entrypoint, traefikMiddlewareName string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
@@ -752,7 +754,7 @@ func (w *Watcher) buildIngressObjectMeta(namespace, name string, portal *hubv1al
 	}
 }
 
-func (w *Watcher) buildIngressSpec(domains []string, apis []hubv1alpha1.API, tlsSecretName string) netv1.IngressSpec {
+func (w *WatcherPortal) buildIngressSpec(domains []string, apis []hubv1alpha1.API, tlsSecretName string) netv1.IngressSpec {
 	pathType := netv1.PathTypePrefix
 
 	var paths []netv1.HTTPIngressPath

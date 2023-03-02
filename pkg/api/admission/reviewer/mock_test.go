@@ -17,4 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 package admission
 
-// mocktail:Reviewer
+// mocktail:apiService
+// mocktail:portalService
+// mocktail:gatewayService

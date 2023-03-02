@@ -26,6 +26,121 @@ func newPlatformClientMock(tb testing.TB) *platformClientMock {
 	return m
 }
 
+func (_m *platformClientMock) GetAPIs(_ context.Context) ([]API, error) {
+	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() ([]API, error)); ok {
+		return _rf()
+	}
+
+	_ra0, _ := _ret.Get(0).([]API)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnGetAPIs() *platformClientGetAPIsCall {
+	return &platformClientGetAPIsCall{Call: _m.Mock.On("GetAPIs"), Parent: _m}
+}
+
+func (_m *platformClientMock) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return &platformClientGetAPIsCall{Call: _m.Mock.On("GetAPIs"), Parent: _m}
+}
+
+type platformClientGetAPIsCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientGetAPIsCall) Panic(msg string) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) Once() *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) Twice() *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) Times(i int) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) WaitUntil(w <-chan time.Time) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) After(d time.Duration) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) Run(fn func(args mock.Arguments)) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) Maybe() *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) TypedReturns(a []API, b error) *platformClientGetAPIsCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) ReturnsFn(fn func() ([]API, error)) *platformClientGetAPIsCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) TypedRun(fn func()) *platformClientGetAPIsCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *platformClientGetAPIsCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetAPIsCall) OnGetPortals() *platformClientGetPortalsCall {
+	return _c.Parent.OnGetPortals()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetAPIsCall) OnGetPortalsRaw() *platformClientGetPortalsCall {
+	return _c.Parent.OnGetPortalsRaw()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
+}
+
 func (_m *platformClientMock) GetCertificateByDomains(_ context.Context, domains []string) (edgeingress.Certificate, error) {
 	_ret := _m.Called(domains)
 
@@ -110,6 +225,10 @@ func (_c *platformClientGetCertificateByDomainsCall) TypedRun(fn func([]string))
 	return _c
 }
 
+func (_c *platformClientGetCertificateByDomainsCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
 func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
@@ -120,6 +239,10 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetPortals() *platformCli
 
 func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
 	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetCertificateByDomainsCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
 }
 
 func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
@@ -217,6 +340,10 @@ func (_c *platformClientGetPortalsCall) TypedRun(fn func()) *platformClientGetPo
 	return _c
 }
 
+func (_c *platformClientGetPortalsCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
 func (_c *platformClientGetPortalsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
@@ -227,6 +354,10 @@ func (_c *platformClientGetPortalsCall) OnGetPortals() *platformClientGetPortals
 
 func (_c *platformClientGetPortalsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
 	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetPortalsCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
 }
 
 func (_c *platformClientGetPortalsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
@@ -324,6 +455,10 @@ func (_c *platformClientGetWildcardCertificateCall) TypedRun(fn func()) *platfor
 	return _c
 }
 
+func (_c *platformClientGetWildcardCertificateCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
 func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
@@ -334,6 +469,10 @@ func (_c *platformClientGetWildcardCertificateCall) OnGetPortals() *platformClie
 
 func (_c *platformClientGetWildcardCertificateCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
 	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
 }
 
 func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {

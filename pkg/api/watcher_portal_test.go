@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -157,7 +158,7 @@ func Test_WatcherRun(t *testing.T) {
 					PrivateKey:  []byte("private"),
 				}, nil)
 
-			w := NewWatcher(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
+			w := NewWatcherPortal(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
 				IngressClassName:        "ingress-class",
 				AgentNamespace:          "agent-ns",
 				TraefikAPIEntryPoint:    "api-entrypoint",
@@ -209,6 +210,10 @@ func assertPortalsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, wan
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
+
 	portalList, err := hubClientSet.HubV1alpha1().APIPortals().List(ctx, metav1.ListOptions{})
 	require.NoError(t, err)
 
@@ -219,11 +224,19 @@ func assertPortalsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, wan
 		portals = append(portals, portal)
 	}
 
-	assert.ElementsMatch(t, want, portals)
+	sort.Slice(portals, func(i, j int) bool {
+		return portals[i].Name < portals[j].Name
+	})
+
+	assert.Equal(t, want, portals)
 }
 
 func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, namespace string, want []hubv1alpha1.EdgeIngress) {
 	t.Helper()
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -231,7 +244,18 @@ func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientse
 	edgeIngresses, err := hubClientSet.HubV1alpha1().EdgeIngresses(namespace).List(ctx, metav1.ListOptions{})
 	require.NoError(t, err)
 
-	assert.ElementsMatch(t, want, edgeIngresses.Items)
+	var gotEdgeIngresses []hubv1alpha1.EdgeIngress
+	for _, portal := range edgeIngresses.Items {
+		portal.Status.SyncedAt = metav1.Time{}
+
+		gotEdgeIngresses = append(gotEdgeIngresses, portal)
+	}
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
+
+	assert.Equal(t, want, gotEdgeIngresses)
 }
 
 func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []netv1.Ingress) {
@@ -239,6 +263,10 @@ func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, nam
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
 
 	var ingresses []netv1.Ingress
 	for _, namespace := range namespaces {
@@ -252,7 +280,11 @@ func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, nam
 		}
 	}
 
-	assert.ElementsMatch(t, want, ingresses)
+	sort.Slice(ingresses, func(i, j int) bool {
+		return ingresses[i].Name < ingresses[j].Name
+	})
+
+	assert.Equal(t, want, ingresses)
 }
 
 func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Clientset, namespaces []string, want []traefikv1alpha1.Middleware) {
@@ -260,6 +292,10 @@ func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Cl
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
 
 	var middlewares []traefikv1alpha1.Middleware
 	for _, namespace := range namespaces {
@@ -269,22 +305,25 @@ func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Cl
 		middlewares = append(middlewares, namespaceMiddlewareList.Items...)
 	}
 
-	assert.ElementsMatch(t, want, middlewares)
+	sort.Slice(middlewares, func(i, j int) bool {
+		return middlewares[i].Name < middlewares[j].Name
+	})
+
+	assert.Equal(t, want, middlewares)
 }
 
 func loadFixtures[T any](t *testing.T, path string) []T {
 	t.Helper()
 
+	var objects []T
 	if path == "" {
-		return []T{}
+		return objects
 	}
 
 	b, err := os.ReadFile(path)
 	require.NoError(t, err)
 
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(b), 1000)
-
-	var objects []T
 
 	for {
 		var object T
