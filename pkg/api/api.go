@@ -19,7 +19,6 @@ package api
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -56,8 +55,6 @@ type OpenAPISpec struct {
 
 	Path string `json:"path,omitempty" bson:"path,omitempty"`
 	Port int    `json:"port,omitempty" bson:"port,omitempty"`
-
-	Schema json.RawMessage `json:"schema,omitempty" bson:"schema,omitempty"`
 }
 
 // Resource builds the v1alpha1 API resource.
@@ -85,7 +82,6 @@ func (a *API) Resource() (*hubv1alpha1.API, error) {
 					Port: hubv1alpha1.APIServiceBackendPort{
 						Number: int32(a.Service.OpenAPISpec.Port),
 					},
-					// TODO handle Schema
 				},
 			},
 		},

@@ -24,21 +24,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"sort"
-	"strconv"
 
-	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const (
-	annotationOpenAPIPath = "hub.traefik.io/openapi-path"
-	annotationOpenAPIPort = "hub.traefik.io/openapi-port"
-)
-
-func (f *Fetcher) getServices(ctx context.Context) (map[string]*Service, error) {
+func (f *Fetcher) getServices() (map[string]*Service, error) {
 	services, err := f.k8s.Core().V1().Services().Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -66,57 +58,20 @@ func (f *Fetcher) getServices(ctx context.Context) (map[string]*Service, error) 
 			}
 		}
 
-		oasLocation, err := f.getOpenAPISpecLocation(ctx, service)
-		if err != nil {
-			log.Error().Err(err).
-				Str("service_name", service.Name).
-				Str("service_namespace", service.Namespace).
-				Msg("Unable to find OpenAPI specification")
-		}
-
 		sort.Strings(externalIPs)
 
 		svcName := objectKey(service.Name, service.Namespace)
 		svcs[svcName] = &Service{
-			Name:                service.Name,
-			Namespace:           service.Namespace,
-			Annotations:         sanitizeAnnotations(service.Annotations),
-			Type:                service.Spec.Type,
-			ExternalIPs:         externalIPs,
-			ExternalPorts:       externalPorts,
-			OpenAPISpecLocation: oasLocation,
+			Name:          service.Name,
+			Namespace:     service.Namespace,
+			Annotations:   sanitizeAnnotations(service.Annotations),
+			Type:          service.Spec.Type,
+			ExternalIPs:   externalIPs,
+			ExternalPorts: externalPorts,
 		}
 	}
 
 	return svcs, nil
-}
-
-func (f *Fetcher) getOpenAPISpecLocation(ctx context.Context, service *corev1.Service) (*OpenAPISpecLocation, error) {
-	location, err := getLocationFromService(service)
-	if err != nil {
-		return nil, err
-	}
-
-	if location == nil {
-		return nil, nil
-	}
-
-	u := &url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s.%s.svc:%d", service.Name, service.Namespace, location.Port),
-		Path:   location.Path,
-	}
-
-	spec, err := f.specs.Load(ctx, u)
-	if err != nil {
-		return nil, fmt.Errorf("load specification %s: %w", u.String(), err)
-	}
-
-	if err = spec.Validate(); err != nil {
-		return nil, fmt.Errorf("validate specification %s: %w", u.String(), err)
-	}
-
-	return location, nil
 }
 
 // GetServiceLogs returns the logs from a service.
@@ -167,40 +122,6 @@ func (f *Fetcher) GetServiceLogs(ctx context.Context, namespace, name string, li
 	}
 
 	return buf.Bytes(), nil
-}
-
-func getLocationFromService(service *corev1.Service) (*OpenAPISpecLocation, error) {
-	oasPath, ok := service.Annotations[annotationOpenAPIPath]
-	if !ok {
-		return nil, nil
-	}
-
-	var portStr string
-	portStr, ok = service.Annotations[annotationOpenAPIPort]
-	if !ok {
-		return nil, nil
-	}
-
-	aosPort, err := strconv.ParseInt(portStr, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("%q must be a valid port", annotationOpenAPIPort)
-	}
-
-	var portFound bool
-	for _, servicePort := range service.Spec.Ports {
-		if int64(servicePort.Port) == aosPort {
-			portFound = true
-			break
-		}
-	}
-	if !portFound {
-		return nil, fmt.Errorf("%q contains a port which is not defined on the service", annotationOpenAPIPort)
-	}
-
-	return &OpenAPISpecLocation{
-		Path: oasPath,
-		Port: int(aosPort),
-	}, nil
 }
 
 func writeBytes(buf *bytes.Buffer, b []byte, maxLen int) {

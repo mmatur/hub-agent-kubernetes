@@ -2323,7 +2323,7 @@ func TestClient_CreateAPI(t *testing.T) {
 				Namespace:  "ns",
 				Labels:     map[string]string{"a": "b"},
 				PathPrefix: "prefix",
-				Service: Service{
+				Service: APIService{
 					Name: "svc",
 					Port: 80,
 				},
@@ -2351,7 +2351,7 @@ func TestClient_CreateAPI(t *testing.T) {
 				Namespace:  "ns",
 				Labels:     map[string]string{"a": "b"},
 				PathPrefix: "prefix",
-				Service: Service{
+				Service: APIService{
 					Name: "svc",
 					Port: 80,
 				},
@@ -2422,7 +2422,7 @@ func TestClient_UpdateAPI(t *testing.T) {
 			req: &UpdateAPIReq{
 				Labels:     map[string]string{"a": "b"},
 				PathPrefix: "prefix",
-				Service: Service{
+				Service: APIService{
 					Name: "svc",
 					Port: 80,
 				},
@@ -2448,7 +2448,7 @@ func TestClient_UpdateAPI(t *testing.T) {
 			req: &UpdateAPIReq{
 				Labels:     map[string]string{"a": "b"},
 				PathPrefix: "prefix",
-				Service: Service{
+				Service: APIService{
 					Name: "svc",
 					Port: 80,
 				},

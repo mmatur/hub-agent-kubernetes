@@ -99,14 +99,13 @@ func (a *API) reviewCreateOperation(ctx context.Context, apiCRD *hubv1alpha1.API
 		Namespace:  apiCRD.Namespace,
 		Labels:     apiCRD.Labels,
 		PathPrefix: apiCRD.Spec.PathPrefix,
-		Service: platform.Service{
+		Service: platform.APIService{
 			Name: apiCRD.Spec.Service.Name,
 			Port: int(apiCRD.Spec.Service.Port.Number),
 			OpenAPISpec: platform.OpenAPISpec{
 				URL:  apiCRD.Spec.Service.OpenAPISpec.URL,
 				Path: apiCRD.Spec.Service.OpenAPISpec.Path,
 				Port: int(apiCRD.Spec.Service.OpenAPISpec.Port.Number),
-				// TODO: handle schema
 			},
 		},
 	}
@@ -125,14 +124,13 @@ func (a *API) reviewUpdateOperation(ctx context.Context, oldAPI, newAPI *hubv1al
 	updateReq := &platform.UpdateAPIReq{
 		Labels:     newAPI.Labels,
 		PathPrefix: newAPI.Spec.PathPrefix,
-		Service: platform.Service{
+		Service: platform.APIService{
 			Name: newAPI.Spec.Service.Name,
 			Port: int(newAPI.Spec.Service.Port.Number),
 			OpenAPISpec: platform.OpenAPISpec{
 				URL:  newAPI.Spec.Service.OpenAPISpec.URL,
 				Path: newAPI.Spec.Service.OpenAPISpec.Path,
 				Port: int(newAPI.Spec.Service.OpenAPISpec.Port.Number),
-				// TODO: handle Schema
 			},
 		},
 	}

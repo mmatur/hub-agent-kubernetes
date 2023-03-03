@@ -39,8 +39,9 @@ type APIAccess struct {
 
 // APIAccessSpec configures an APIAccess.
 type APIAccessSpec struct {
-	Groups   []string             `json:"groups"`
-	Selector metav1.LabelSelector `json:"selector"`
+	Groups                []string             `json:"groups"`
+	APISelector           metav1.LabelSelector `json:"apiSelector"`
+	APICollectionSelector metav1.LabelSelector `json:"apiCollectionSelector"`
 }
 
 // APIAccessStatus is the status of an APIAccess.

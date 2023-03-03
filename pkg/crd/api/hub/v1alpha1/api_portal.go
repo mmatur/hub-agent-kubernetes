@@ -45,7 +45,7 @@ type APIPortal struct {
 type APIPortalSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
-	APIGateway  string `json:"gateway"`
+	APIGateway  string `json:"apiGateway"`
 	// CustomDomains are the custom domains under which the portal will be exposed.
 	// +optional
 	CustomDomains []string `json:"customDomains,omitempty"`

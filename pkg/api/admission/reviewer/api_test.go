@@ -77,7 +77,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 				Name:       "api-name",
 				Namespace:  "",
 				PathPrefix: "prefix",
-				Service: platform.Service{
+				Service: platform.APIService{
 					Name: "svc",
 					Port: 80,
 				},
@@ -86,7 +86,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APIStatus{
 					Version:  "version-1",
 					SyncedAt: now,
-					Hash:     "rqayJiQLMKn9w/5AHZJASw==",
+					Hash:     "wu4uS9iIu1+FK5Q1xtqttA==",
 				}},
 			}),
 		},
@@ -116,7 +116,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 				Name:       "api-name",
 				Namespace:  "",
 				PathPrefix: "prefix",
-				Service: platform.Service{
+				Service: platform.APIService{
 					Name: "svc",
 					Port: 80,
 				},
@@ -214,7 +214,7 @@ func TestAPI_Review_updateOperation(t *testing.T) {
 			req:  updateReq,
 			wantUpdateReq: &platform.UpdateAPIReq{
 				PathPrefix: "newPrefix",
-				Service: platform.Service{
+				Service: platform.APIService{
 					Name: "newSvc",
 					Port: 81,
 				},
@@ -223,7 +223,7 @@ func TestAPI_Review_updateOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APIStatus{
 					Version:  "version-2",
 					SyncedAt: now,
-					Hash:     "/Nq+LA9SdjIAxSRj162bCw==",
+					Hash:     "D7tzas7nZmqBZrLVbTiK0A==",
 				}},
 			}),
 		},
@@ -232,7 +232,7 @@ func TestAPI_Review_updateOperation(t *testing.T) {
 			req:  updateReq,
 			wantUpdateReq: &platform.UpdateAPIReq{
 				PathPrefix: "newPrefix",
-				Service: platform.Service{
+				Service: platform.APIService{
 					Name: "newSvc",
 					Port: 81,
 				},

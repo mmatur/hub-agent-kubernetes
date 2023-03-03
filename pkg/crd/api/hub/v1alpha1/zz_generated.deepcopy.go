@@ -123,7 +123,8 @@ func (in *APIAccessSpec) DeepCopyInto(out *APIAccessSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	in.Selector.DeepCopyInto(&out.Selector)
+	in.APISelector.DeepCopyInto(&out.APISelector)
+	in.APICollectionSelector.DeepCopyInto(&out.APICollectionSelector)
 	return
 }
 
@@ -1210,7 +1211,6 @@ func (in *IngressClassSpec) DeepCopy() *IngressClassSpec {
 func (in *OpenAPISpec) DeepCopyInto(out *OpenAPISpec) {
 	*out = *in
 	out.Port = in.Port
-	out.Schema = in.Schema
 	return
 }
 

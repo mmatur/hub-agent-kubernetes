@@ -43,13 +43,12 @@ type ResourceMeta struct {
 
 // Service describes a Service.
 type Service struct {
-	Name                string               `json:"name"`
-	Namespace           string               `json:"namespace"`
-	Type                corev1.ServiceType   `json:"type"`
-	Annotations         map[string]string    `json:"annotations,omitempty"`
-	ExternalIPs         []string             `json:"externalIPs,omitempty"`
-	ExternalPorts       []int                `json:"externalPorts,omitempty"`
-	OpenAPISpecLocation *OpenAPISpecLocation `json:"openApiSpecLocation,omitempty"`
+	Name          string             `json:"name"`
+	Namespace     string             `json:"namespace"`
+	Type          corev1.ServiceType `json:"type"`
+	Annotations   map[string]string  `json:"annotations,omitempty"`
+	ExternalIPs   []string           `json:"externalIPs,omitempty"`
+	ExternalPorts []int              `json:"externalPorts,omitempty"`
 }
 
 // OpenAPISpecLocation describes the location of an OpenAPI specification.

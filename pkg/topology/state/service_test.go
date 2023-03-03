@@ -19,16 +19,12 @@ package state
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
-	"github.com/traefik/hub-agent-kubernetes/pkg/openapi"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,7 +93,7 @@ func TestFetcher_GetServices(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
 
-	gotSvcs, err := f.getServices(context.Background())
+	gotSvcs, err := f.getServices()
 	require.NoError(t, err)
 
 	assert.Equal(t, wantSvcs, gotSvcs)
@@ -167,7 +163,7 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
 
-	gotSvcs, err := f.getServices(context.Background())
+	gotSvcs, err := f.getServices()
 	require.NoError(t, err)
 
 	assert.Equal(t, wantSvcs, gotSvcs)
@@ -175,10 +171,9 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 
 func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 	tests := []struct {
-		desc               string
-		service            *corev1.Service
-		want               map[string]*Service
-		wantOpenAPISpecURI string
+		desc    string
+		service *corev1.Service
+		want    map[string]*Service
 	}{
 		{
 			desc: "no openapi spec location defined",
@@ -305,7 +300,6 @@ func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 					},
 				},
 			},
-			wantOpenAPISpecURI: "http://svc.default.svc:8080/spec.json",
 			want: map[string]*Service{
 				"svc@default": {
 					Name:      "svc",
@@ -314,11 +308,7 @@ func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 						"hub.traefik.io/openapi-path": "/spec.json",
 						"hub.traefik.io/openapi-port": "8080",
 					},
-					Type: corev1.ServiceTypeClusterIP,
-					OpenAPISpecLocation: &OpenAPISpecLocation{
-						Path: "/spec.json",
-						Port: 8080,
-					},
+					Type:          corev1.ServiceTypeClusterIP,
 					ExternalPorts: []int{8080},
 				},
 			},
@@ -338,145 +328,12 @@ func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 			f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 			require.NoError(t, err)
 
-			loader := newOpenAPISpecLoaderMock(t)
-
-			if test.wantOpenAPISpecURI != "" {
-				var specURL *url.URL
-				specURL, err = url.Parse(test.wantOpenAPISpecURI)
-				require.NoError(t, err)
-
-				loader.OnLoad(specURL).TypedReturns(NewOpenAPISpecFromData(t, []byte(`{
-					"openapi": "3.1.0",
-					"info": {
-						"title": "my-api",
-						"version": "0.0.1"
-					},
-					"paths": {}
-				}`)), nil)
-			}
-
-			f.specs = loader
-
-			gotSvcs, err := f.getServices(context.Background())
+			gotSvcs, err := f.getServices()
 			require.NoError(t, err)
 
 			assert.Equal(t, test.want, gotSvcs)
 		})
 	}
-}
-
-func TestFetcher_GetServicesWithOpenAPISpecs_specNotFound(t *testing.T) {
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"hub.traefik.io/openapi-path": "/spec.json",
-				"hub.traefik.io/openapi-port": "8080",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "port",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       8080,
-					TargetPort: intstr.FromInt(8080),
-				},
-			},
-		},
-	}
-
-	kubeClient := kubemock.NewSimpleClientset(service)
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
-
-	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
-	require.NoError(t, err)
-
-	loader := newOpenAPISpecLoaderMock(t)
-
-	specURL, err := url.Parse("http://svc.default.svc:8080/spec.json")
-	require.NoError(t, err)
-
-	loader.OnLoad(specURL).TypedReturns(nil, errors.New("spec not found"))
-
-	f.specs = loader
-
-	gotSvcs, err := f.getServices(context.Background())
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]*Service{
-		"svc@default": {
-			Name:      "svc",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"hub.traefik.io/openapi-path": "/spec.json",
-				"hub.traefik.io/openapi-port": "8080",
-			},
-			Type:          corev1.ServiceTypeClusterIP,
-			ExternalPorts: []int{8080},
-		},
-	}, gotSvcs)
-}
-
-func TestFetcher_GetServicesWithOpenAPISpecs_specInvalid(t *testing.T) {
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"hub.traefik.io/openapi-path": "/spec.json",
-				"hub.traefik.io/openapi-port": "8080",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "port",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       8080,
-					TargetPort: intstr.FromInt(8080),
-				},
-			},
-		},
-	}
-
-	kubeClient := kubemock.NewSimpleClientset(service)
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
-
-	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
-	require.NoError(t, err)
-
-	loader := newOpenAPISpecLoaderMock(t)
-
-	specURL, err := url.Parse("http://svc.default.svc:8080/spec.json")
-	require.NoError(t, err)
-
-	loader.OnLoad(specURL).TypedReturns(NewOpenAPISpecFromData(t, []byte(`{
-		"openapi": "2.1.0"
-	}`)), nil)
-
-	f.specs = loader
-
-	gotSvcs, err := f.getServices(context.Background())
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]*Service{
-		"svc@default": {
-			Name:      "svc",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"hub.traefik.io/openapi-path": "/spec.json",
-				"hub.traefik.io/openapi-port": "8080",
-			},
-			Type:          corev1.ServiceTypeClusterIP,
-			ExternalPorts: []int{8080},
-		},
-	}, gotSvcs)
 }
 
 func TestFetcher_GetServiceLogs(t *testing.T) {
@@ -638,15 +495,4 @@ func TestFetcher_GetServiceLogsHandlesTooManyPods(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []byte("fake logs\nfake logs\n"), got)
-}
-
-func NewOpenAPISpecFromData(t *testing.T, data []byte) *openapi.Spec {
-	t.Helper()
-
-	var spec openapi.Spec
-
-	err := json.Unmarshal(data, &spec)
-	require.NoError(t, err)
-
-	return &spec
 }

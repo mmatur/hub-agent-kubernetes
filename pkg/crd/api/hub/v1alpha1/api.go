@@ -18,7 +18,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"github.com/traefik/hub-agent-kubernetes/pkg/openapi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,8 +77,6 @@ type OpenAPISpec struct {
 	Path string `json:"path,omitempty"`
 	// +optional
 	Port APIServiceBackendPort `json:"port,omitempty"`
-	// +optional
-	Schema openapi.Spec `json:"schema,omitempty"`
 }
 
 // APIStatus is the status of an API.

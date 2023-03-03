@@ -63,20 +63,8 @@ type CreateEdgeIngressReq struct {
 
 // Service defines the service being exposed by the edge ingress.
 type Service struct {
-	Name        string      `json:"name"`
-	Port        int         `json:"port"`
-	OpenAPISpec OpenAPISpec `json:"openApiSpec"`
-}
-
-// OpenAPISpec is an OpenAPISpec. It can either be fetched from a URL, or Path/Port from the service
-// or directly in the Schema field.
-type OpenAPISpec struct {
-	URL string `json:"url,omitempty"`
-
-	Path string `json:"path,omitempty"`
-	Port int    `json:"port,omitempty"`
-
-	Schema json.RawMessage `json:"schema,omitempty"`
+	Name string `json:"name"`
+	Port int    `json:"port"`
 }
 
 // ACP defines the ACP attached to the edge ingress.
@@ -140,16 +128,31 @@ type CreateAPIReq struct {
 
 	Labels map[string]string `json:"labels,omitempty"`
 
-	PathPrefix string  `json:"pathPrefix" bson:"pathPrefix"`
-	Service    Service `json:"service" bson:"service"`
+	PathPrefix string     `json:"pathPrefix" bson:"pathPrefix"`
+	Service    APIService `json:"service" bson:"service"`
 }
 
 // UpdateAPIReq is a request for updating an API.
 type UpdateAPIReq struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
-	PathPrefix string  `json:"pathPrefix" bson:"pathPrefix"`
-	Service    Service `json:"service" bson:"service"`
+	PathPrefix string     `json:"pathPrefix" bson:"pathPrefix"`
+	Service    APIService `json:"service" bson:"service"`
+}
+
+// APIService is a service used in API struct.
+type APIService struct {
+	Name        string      `json:"name"`
+	Port        int         `json:"port"`
+	OpenAPISpec OpenAPISpec `json:"openApiSpec"`
+}
+
+// OpenAPISpec is an OpenAPISpec. It can either be fetched from a URL, or Path/Port from the service.
+type OpenAPISpec struct {
+	URL string `json:"url,omitempty"`
+
+	Path string `json:"path,omitempty"`
+	Port int    `json:"port,omitempty"`
 }
 
 // Command defines patch operation to apply on the cluster.

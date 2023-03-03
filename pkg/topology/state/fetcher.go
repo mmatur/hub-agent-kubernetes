@@ -20,7 +20,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -32,17 +31,11 @@ import (
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
-	"github.com/traefik/hub-agent-kubernetes/pkg/openapi"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
-
-// OpenAPISpecLoader can load OpenAPI specifications.
-type OpenAPISpecLoader interface {
-	Load(ctx context.Context, uri *url.URL) (*openapi.Spec, error)
-}
 
 // Fetcher fetches Kubernetes resources and converts them into a filtered and simplified state.
 type Fetcher struct {
@@ -52,8 +45,6 @@ type Fetcher struct {
 	hub       hubinformer.SharedInformerFactory
 	traefik   traefikinformer.SharedInformerFactory
 	clientSet clientset.Interface
-
-	specs OpenAPISpecLoader
 }
 
 // NewFetcher creates a new Fetcher.
@@ -144,7 +135,6 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 		hub:           hubFactory,
 		traefik:       traefikFactory,
 		clientSet:     clientSet,
-		specs:         openapi.NewLoader(),
 	}, nil
 }
 
@@ -154,7 +144,7 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 
 	var err error
 
-	cluster.Services, err = f.getServices(ctx)
+	cluster.Services, err = f.getServices()
 	if err != nil {
 		return nil, err
 	}
