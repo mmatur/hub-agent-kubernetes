@@ -19,7 +19,7 @@ package api
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"sort"
@@ -52,7 +52,7 @@ func newSortedMap[T constraints.Ordered](source map[T]string) sortedMap[T] {
 // sum returns the version of the provided data.
 func sum(a any) ([]byte, error) {
 	var buff bytes.Buffer
-	encoder := gob.NewEncoder(&buff)
+	encoder := json.NewEncoder(&buff)
 
 	if err := encoder.Encode(a); err != nil {
 		return nil, fmt.Errorf("encode data: %w", err)

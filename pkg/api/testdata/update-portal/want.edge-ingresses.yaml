@@ -1,0 +1,40 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: EdgeIngress
+metadata:
+  name: modified-portal-3823062443-portal
+  namespace: agent-ns
+  ownerReferences:
+    - apiVersion: hub.traefik.io/v1alpha1
+      kind: APIPortal
+      name: modified-portal
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+spec:
+  service:
+    name: dev-portal-service-name
+    port: 8080
+  customDomains:
+    - hello.example.com
+    - new.example.com
+
+---
+# This EdgeIngress should have been deleted at the same time as the Portal,
+# but the foreground propagation does not work when testing
+apiVersion: hub.traefik.io/v1alpha1
+kind: EdgeIngress
+metadata:
+  name: portal-3684986092-portal
+  namespace: agent-ns
+  ownerReferences:
+    - apiVersion: hub.traefik.io/v1alpha1
+      kind: APIPortal
+      name: portal
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+spec:
+  service:
+    name: dev-portal-service-name
+    port: 8080
+  customDomains:
+    - hello.example.com
+    - welcome.example.com

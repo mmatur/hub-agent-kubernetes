@@ -83,7 +83,7 @@ func TestPortal_Review_createOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
 					Version:  "version-1",
 					SyncedAt: now,
-					Hash:     "TQJwu+48AdSMgSOx3EO4WA==",
+					Hash:     "7z8bBr7Yav5c/oZ/W/Qy8Q==",
 				}},
 			}),
 		},
@@ -188,7 +188,7 @@ func TestPortal_Review_updateOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
 					Version:  "version-2",
 					SyncedAt: now,
-					Hash:     "TQJwu+48AdSMgSOx3EO4WA==",
+					Hash:     "7z8bBr7Yav5c/oZ/W/Qy8Q==",
 				}},
 			}),
 		},

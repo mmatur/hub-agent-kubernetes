@@ -1,10 +1,10 @@
 apiVersion: hub.traefik.io/v1alpha1
 kind: APIPortal
 metadata:
-  name: new-portal
+  name: portal
 spec:
-  description: "My new portal"
-  apiGateway: gateway
+  description: "My portal"
+  gateway: gateway
   customDomains:
     - "hello.example.com"
     - "welcome.example.com"
@@ -14,4 +14,4 @@ status:
     - hello.example.com
     - welcome.example.com
   urls: "https://hello.example.com,https://welcome.example.com"
-  hash: "xxCSMwqOpZERzooqvUhusQ=="
+  hash: "HtPv59eS2+R4jrHZHiRuGwDUgAw="

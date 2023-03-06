@@ -263,3 +263,6 @@ issues:
         - gochecknoglobals
     - path: portal/embed.go
       text: "pattern dist: no matching files found"
+    - path: pkg/api/watcher_gateway_test.go
+      linters:
+        - gocognit

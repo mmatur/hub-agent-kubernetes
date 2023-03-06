@@ -1,0 +1,23 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIGateway
+metadata:
+  name: gateway
+  labels:
+    area: users
+spec:
+  apiAccesses:
+    - users
+  customDomains:
+    - "api.hello.example.com"
+    - "api.welcome.example.com"
+    - "not-verified.example.com"
+status:
+  accesses:
+    - users
+  version: version-1
+  hubDomain: brave-lion-123.hub-traefik.io
+  customDomains:
+    - api.hello.example.com
+    - api.welcome.example.com
+  urls: "https://api.hello.example.com,https://api.welcome.example.com,https://brave-lion-123.hub-traefik.io"
+  hash: "8SctbQ7WDd1U8DK9U5okdzu0Pcg="

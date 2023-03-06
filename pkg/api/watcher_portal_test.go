@@ -29,13 +29,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
-	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
-	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -57,36 +53,58 @@ func Test_WatcherRun(t *testing.T) {
 		},
 	}
 
-	namespaces := []string{"agent-ns", "default", "my-ns"}
-
 	tests := []struct {
-		desc           string
-		platformPortal Portal
+		desc            string
+		platformPortals []Portal
 
-		clusterPortals     string
-		clusterIngresses   string
-		clusterSecrets     string
-		clusterMiddlewares string
+		clusterPortals       string
+		clusterEdgeIngresses string
 
 		wantPortals       string
-		wantIngresses     string
 		wantEdgeIngresses string
-		wantSecrets       string
-		wantMiddlewares   string
 	}{
 		{
 			desc: "new portal present on the platform needs to be created on the cluster",
-			platformPortal: Portal{
-				Name:    "new-portal",
-				Version: "version-1",
-				CustomDomains: []string{
-					"hello.example.com",
-					"welcome.example.com",
+			platformPortals: []Portal{
+				{
+					Name:        "new-portal",
+					Description: "My new portal",
+					Gateway:     "gateway",
+					Version:     "version-1",
+					CustomDomains: []string{
+						"hello.example.com",
+						"welcome.example.com",
+					},
 				},
 			},
 			wantPortals:       "testdata/new-portal/want.portals.yaml",
 			wantEdgeIngresses: "testdata/new-portal/want.edge-ingresses.yaml",
-			wantSecrets:       "testdata/new-portal/want.secrets.yaml",
+		},
+		{
+			desc: "modified portal on the platform needs to be updated on the cluster",
+			platformPortals: []Portal{
+				{
+					Name:        "modified-portal",
+					Description: "My modified portal",
+					Gateway:     "modified-gateway",
+					Version:     "version-2",
+					CustomDomains: []string{
+						"hello.example.com",
+						"new.example.com",
+					},
+				},
+			},
+			clusterPortals:       "testdata/update-portal/portals.yaml",
+			clusterEdgeIngresses: "testdata/update-portal/edge-ingresses.yaml",
+			wantPortals:          "testdata/update-portal/want.portals.yaml",
+			wantEdgeIngresses:    "testdata/update-portal/want.edge-ingresses.yaml",
+		},
+		{
+			desc:                 "deleted portal on the platform needs to be deleted on the cluster",
+			platformPortals:      []Portal{},
+			clusterPortals:       "testdata/delete-portal/portals.yaml",
+			clusterEdgeIngresses: "testdata/delete-portal/edge-ingresses.yaml",
+			wantEdgeIngresses:    "testdata/delete-portal/want.edge-ingresses.yaml",
 		},
 	}
 
@@ -95,38 +113,24 @@ func Test_WatcherRun(t *testing.T) {
 
 		t.Run(test.desc, func(t *testing.T) {
 			wantPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.wantPortals)
-			wantIngresses := loadFixtures[netv1.Ingress](t, test.wantIngresses)
 			wantEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.wantEdgeIngresses)
-			wantSecrets := loadFixtures[corev1.Secret](t, test.wantSecrets)
-			wantMiddlewares := loadFixtures[traefikv1alpha1.Middleware](t, test.wantMiddlewares)
 
 			clusterPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.clusterPortals)
-			clusterIngresses := loadFixtures[netv1.Ingress](t, test.clusterIngresses)
-			clusterSecrets := loadFixtures[corev1.Secret](t, test.clusterSecrets)
-			clusterMiddlewares := loadFixtures[traefikv1alpha1.Middleware](t, test.clusterMiddlewares)
+			clusterEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.clusterEdgeIngresses)
 
 			var kubeObjects []runtime.Object
 			kubeObjects = append(kubeObjects, services...)
-			for _, clusterIngress := range clusterIngresses {
-				kubeObjects = append(kubeObjects, clusterIngress.DeepCopy())
-			}
-			for _, secret := range clusterSecrets {
-				kubeObjects = append(kubeObjects, secret.DeepCopy())
-			}
 
 			var hubObjects []runtime.Object
 			for _, clusterPortal := range clusterPortals {
 				hubObjects = append(hubObjects, clusterPortal.DeepCopy())
 			}
-
-			var traefikObjects []runtime.Object
-			for _, clusterMiddleware := range clusterMiddlewares {
-				traefikObjects = append(traefikObjects, clusterMiddleware.DeepCopy())
+			for _, clusterEdgeIngress := range clusterEdgeIngresses {
+				hubObjects = append(hubObjects, clusterEdgeIngress.DeepCopy())
 			}
 
 			kubeClientSet := kubemock.NewSimpleClientset(kubeObjects...)
 			hubClientSet := hubkubemock.NewSimpleClientset(hubObjects...)
-			traefikClientSet := traefikkubemock.NewSimpleClientset(traefikObjects...)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -146,28 +150,21 @@ func Test_WatcherRun(t *testing.T) {
 
 			getPortalCount := 0
 			// Cancel the context on the second portal synchronization occurred.
-			client.OnGetPortals().TypedReturns([]Portal{test.platformPortal}, nil).Run(func(_ mock.Arguments) {
+			client.OnGetPortals().TypedReturns(test.platformPortals, nil).Run(func(_ mock.Arguments) {
 				getPortalCount++
 				if getPortalCount == 2 {
 					cancel()
 				}
 			})
-			client.OnGetWildcardCertificate().
-				TypedReturns(edgeingress.Certificate{
-					Certificate: []byte("cert"),
-					PrivateKey:  []byte("private"),
-				}, nil)
 
-			w := NewWatcherPortal(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet.TraefikV1alpha1(), &WatcherConfig{
+			w := NewWatcherPortal(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, &WatcherPortalConfig{
 				IngressClassName:        "ingress-class",
 				AgentNamespace:          "agent-ns",
 				TraefikAPIEntryPoint:    "api-entrypoint",
 				TraefikTunnelEntryPoint: "tunnel-entrypoint",
 				DevPortalServiceName:    "dev-portal-service-name",
 				DevPortalPort:           8080,
-				APISyncInterval:         time.Millisecond,
-				CertSyncInterval:        time.Millisecond,
-				CertRetryInterval:       time.Millisecond,
+				PortalSyncInterval:      time.Millisecond,
 			})
 
 			stop := make(chan struct{})
@@ -180,28 +177,8 @@ func Test_WatcherRun(t *testing.T) {
 
 			assertPortalsMatches(t, hubClientSet, wantPortals)
 			assertEdgeIngressesMatches(t, hubClientSet, "agent-ns", wantEdgeIngresses)
-			assertSecretsMatches(t, kubeClientSet, namespaces, wantSecrets)
-			assertIngressesMatches(t, kubeClientSet, namespaces, wantIngresses)
-			assertMiddlewaresMatches(t, traefikClientSet, namespaces, wantMiddlewares)
 		})
 	}
-}
-
-func assertSecretsMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []corev1.Secret) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	var secrets []corev1.Secret
-	for _, namespace := range namespaces {
-		namespaceSecretList, err := kubeClientSet.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
-		require.NoError(t, err)
-
-		secrets = append(secrets, namespaceSecretList.Items...)
-	}
-
-	assert.ElementsMatch(t, want, secrets)
 }
 
 func assertPortalsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, want []hubv1alpha1.APIPortal) {
@@ -251,65 +228,11 @@ func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientse
 		gotEdgeIngresses = append(gotEdgeIngresses, portal)
 	}
 
-	sort.Slice(want, func(i, j int) bool {
-		return want[i].Name < want[j].Name
+	sort.Slice(gotEdgeIngresses, func(i, j int) bool {
+		return gotEdgeIngresses[i].Name < gotEdgeIngresses[j].Name
 	})
 
 	assert.Equal(t, want, gotEdgeIngresses)
-}
-
-func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []netv1.Ingress) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	sort.Slice(want, func(i, j int) bool {
-		return want[i].Name < want[j].Name
-	})
-
-	var ingresses []netv1.Ingress
-	for _, namespace := range namespaces {
-		namespaceIngressList, err := kubeClientSet.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
-		require.NoError(t, err)
-
-		for _, ingress := range namespaceIngressList.Items {
-			ingress.Status = netv1.IngressStatus{}
-
-			ingresses = append(ingresses, ingress)
-		}
-	}
-
-	sort.Slice(ingresses, func(i, j int) bool {
-		return ingresses[i].Name < ingresses[j].Name
-	})
-
-	assert.Equal(t, want, ingresses)
-}
-
-func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Clientset, namespaces []string, want []traefikv1alpha1.Middleware) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	sort.Slice(want, func(i, j int) bool {
-		return want[i].Name < want[j].Name
-	})
-
-	var middlewares []traefikv1alpha1.Middleware
-	for _, namespace := range namespaces {
-		namespaceMiddlewareList, err := traefikClientSet.TraefikV1alpha1().Middlewares(namespace).List(ctx, metav1.ListOptions{})
-		require.NoError(t, err)
-
-		middlewares = append(middlewares, namespaceMiddlewareList.Items...)
-	}
-
-	sort.Slice(middlewares, func(i, j int) bool {
-		return middlewares[i].Name < middlewares[j].Name
-	})
-
-	assert.Equal(t, want, middlewares)
 }
 
 func loadFixtures[T any](t *testing.T, path string) []T {
