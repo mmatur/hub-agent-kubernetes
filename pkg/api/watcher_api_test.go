@@ -68,6 +68,7 @@ func Test_WatcherAPIRun(t *testing.T) {
 		TypedReturns([]API{
 			{
 				Name:       "toCreate",
+				Labels:     map[string]string{"foo": "bar"},
 				PathPrefix: "prefix",
 				Service: Service{
 					Name: "service",
@@ -77,6 +78,7 @@ func Test_WatcherAPIRun(t *testing.T) {
 			},
 			{
 				Name:       "toUpdate",
+				Labels:     map[string]string{"foo": "bar"},
 				PathPrefix: "prefixUpdate",
 				Service: Service{
 					Name: "serviceUpdate",
@@ -106,6 +108,7 @@ func Test_WatcherAPIRun(t *testing.T) {
 			Number: 80,
 		},
 	}, api.Spec.Service)
+	assert.Equal(t, map[string]string{"foo": "bar"}, api.Labels)
 
 	api, err = clientSetHub.HubV1alpha1().APIs("").Get(ctx, "toUpdate", metav1.GetOptions{})
 	require.NoError(t, err)
@@ -116,6 +119,7 @@ func Test_WatcherAPIRun(t *testing.T) {
 			Number: 80,
 		},
 	}, api.Spec.Service)
+	assert.Equal(t, map[string]string{"foo": "bar"}, api.Labels)
 
 	_, err = clientSetHub.HubV1alpha1().APIs("").Get(ctx, "toDelete", metav1.GetOptions{})
 	require.Error(t, err)

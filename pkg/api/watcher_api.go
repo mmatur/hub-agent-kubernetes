@@ -140,6 +140,7 @@ func (w *WatcherAPI) updateAPI(ctx context.Context, oldAPI *hubv1alpha1.API, new
 	}
 
 	obj.ObjectMeta = oldAPI.ObjectMeta
+	obj.ObjectMeta.Labels = newAPI.Labels
 
 	if obj.Status.Version != oldAPI.Status.Version {
 		obj, err = w.hubClientSet.HubV1alpha1().APIs(obj.Namespace).Update(ctx, obj, metav1.UpdateOptions{})
