@@ -31,6 +31,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oauthintro"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
 	"github.com/traefik/hub-agent-kubernetes/pkg/optional"
@@ -140,9 +141,12 @@ func makeAPIKeyConfig(policy *hubv1alpha1.AccessControlPolicyAPIKey) *Config {
 
 	return &Config{
 		APIKey: &apikey.Config{
-			Header:         policy.Header,
-			Query:          policy.Query,
-			Cookie:         policy.Cookie,
+			KeySource: token.Source{
+				Header:           policy.KeySource.Header,
+				HeaderAuthScheme: policy.KeySource.HeaderAuthScheme,
+				Query:            policy.KeySource.Query,
+				Cookie:           policy.KeySource.Cookie,
+			},
 			Keys:           keys,
 			ForwardHeaders: policy.ForwardHeaders,
 		},
@@ -303,7 +307,7 @@ func makeOAuthIntro(policy *hubv1alpha1.AccessControlOAuthIntro, secrets SecretG
 		}
 	}
 
-	oauthIntroConfig.TokenSource = oauthintro.TokenSource{
+	oauthIntroConfig.TokenSource = token.Source{
 		Header:           policy.TokenSource.Header,
 		HeaderAuthScheme: policy.TokenSource.HeaderAuthScheme,
 		Query:            policy.TokenSource.Query,

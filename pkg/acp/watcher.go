@@ -222,9 +222,12 @@ func buildAccessControlPolicySpec(a ACP) hubv1alpha1.AccessControlPolicySpec {
 		}
 
 		spec.APIKey = &hubv1alpha1.AccessControlPolicyAPIKey{
-			Header:         a.APIKey.Header,
-			Query:          a.APIKey.Query,
-			Cookie:         a.APIKey.Cookie,
+			KeySource: hubv1alpha1.TokenSource{
+				Header:           a.APIKey.KeySource.Header,
+				HeaderAuthScheme: a.APIKey.KeySource.HeaderAuthScheme,
+				Query:            a.APIKey.KeySource.Query,
+				Cookie:           a.APIKey.KeySource.Cookie,
+			},
 			Keys:           keys,
 			ForwardHeaders: a.APIKey.ForwardHeaders,
 		}

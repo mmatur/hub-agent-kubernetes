@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
 	"github.com/traefik/hub-agent-kubernetes/pkg/optional"
 )
@@ -110,7 +111,7 @@ func TestNewHandler(t *testing.T) {
 						},
 					},
 				},
-				TokenSource: TokenSource{
+				TokenSource: token.Source{
 					Header: "",
 					Query:  "",
 					Cookie: "",
@@ -161,7 +162,7 @@ func TestOAuthIntro_GetsTokenFromHeader(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -205,7 +206,7 @@ func TestOAuthIntro_GetsTokenFromQuery(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Query: "tok",
 		},
 	}
@@ -249,7 +250,7 @@ func TestOAuthIntro_GetsTokenFromCookie(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Cookie: "tok",
 		},
 	}
@@ -282,7 +283,7 @@ func TestOAuthIntro_FailsIfMissingToken(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -326,7 +327,7 @@ func TestOAuthIntro_AuthenticatesWithHeader(t *testing.T) {
 				Value: "Bearer intro-token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header: "Token",
 		},
 	}
@@ -372,7 +373,7 @@ func TestOAuthIntro_AuthenticatesWithQuery(t *testing.T) {
 				Value: "intro-token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header: "Token",
 		},
 	}
@@ -431,7 +432,7 @@ func TestOAuthIntro_SendsCustomHeaders(t *testing.T) {
 				"Request-Query-Foo": `{{ .Request.URL.Query.Get "foo" }}`,
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -476,7 +477,7 @@ func TestOAuthIntro_HandlesTokenInactive(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -520,7 +521,7 @@ func TestOAuthIntro_HandlesIntrospectionServerError(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -566,7 +567,7 @@ func TestOAuthIntro_HandlesWrongClaims(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},
@@ -611,7 +612,7 @@ func TestOAuthIntro_ForwardsClaimsHeaders(t *testing.T) {
 				Value: "Bearer token",
 			},
 		},
-		TokenSource: TokenSource{
+		TokenSource: token.Source{
 			Header:           "Authorization",
 			HeaderAuthScheme: "Bearer",
 		},

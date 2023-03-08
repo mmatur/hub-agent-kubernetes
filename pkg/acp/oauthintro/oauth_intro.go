@@ -29,13 +29,14 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/expr"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	"github.com/traefik/hub-agent-kubernetes/pkg/httpclient"
 )
 
 // Config configures an OAuth 2.0 Token Introspection ACP handler.
 type Config struct {
 	ClientConfig   ClientConfig      `json:"clientConfig,omitempty"`
-	TokenSource    TokenSource       `json:"tokenSource,omitempty"`
+	TokenSource    token.Source      `json:"tokenSource,omitempty"`
 	Claims         string            `json:"claims,omitempty"`
 	ForwardHeaders map[string]string `json:"forwardHeaders,omitempty"`
 }
@@ -77,7 +78,7 @@ type Handler struct {
 	httpClient    *http.Client
 	auth          ClientConfigAuth
 
-	tokenSrc             TokenSource
+	tokenSrc             token.Source
 	fwdHeaders           map[string]string
 	validateCustomClaims expr.Predicate
 }
@@ -141,7 +142,7 @@ func NewHandler(cfg *Config, polName string) (*Handler, error) {
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	l := log.With().Str("handler_type", "OAuthIntro").Str("handler_name", h.name).Logger()
 
-	tok, err := extractToken(req, h.tokenSrc)
+	tok, err := token.Extract(req, h.tokenSrc)
 	if tok == "" {
 		l.Debug().Err(err).Msg("No token found in request")
 		rw.WriteHeader(http.StatusUnauthorized)

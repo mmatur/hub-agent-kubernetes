@@ -4,8 +4,9 @@ metadata:
   name: my-acp
 spec:
   apiKey:
-    header: Api-Key
-    query: api-key
+    keySource:
+      header: Api-Key
+      query: api-key
     keys:
       - id: user-1
         value: 17fa993d5eecbd361f30baf0b9b2329ad053bb6d5fec2228eca55e9b4914fface3af69bcc9a6b5f7ff093aa9a0d00811d0b2a3ee67eac60c57e79d2fd99bbde0

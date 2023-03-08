@@ -147,9 +147,7 @@ type AccessControlPolicyBasicAuth struct {
 
 // AccessControlPolicyAPIKey describes the settings for APIKey authentication within an access control policy.
 type AccessControlPolicyAPIKey struct {
-	Header         string                         `json:"header,omitempty"`
-	Query          string                         `json:"query,omitempty"`
-	Cookie         string                         `json:"cookie,omitempty"`
+	KeySource      TokenSource                    `json:"keySource,omitempty"`
 	Keys           []AccessControlPolicyAPIKeyKey `json:"keys,omitempty"`
 	ForwardHeaders map[string]string              `json:"forwardHeaders,omitempty"`
 }

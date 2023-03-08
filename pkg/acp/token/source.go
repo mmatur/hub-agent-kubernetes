@@ -15,7 +15,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-package oauthintro
+package token
 
 import (
 	"errors"
@@ -24,15 +24,16 @@ import (
 	"strings"
 )
 
-// TokenSource describes where to find a token in an HTTP request.
-type TokenSource struct {
+// Source describes where to find a token in an HTTP request.
+type Source struct {
 	Header           string `json:"header,omitempty"`
 	HeaderAuthScheme string `json:"headerAuthScheme,omitempty"`
 	Query            string `json:"query,omitempty"`
 	Cookie           string `json:"cookie,omitempty"`
 }
 
-func extractToken(req *http.Request, src TokenSource) (string, error) {
+// Extract extracts a token from an HTTP request given a Source.
+func Extract(req *http.Request, src Source) (string, error) {
 	if src.Header != "" {
 		if token := getTokenFromHeader(req.Header, src.Header, src.HeaderAuthScheme); token != "" {
 			return token, nil

@@ -91,12 +91,9 @@ type AccessControlPolicyBasicAuth struct {
 
 // AccessControlPolicyAPIKey configure an APIKey control policy.
 type AccessControlPolicyAPIKey struct {
-	// Header name where to look for the API key. One of header, query or cookie must be set.
-	Header string `json:"header,omitempty"`
-	// Query name where to look for the API key. One of header, query or cookie must be set.
-	Query string `json:"query,omitempty"`
-	// Cookie name where to look for the API key. One of header, query or cookie must be set.
-	Cookie string `json:"cookie,omitempty"`
+	// KeySource defines how to extract API keys from requests.
+	// +kubebuilder:validation:Required
+	KeySource TokenSource `json:"keySource"`
 	// Keys define the set of authorized keys to access a protected resource.
 	// +kubebuilder:validation:MinItems:=1
 	Keys []AccessControlPolicyAPIKeyKey `json:"keys,omitempty"`

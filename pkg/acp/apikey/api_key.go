@@ -21,17 +21,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/rs/zerolog/log"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	"golang.org/x/crypto/sha3"
 )
 
 // Config configures an API key ACP handler.
 type Config struct {
-	Header         string            `json:"header"`
-	Query          string            `json:"query"`
-	Cookie         string            `json:"cookie"`
+	KeySource      token.Source      `json:"keySource"`
 	Keys           []Key             `json:"keys"`
 	ForwardHeaders map[string]string `json:"forwardHeaders"`
 }
@@ -46,17 +44,15 @@ type Key struct {
 // Handler is an API Key ACP Handler.
 type Handler struct {
 	name       string
-	header     string
-	query      string
-	cookie     string
+	keySrc     token.Source
 	keys       map[string]Key
 	fwdHeaders map[string]string
 }
 
 // NewHandler creates a new API key ACP Handler.
 func NewHandler(cfg *Config, name string) (*Handler, error) {
-	if cfg.Header == "" && cfg.Query == "" && cfg.Cookie == "" {
-		return nil, errors.New("at least one of header, query or cookie is required")
+	if cfg.KeySource.Header == "" && cfg.KeySource.Query == "" && cfg.KeySource.Cookie == "" {
+		return nil, errors.New(`at least one of "header", "query" or "cookie" must be set`)
 	}
 
 	if len(cfg.Keys) == 0 {
@@ -97,9 +93,7 @@ func NewHandler(cfg *Config, name string) (*Handler, error) {
 
 	return &Handler{
 		name:       name,
-		header:     cfg.Header,
-		query:      cfg.Query,
-		cookie:     cfg.Cookie,
+		keySrc:     cfg.KeySource,
 		keys:       keys,
 		fwdHeaders: cfg.ForwardHeaders,
 	}, nil
@@ -108,7 +102,7 @@ func NewHandler(cfg *Config, name string) (*Handler, error) {
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	l := log.With().Str("handler_type", "APIKey").Str("handler_name", h.name).Logger()
 
-	apiKey, err := h.getAPIkey(req)
+	apiKey, err := token.Extract(req, h.keySrc)
 	if err != nil {
 		l.Debug().Err(err).Msg("Getting API key")
 		rw.WriteHeader(http.StatusUnauthorized)
@@ -130,56 +124,4 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.WriteHeader(http.StatusOK)
-}
-
-// getAPIkey finds the API key from an HTTP request based on how the API key middleware was configured.
-func (h *Handler) getAPIkey(req *http.Request) (string, error) {
-	if h.header != "" {
-		if hdr := req.Header.Get(h.header); hdr != "" {
-			return hdr, nil
-		}
-	}
-
-	if h.query != "" {
-		key, err := getAPIKeyFromQuery(req.Header, h.query)
-		if err != nil {
-			return "", err
-		}
-		if key != "" {
-			return key, nil
-		}
-	}
-
-	if h.cookie != "" {
-		if cookie, _ := req.Cookie(h.cookie); cookie != nil && cookie.Value != "" {
-			return cookie.Value, nil
-		}
-	}
-
-	return "", errors.New("missing API key")
-}
-
-func getAPIKeyFromQuery(header http.Header, key string) (string, error) {
-	if uri := originalURI(header); uri != "" {
-		parsedURI, err := url.Parse(uri)
-		if err != nil {
-			return "", err
-		}
-
-		if qry := parsedURI.Query().Get(key); qry != "" {
-			return qry, nil
-		}
-	}
-
-	return "", nil
-}
-
-// originalURI gets the original URI that was sent to the ingress controller, regardless of its type.
-// It currently supports Traefik (X-Forwarded-Uri) and Nginx Community (X-Original-Url).
-func originalURI(hdr http.Header) string {
-	if xfu := hdr.Get("X-Forwarded-Uri"); xfu != "" {
-		return xfu
-	}
-
-	return hdr.Get("X-Original-Url")
 }

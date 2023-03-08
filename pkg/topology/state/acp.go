@@ -52,9 +52,12 @@ func (f *Fetcher) getAccessControlPolicies() (map[string]*AccessControlPolicy, e
 		case policy.Spec.APIKey != nil:
 			acp.Method = "apiKey"
 			acp.APIKey = &AccessControlPolicyAPIKey{
-				Header:         policy.Spec.APIKey.Header,
-				Query:          policy.Spec.APIKey.Query,
-				Cookie:         policy.Spec.APIKey.Cookie,
+				KeySource: TokenSource{
+					Header:           policy.Spec.APIKey.KeySource.Header,
+					HeaderAuthScheme: policy.Spec.APIKey.KeySource.HeaderAuthScheme,
+					Query:            policy.Spec.APIKey.KeySource.Query,
+					Cookie:           policy.Spec.APIKey.KeySource.Cookie,
+				},
 				Keys:           redactKeys(policy.Spec.APIKey.Keys),
 				ForwardHeaders: policy.Spec.APIKey.ForwardHeaders,
 			}

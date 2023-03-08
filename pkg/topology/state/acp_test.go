@@ -61,8 +61,10 @@ func TestFetcher_GetAccessControlPolicies(t *testing.T) {
 					Name:   "my-acp",
 					Method: "apiKey",
 					APIKey: &AccessControlPolicyAPIKey{
-						Header: "Api-Key",
-						Query:  "api-key",
+						KeySource: TokenSource{
+							Header: "Api-Key",
+							Query:  "api-key",
+						},
 						Keys: []AccessControlPolicyAPIKeyKey{
 							{ID: "user-1", Value: "redacted"},
 							{ID: "user-2", Value: "redacted"},

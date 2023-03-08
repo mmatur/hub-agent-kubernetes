@@ -15,7 +15,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-package oauthintro
+package token
 
 import (
 	"net/http"
@@ -28,7 +28,7 @@ import (
 func Test_extractToken(t *testing.T) {
 	tests := []struct {
 		desc         string
-		source       TokenSource
+		source       Source
 		header       http.Header
 		queryTraefik string
 		queryNginx   string
@@ -38,7 +38,7 @@ func Test_extractToken(t *testing.T) {
 	}{
 		{
 			desc: "token extracted from header",
-			source: TokenSource{
+			source: Source{
 				Header: "Authorization",
 			},
 			header: http.Header{
@@ -48,7 +48,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from query with all token sources set",
-			source: TokenSource{
+			source: Source{
 				Header: "Authorization",
 				Query:  "tok",
 				Cookie: "tok",
@@ -58,7 +58,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from cookie with all token sources set",
-			source: TokenSource{
+			source: Source{
 				Header: "Authorization",
 				Query:  "tok",
 				Cookie: "token",
@@ -68,7 +68,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from header (bearer)",
-			source: TokenSource{
+			source: Source{
 				Header:           "Authorization",
 				HeaderAuthScheme: "Bearer",
 			},
@@ -79,7 +79,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from query parameter (Traefik)",
-			source: TokenSource{
+			source: Source{
 				Query: "tok",
 			},
 			queryTraefik: "tok=token",
@@ -87,7 +87,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from query parameter (Nginx)",
-			source: TokenSource{
+			source: Source{
 				Query: "tok",
 			},
 			queryNginx: "tok=token",
@@ -95,7 +95,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "token extracted from cookie",
-			source: TokenSource{
+			source: Source{
 				Cookie: "token",
 			},
 			cookie: "token=token",
@@ -103,7 +103,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "prioritize header over query parameter",
-			source: TokenSource{
+			source: Source{
 				Header: "Authorization",
 				Query:  "tok",
 			},
@@ -115,7 +115,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "prioritize query parameter over cookie",
-			source: TokenSource{
+			source: Source{
 				Query:  "tok",
 				Cookie: "token",
 			},
@@ -125,7 +125,7 @@ func Test_extractToken(t *testing.T) {
 		},
 		{
 			desc: "invalid Authorization header scheme",
-			source: TokenSource{
+			source: Source{
 				Header:           "Authorization",
 				HeaderAuthScheme: "Bearer",
 			},
@@ -158,7 +158,7 @@ func Test_extractToken(t *testing.T) {
 				req.Header.Set("Cookie", test.cookie)
 			}
 
-			tok, err := extractToken(req, test.source)
+			tok, err := Extract(req, test.source)
 			if test.wantErr != "" {
 				require.Error(t, err)
 				assert.Equal(t, test.wantErr, err.Error())

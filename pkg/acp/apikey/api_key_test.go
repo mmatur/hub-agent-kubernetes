@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 )
 
 func TestNewHandler(t *testing.T) {
@@ -40,14 +41,14 @@ func TestNewHandler(t *testing.T) {
 		{
 			desc: "missing keys",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 			},
 			wantErr: true,
 		},
 		{
 			desc: "ill-formed key, id cannot be empty",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "",
@@ -60,7 +61,7 @@ func TestNewHandler(t *testing.T) {
 		{
 			desc: "ill-formed key, value cannot be empty",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -73,7 +74,7 @@ func TestNewHandler(t *testing.T) {
 		{
 			desc: "ill-formed keys, duplicated key ID",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id",
@@ -90,7 +91,7 @@ func TestNewHandler(t *testing.T) {
 		{
 			desc: "ill-formed keys, duplicated key value",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -107,7 +108,7 @@ func TestNewHandler(t *testing.T) {
 		{
 			desc: "ok",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -153,7 +154,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "get API key from header",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -167,7 +168,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "get API key from query (Traefik)",
 			cfg: Config{
-				Query: "api-key",
+				KeySource: token.Source{Query: "api-key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -181,7 +182,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "get API key from query (Nginx)",
 			cfg: Config{
-				Query: "api-key",
+				KeySource: token.Source{Query: "api-key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -195,7 +196,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "get API key from cookie",
 			cfg: Config{
-				Cookie: "api_key",
+				KeySource: token.Source{Cookie: "api_key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -209,8 +210,10 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "get API key prioritize header",
 			cfg: Config{
-				Header: "Api-Key",
-				Query:  "api-key",
+				KeySource: token.Source{
+					Header: "Api-Key",
+					Query:  "api-key",
+				},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -225,7 +228,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "can't get API key",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -238,7 +241,7 @@ func TestServeHTTP(t *testing.T) {
 		{
 			desc: "invalid API key",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
@@ -299,7 +302,7 @@ func TestServeHTTPForwardsHeader(t *testing.T) {
 		{
 			desc: "ID is forwarded if configured",
 			cfg: Config{
-				Header: "Api-Key",
+				KeySource: token.Source{Header: "Api-Key"},
 				Keys: []Key{
 					{
 						ID:    "id-1",
