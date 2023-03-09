@@ -22,9 +22,11 @@ import (
 )
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIAccess defines which group of consumers can access APIs and APICollections.
+// +kubebuilder:resource:scope=Cluster
 type APIAccess struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -39,9 +41,9 @@ type APIAccess struct {
 
 // APIAccessSpec configures an APIAccess.
 type APIAccessSpec struct {
-	Groups                []string             `json:"groups"`
-	APISelector           metav1.LabelSelector `json:"apiSelector"`
-	APICollectionSelector metav1.LabelSelector `json:"apiCollectionSelector"`
+	Groups                []string              `json:"groups"`
+	APISelector           *metav1.LabelSelector `json:"apiSelector,omitempty"`
+	APICollectionSelector *metav1.LabelSelector `json:"apiCollectionSelector,omitempty"`
 }
 
 // APIAccessStatus is the status of an APIAccess.

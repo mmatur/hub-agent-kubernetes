@@ -42,33 +42,32 @@ type APIAccessInformer interface {
 type aPIAccessInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
 // NewAPIAccessInformer constructs a new informer for APIAccess type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewAPIAccessInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredAPIAccessInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewAPIAccessInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredAPIAccessInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredAPIAccessInformer constructs a new informer for APIAccess type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredAPIAccessInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredAPIAccessInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HubV1alpha1().APIAccesses(namespace).List(context.TODO(), options)
+				return client.HubV1alpha1().APIAccesses().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HubV1alpha1().APIAccesses(namespace).Watch(context.TODO(), options)
+				return client.HubV1alpha1().APIAccesses().Watch(context.TODO(), options)
 			},
 		},
 		&hubv1alpha1.APIAccess{},
@@ -78,7 +77,7 @@ func NewFilteredAPIAccessInformer(client versioned.Interface, namespace string, 
 }
 
 func (f *aPIAccessInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredAPIAccessInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredAPIAccessInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *aPIAccessInformer) Informer() cache.SharedIndexInformer {

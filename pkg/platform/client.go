@@ -171,6 +171,26 @@ type UpdateCollectionReq struct {
 	Selector   metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+// CreateAccessReq is the request for creating an API access.
+type CreateAccessReq struct {
+	Name string `json:"name"`
+
+	Labels map[string]string `json:"labels,omitempty"`
+
+	Groups                []string              `json:"groups"`
+	APISelector           *metav1.LabelSelector `json:"apiSelector,omitempty"`
+	APICollectionSelector *metav1.LabelSelector `json:"apiCollectionSelector,omitempty"`
+}
+
+// UpdateAccessReq is a request for updating an API access.
+type UpdateAccessReq struct {
+	Labels map[string]string `json:"labels,omitempty"`
+
+	Groups                []string              `json:"groups"`
+	APISelector           *metav1.LabelSelector `json:"apiSelector,omitempty"`
+	APICollectionSelector *metav1.LabelSelector `json:"apiCollectionSelector,omitempty"`
+}
+
 // Command defines patch operation to apply on the cluster.
 type Command struct {
 	ID        string          `json:"id"`
@@ -686,6 +706,21 @@ func (c *Client) CreateAPI(ctx context.Context, createReq *CreateAPIReq) (*api.A
 	return &a, nil
 }
 
+// CreateAccess creates an API access.
+func (c *Client) CreateAccess(ctx context.Context, createReq *CreateAccessReq) (*api.Access, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal access request: %w", err)
+	}
+
+	var a api.Access
+	if err = c.createResource(ctx, "accesses", body, &a); err != nil {
+		return nil, fmt.Errorf("create access: %w", err)
+	}
+
+	return &a, nil
+}
+
 // GetAPIs fetches the APIs available for this agent.
 func (c *Client) GetAPIs(ctx context.Context) ([]api.API, error) {
 	var apis []api.API
@@ -706,6 +741,31 @@ func (c *Client) UpdateAPI(ctx context.Context, namespace, name, lastKnownVersio
 	var a api.API
 	if err = c.updateResource(ctx, "apis", name+"@"+namespace, lastKnownVersion, body, &a); err != nil {
 		return nil, fmt.Errorf("update api: %w", err)
+	}
+
+	return &a, nil
+}
+
+// GetAccesses fetches the accesses available for this agent.
+func (c *Client) GetAccesses(ctx context.Context) ([]api.Access, error) {
+	var accesses []api.Access
+	if err := c.listResource(ctx, "accesses", &accesses); err != nil {
+		return nil, fmt.Errorf("list accesses: %w", err)
+	}
+
+	return accesses, nil
+}
+
+// UpdateAccess updates an API access.
+func (c *Client) UpdateAccess(ctx context.Context, name, lastKnownVersion string, updateReq *UpdateAccessReq) (*api.Access, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal access request: %w", err)
+	}
+
+	var a api.Access
+	if err = c.updateResource(ctx, "accesses", name, lastKnownVersion, body, &a); err != nil {
+		return nil, fmt.Errorf("update access: %w", err)
 	}
 
 	return &a, nil
@@ -764,6 +824,15 @@ func (c *Client) UpdateCollection(ctx context.Context, name, lastKnownVersion st
 func (c *Client) DeleteCollection(ctx context.Context, name, lastKnownVersion string) error {
 	if err := c.deleteResource(ctx, "collections", name, lastKnownVersion); err != nil {
 		return fmt.Errorf("delete collection: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAccess deletes an API access.
+func (c *Client) DeleteAccess(ctx context.Context, name, lastKnownVersion string) error {
+	if err := c.deleteResource(ctx, "accesses", name, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete access: %w", err)
 	}
 
 	return nil

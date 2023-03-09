@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 package admission
 
-// mocktail:portalService
-// mocktail:gatewayService
 // mocktail:apiService
 // mocktail:collectionService
+// mocktail:accessService
+// mocktail:portalService
+// mocktail:gatewayService

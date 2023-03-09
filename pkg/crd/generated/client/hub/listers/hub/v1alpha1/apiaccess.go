@@ -31,8 +31,9 @@ type APIAccessLister interface {
 	// List lists all APIAccesses in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.APIAccess, err error)
-	// APIAccesses returns an object that can list and get APIAccesses.
-	APIAccesses(namespace string) APIAccessNamespaceLister
+	// Get retrieves the APIAccess from the index for a given name.
+	// Objects returned here must be treated as read-only.
+	Get(name string) (*v1alpha1.APIAccess, error)
 	APIAccessListerExpansion
 }
 
@@ -54,41 +55,9 @@ func (s *aPIAccessLister) List(selector labels.Selector) (ret []*v1alpha1.APIAcc
 	return ret, err
 }
 
-// APIAccesses returns an object that can list and get APIAccesses.
-func (s *aPIAccessLister) APIAccesses(namespace string) APIAccessNamespaceLister {
-	return aPIAccessNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// APIAccessNamespaceLister helps list and get APIAccesses.
-// All objects returned here must be treated as read-only.
-type APIAccessNamespaceLister interface {
-	// List lists all APIAccesses in the indexer for a given namespace.
-	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.APIAccess, err error)
-	// Get retrieves the APIAccess from the indexer for a given namespace and name.
-	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.APIAccess, error)
-	APIAccessNamespaceListerExpansion
-}
-
-// aPIAccessNamespaceLister implements the APIAccessNamespaceLister
-// interface.
-type aPIAccessNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all APIAccesses in the indexer for a given namespace.
-func (s aPIAccessNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.APIAccess, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.APIAccess))
-	})
-	return ret, err
-}
-
-// Get retrieves the APIAccess from the indexer for a given namespace and name.
-func (s aPIAccessNamespaceLister) Get(name string) (*v1alpha1.APIAccess, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the APIAccess from the index for a given name.
+func (s *aPIAccessLister) Get(name string) (*v1alpha1.APIAccess, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

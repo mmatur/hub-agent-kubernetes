@@ -60,7 +60,7 @@ func (v *version) APIs() APIInformer {
 
 // APIAccesses returns a APIAccessInformer.
 func (v *version) APIAccesses() APIAccessInformer {
-	return &aPIAccessInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &aPIAccessInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // APICollections returns a APICollectionInformer.

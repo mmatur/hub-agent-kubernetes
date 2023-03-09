@@ -2577,3 +2577,310 @@ func TestClient_DeleteAPI(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_GetAccesses(t *testing.T) {
+	wantAccesses := []api.Access{
+		{
+			Name:   "name",
+			Groups: []string{"group"},
+			APISelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "value"},
+			},
+			APICollectionSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "value"},
+			},
+			Version: "version-1",
+		},
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/accesses", func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if req.Header.Get("Authorization") != "Bearer "+testToken {
+			http.Error(rw, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		err := json.NewEncoder(rw).Encode(wantAccesses)
+		require.NoError(t, err)
+	})
+
+	srv := httptest.NewServer(mux)
+
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(srv.URL, testToken)
+	require.NoError(t, err)
+	c.httpClient = srv.Client()
+
+	gotAccesses, err := c.GetAccesses(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, wantAccesses, gotAccesses)
+}
+
+func TestClient_CreateAccess(t *testing.T) {
+	tests := []struct {
+		desc             string
+		req              *CreateAccessReq
+		access           *api.Access
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "create Access",
+			req: &CreateAccessReq{
+				Name:   "name",
+				Labels: map[string]string{"a": "b"},
+				Groups: []string{"group"},
+				APISelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				APICollectionSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+			},
+			returnStatusCode: http.StatusCreated,
+			wantErr:          assert.NoError,
+			access: &api.Access{
+				Name: "name",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				Groups: []string{"group"},
+				APISelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				APICollectionSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				Version: "version-1",
+			},
+		},
+		{
+			desc: "error",
+			req: &CreateAccessReq{
+				Name:   "name",
+				Labels: map[string]string{"a": "b"},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var gotReq CreateAccessReq
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/accesses", func(rw http.ResponseWriter, req *http.Request) {
+				if req.Method != http.MethodPost {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&gotReq)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				err = json.NewEncoder(rw).Encode(test.access)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			createdAccess, err := c.CreateAccess(context.Background(), test.req)
+			test.wantErr(t, err)
+
+			assert.Equal(t, *test.req, gotReq)
+			assert.Equal(t, test.access, createdAccess)
+		})
+	}
+}
+
+func TestClient_UpdateAccess(t *testing.T) {
+	tests := []struct {
+		desc             string
+		req              *UpdateAccessReq
+		access           *api.Access
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc: "update access",
+			req: &UpdateAccessReq{
+				Labels: map[string]string{"a": "b"},
+				Groups: []string{"group"},
+				APISelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				APICollectionSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+			},
+			returnStatusCode: http.StatusOK,
+			wantErr:          assert.NoError,
+			access: &api.Access{
+				Name: "name",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				Groups: []string{"group"},
+				APISelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				APICollectionSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
+				},
+				Version: "version-1",
+			},
+		},
+		{
+			desc: "conflict",
+			req: &UpdateAccessReq{
+				Labels: map[string]string{"a": "b"},
+			},
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var gotReq UpdateAccessReq
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/accesses/name", func(rw http.ResponseWriter, req *http.Request) {
+				if req.Method != http.MethodPut {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				if req.Header.Get("Last-Known-Version") != "oldAccessVersion" {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+
+				err := json.NewDecoder(req.Body).Decode(&gotReq)
+				require.NoError(t, err)
+
+				rw.WriteHeader(test.returnStatusCode)
+				if test.returnStatusCode == http.StatusConflict {
+					return
+				}
+
+				err = json.NewEncoder(rw).Encode(test.access)
+				require.NoError(t, err)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			updatedAccess, err := c.UpdateAccess(context.Background(), "name", "oldAccessVersion", test.req)
+			test.wantErr(t, err)
+
+			assert.Equal(t, *test.req, gotReq)
+			assert.Equal(t, test.access, updatedAccess)
+		})
+	}
+}
+
+func TestClient_DeleteAccess(t *testing.T) {
+	tests := []struct {
+		desc             string
+		name             string
+		returnStatusCode int
+		wantErr          assert.ErrorAssertionFunc
+	}{
+		{
+			desc:             "delete access",
+			name:             "name",
+			returnStatusCode: http.StatusNoContent,
+			wantErr:          assert.NoError,
+		},
+		{
+			desc:             "error",
+			name:             "name",
+			returnStatusCode: http.StatusConflict,
+			wantErr:          assert.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			var callCount int
+			mux := http.NewServeMux()
+			mux.HandleFunc("/accesses/"+test.name, func(rw http.ResponseWriter, req *http.Request) {
+				callCount++
+
+				if req.Method != http.MethodDelete {
+					http.Error(rw, fmt.Sprintf("unexpected method: %s", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+
+				if req.Header.Get("Authorization") != "Bearer "+testToken {
+					http.Error(rw, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+				if req.Header.Get("Last-Known-Version") != "oldAccessVersion" {
+					http.Error(rw, "Invalid token", http.StatusInternalServerError)
+					return
+				}
+
+				rw.WriteHeader(test.returnStatusCode)
+			})
+
+			srv := httptest.NewServer(mux)
+
+			t.Cleanup(srv.Close)
+
+			c, err := NewClient(srv.URL, testToken)
+			require.NoError(t, err)
+			c.httpClient = srv.Client()
+
+			err = c.DeleteAccess(context.Background(), test.name, "oldAccessVersion")
+			test.wantErr(t, err)
+
+			require.Equal(t, 1, callCount)
+		})
+	}
+}

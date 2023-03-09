@@ -44,6 +44,7 @@ type PlatformClient interface {
 	GetGateways(ctx context.Context) ([]Gateway, error)
 	GetAPIs(ctx context.Context) ([]API, error)
 	GetCollections(ctx context.Context) ([]Collection, error)
+	GetAccesses(ctx context.Context) ([]Access, error)
 }
 
 // WatcherPortalConfig holds the portal watcher configuration.

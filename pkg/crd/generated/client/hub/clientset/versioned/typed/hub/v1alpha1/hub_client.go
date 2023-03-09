@@ -45,8 +45,8 @@ func (c *HubV1alpha1Client) APIs(namespace string) APIInterface {
 	return newAPIs(c, namespace)
 }
 
-func (c *HubV1alpha1Client) APIAccesses(namespace string) APIAccessInterface {
-	return newAPIAccesses(c, namespace)
+func (c *HubV1alpha1Client) APIAccesses() APIAccessInterface {
+	return newAPIAccesses(c)
 }
 
 func (c *HubV1alpha1Client) APICollections() APICollectionInterface {

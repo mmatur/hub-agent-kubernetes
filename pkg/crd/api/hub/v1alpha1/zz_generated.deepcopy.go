@@ -22,7 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -123,8 +124,16 @@ func (in *APIAccessSpec) DeepCopyInto(out *APIAccessSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	in.APISelector.DeepCopyInto(&out.APISelector)
-	in.APICollectionSelector.DeepCopyInto(&out.APICollectionSelector)
+	if in.APISelector != nil {
+		in, out := &in.APISelector, &out.APISelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.APICollectionSelector != nil {
+		in, out := &in.APICollectionSelector, &out.APICollectionSelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -795,7 +804,7 @@ func (in *AccessControlPolicyOIDC) DeepCopyInto(out *AccessControlPolicyOIDC) {
 	*out = *in
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
-		*out = new(v1.SecretReference)
+		*out = new(corev1.SecretReference)
 		**out = **in
 	}
 	if in.AuthParams != nil {
@@ -845,7 +854,7 @@ func (in *AccessControlPolicyOIDCGoogle) DeepCopyInto(out *AccessControlPolicyOI
 	*out = *in
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
-		*out = new(v1.SecretReference)
+		*out = new(corev1.SecretReference)
 		**out = **in
 	}
 	if in.AuthParams != nil {

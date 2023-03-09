@@ -33,7 +33,7 @@ import (
 // APIAccessesGetter has a method to return a APIAccessInterface.
 // A group's client should implement this interface.
 type APIAccessesGetter interface {
-	APIAccesses(namespace string) APIAccessInterface
+	APIAccesses() APIAccessInterface
 }
 
 // APIAccessInterface has methods to work with APIAccess resources.
@@ -53,14 +53,12 @@ type APIAccessInterface interface {
 // aPIAccesses implements APIAccessInterface
 type aPIAccesses struct {
 	client rest.Interface
-	ns     string
 }
 
 // newAPIAccesses returns a APIAccesses
-func newAPIAccesses(c *HubV1alpha1Client, namespace string) *aPIAccesses {
+func newAPIAccesses(c *HubV1alpha1Client) *aPIAccesses {
 	return &aPIAccesses{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -68,7 +66,6 @@ func newAPIAccesses(c *HubV1alpha1Client, namespace string) *aPIAccesses {
 func (c *aPIAccesses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.APIAccess, err error) {
 	result = &v1alpha1.APIAccess{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,7 +82,6 @@ func (c *aPIAccesses) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1alpha1.APIAccessList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,7 +98,6 @@ func (c *aPIAccesses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,7 +108,6 @@ func (c *aPIAccesses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 func (c *aPIAccesses) Create(ctx context.Context, aPIAccess *v1alpha1.APIAccess, opts v1.CreateOptions) (result *v1alpha1.APIAccess, err error) {
 	result = &v1alpha1.APIAccess{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(aPIAccess).
@@ -126,7 +120,6 @@ func (c *aPIAccesses) Create(ctx context.Context, aPIAccess *v1alpha1.APIAccess,
 func (c *aPIAccesses) Update(ctx context.Context, aPIAccess *v1alpha1.APIAccess, opts v1.UpdateOptions) (result *v1alpha1.APIAccess, err error) {
 	result = &v1alpha1.APIAccess{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		Name(aPIAccess.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -141,7 +134,6 @@ func (c *aPIAccesses) Update(ctx context.Context, aPIAccess *v1alpha1.APIAccess,
 func (c *aPIAccesses) UpdateStatus(ctx context.Context, aPIAccess *v1alpha1.APIAccess, opts v1.UpdateOptions) (result *v1alpha1.APIAccess, err error) {
 	result = &v1alpha1.APIAccess{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		Name(aPIAccess.Name).
 		SubResource("status").
@@ -155,7 +147,6 @@ func (c *aPIAccesses) UpdateStatus(ctx context.Context, aPIAccess *v1alpha1.APIA
 // Delete takes name of the aPIAccess and deletes it. Returns an error if one occurs.
 func (c *aPIAccesses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		Name(name).
 		Body(&opts).
@@ -170,7 +161,6 @@ func (c *aPIAccesses) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -183,7 +173,6 @@ func (c *aPIAccesses) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *aPIAccesses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.APIAccess, err error) {
 	result = &v1alpha1.APIAccess{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("apiaccesses").
 		Name(name).
 		SubResource(subresources...).
