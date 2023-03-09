@@ -33,56 +33,52 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var apiToUpdate = &hubv1alpha1.API{
+var collectionToUpdate = &hubv1alpha1.APICollection{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "apiToUpdate",
+		Name: "collectionToUpdate",
 	},
-	Spec: hubv1alpha1.APISpec{
+	Spec: hubv1alpha1.APICollectionSpec{
 		PathPrefix: "oldPrefix",
 	},
 }
 
-var apiToDelete = &hubv1alpha1.API{
+var collectionToDelete = &hubv1alpha1.APICollection{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "apiToDelete",
+		Name: "collectionToDelete",
 	},
-	Spec: hubv1alpha1.APISpec{
+	Spec: hubv1alpha1.APICollectionSpec{
 		PathPrefix: "oldPrefix",
 	},
 }
 
-func Test_WatcherAPIRun(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{apiToUpdate, apiToDelete}...)
+func Test_WatcherCollectionRun(t *testing.T) {
+	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{collectionToUpdate, collectionToDelete}...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
-	apiInformer := hubInformer.Hub().V1alpha1().APIs().Informer()
+	collectionInformer := hubInformer.Hub().V1alpha1().APICollections().Informer()
 
 	hubInformer.Start(ctx.Done())
-	cache.WaitForCacheSync(ctx.Done(), apiInformer.HasSynced)
+	cache.WaitForCacheSync(ctx.Done(), collectionInformer.HasSynced)
 
 	var callCount int
 
 	client := newPlatformClientMock(t)
-	client.OnGetAPIs().
-		TypedReturns([]API{
+	client.OnGetCollections().
+		TypedReturns([]Collection{
 			{
-				Name:       "apiToCreate",
-				Labels:     map[string]string{"foo": "bar"},
+				Name:       "collectionToCreate",
 				PathPrefix: "prefix",
-				Service: Service{
-					Name: "service",
-					Port: 80,
+				APISelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "value"},
 				},
 				Version: "1",
 			},
 			{
-				Name:       "apiToUpdate",
-				Labels:     map[string]string{"foo": "bar"},
+				Name:       "collectionToUpdate",
 				PathPrefix: "prefixUpdate",
-				Service: Service{
-					Name: "serviceUpdate",
-					Port: 80,
+				APISelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"key": "newValue"},
 				},
 				Version: "2",
 			},
@@ -94,33 +90,25 @@ func Test_WatcherAPIRun(t *testing.T) {
 			}
 		})
 
-	w := NewWatcherAPI(client, clientSetHub, hubInformer, time.Millisecond)
+	w := NewWatcherCollection(client, clientSetHub, hubInformer, time.Millisecond)
 	go w.Run(ctx)
 
 	<-ctx.Done()
 
-	api, err := clientSetHub.HubV1alpha1().APIs("").Get(ctx, "apiToCreate", metav1.GetOptions{})
+	collection, err := clientSetHub.HubV1alpha1().APICollections().Get(ctx, "collectionToCreate", metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, "prefix", api.Spec.PathPrefix)
-	assert.Equal(t, hubv1alpha1.APIService{
-		Name: "service",
-		Port: hubv1alpha1.APIServiceBackendPort{
-			Number: 80,
-		},
-	}, api.Spec.Service)
-	assert.Equal(t, map[string]string{"foo": "bar"}, api.Labels)
+	assert.Equal(t, "prefix", collection.Spec.PathPrefix)
+	assert.Equal(t, metav1.LabelSelector{
+		MatchLabels: map[string]string{"key": "value"},
+	}, collection.Spec.APISelector)
 
-	api, err = clientSetHub.HubV1alpha1().APIs("").Get(ctx, "apiToUpdate", metav1.GetOptions{})
+	collection, err = clientSetHub.HubV1alpha1().APICollections().Get(ctx, "collectionToUpdate", metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, "prefixUpdate", api.Spec.PathPrefix)
-	assert.Equal(t, hubv1alpha1.APIService{
-		Name: "serviceUpdate",
-		Port: hubv1alpha1.APIServiceBackendPort{
-			Number: 80,
-		},
-	}, api.Spec.Service)
-	assert.Equal(t, map[string]string{"foo": "bar"}, api.Labels)
+	assert.Equal(t, "prefixUpdate", collection.Spec.PathPrefix)
+	assert.Equal(t, metav1.LabelSelector{
+		MatchLabels: map[string]string{"key": "newValue"},
+	}, collection.Spec.APISelector)
 
-	_, err = clientSetHub.HubV1alpha1().APIs("").Get(ctx, "apiToDelete", metav1.GetOptions{})
+	_, err = clientSetHub.HubV1alpha1().APICollections().Get(ctx, "collectionToDelete", metav1.GetOptions{})
 	require.Error(t, err)
 }

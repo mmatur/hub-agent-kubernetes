@@ -75,7 +75,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 			},
 			wantCreateReq: &platform.CreateAPIReq{
 				Name:       "api-name",
-				Namespace:  "",
+				Namespace:  "default",
 				PathPrefix: "prefix",
 				Service: platform.APIService{
 					Name: "svc",
@@ -114,7 +114,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 			},
 			wantCreateReq: &platform.CreateAPIReq{
 				Name:       "api-name",
-				Namespace:  "",
+				Namespace:  "default",
 				PathPrefix: "prefix",
 				Service: platform.APIService{
 					Name: "svc",
@@ -131,7 +131,7 @@ func TestAPI_Review_createOperation(t *testing.T) {
 
 			createdAPI := &api.API{
 				Name:       "api-name",
-				Namespace:  "",
+				Namespace:  "default",
 				PathPrefix: "prefix",
 				Service: api.Service{
 					Name: "svc",

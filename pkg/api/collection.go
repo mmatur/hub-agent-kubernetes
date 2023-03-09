@@ -31,6 +31,7 @@ import (
 // Collection is a collection of APIs exposed within an APIPortal.
 type Collection struct {
 	Name        string               `json:"name"`
+	Labels      map[string]string    `json:"labels,omitempty"`
 	PathPrefix  string               `json:"pathPrefix,omitempty"`
 	APISelector metav1.LabelSelector `json:"apiSelector"`
 
@@ -48,7 +49,8 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 			Kind:       "APICollection",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: c.Name,
+			Name:   c.Name,
+			Labels: c.Labels,
 		},
 		Spec: hubv1alpha1.APICollectionSpec{
 			PathPrefix:  c.PathPrefix,
@@ -60,7 +62,7 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 		},
 	}
 
-	collectionHash, err := hashCollection(collection)
+	collectionHash, err := HashCollection(collection)
 	if err != nil {
 		return nil, fmt.Errorf("compute APICollection hash: %w", err)
 	}
@@ -73,12 +75,15 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 type collectionHash struct {
 	PathPrefix  string               `json:"pathPrefix,omitempty"`
 	APISelector metav1.LabelSelector `json:"apiSelector"`
+	Labels      sortedMap[string]    `json:"labels,omitempty"`
 }
 
-func hashCollection(c *hubv1alpha1.APICollection) (string, error) {
+// HashCollection generates the hash of the APICollection.
+func HashCollection(c *hubv1alpha1.APICollection) (string, error) {
 	ch := collectionHash{
 		PathPrefix:  c.Spec.PathPrefix,
 		APISelector: c.Spec.APISelector,
+		Labels:      newSortedMap(c.Labels),
 	}
 
 	b, err := json.Marshal(ch)

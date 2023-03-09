@@ -43,6 +43,7 @@ type PlatformClient interface {
 	GetCertificateByDomains(ctx context.Context, domains []string) (edgeingress.Certificate, error)
 	GetGateways(ctx context.Context) ([]Gateway, error)
 	GetAPIs(ctx context.Context) ([]API, error)
+	GetCollections(ctx context.Context) ([]Collection, error)
 }
 
 // WatcherPortalConfig holds the portal watcher configuration.

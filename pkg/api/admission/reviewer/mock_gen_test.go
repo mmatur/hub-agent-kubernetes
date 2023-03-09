@@ -12,349 +12,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
 
-// apiServiceMock mock of apiService.
-type apiServiceMock struct{ mock.Mock }
-
-// newAPIServiceMock creates a new apiServiceMock.
-func newAPIServiceMock(tb testing.TB) *apiServiceMock {
-	tb.Helper()
-
-	m := &apiServiceMock{}
-	m.Mock.Test(tb)
-
-	tb.Cleanup(func() { m.AssertExpectations(tb) })
-
-	return m
-}
-
-func (_m *apiServiceMock) CreateAPI(_ context.Context, req *platform.CreateAPIReq) (*api.API, error) {
-	_ret := _m.Called(req)
-
-	if _rf, ok := _ret.Get(0).(func(*platform.CreateAPIReq) (*api.API, error)); ok {
-		return _rf(req)
-	}
-
-	_ra0, _ := _ret.Get(0).(*api.API)
-	_rb1 := _ret.Error(1)
-
-	return _ra0, _rb1
-}
-
-func (_m *apiServiceMock) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
-	return &apiServiceCreateAPICall{Call: _m.Mock.On("CreateAPI", req), Parent: _m}
-}
-
-func (_m *apiServiceMock) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
-	return &apiServiceCreateAPICall{Call: _m.Mock.On("CreateAPI", req), Parent: _m}
-}
-
-type apiServiceCreateAPICall struct {
-	*mock.Call
-	Parent *apiServiceMock
-}
-
-func (_c *apiServiceCreateAPICall) Panic(msg string) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) Once() *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) Twice() *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) Times(i int) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) WaitUntil(w <-chan time.Time) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) After(d time.Duration) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) Run(fn func(args mock.Arguments)) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) Maybe() *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) TypedReturns(a *api.API, b error) *apiServiceCreateAPICall {
-	_c.Call = _c.Return(a, b)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) ReturnsFn(fn func(*platform.CreateAPIReq) (*api.API, error)) *apiServiceCreateAPICall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) TypedRun(fn func(*platform.CreateAPIReq)) *apiServiceCreateAPICall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_req, _ := args.Get(0).(*platform.CreateAPIReq)
-		fn(_req)
-	})
-	return _c
-}
-
-func (_c *apiServiceCreateAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPI(req)
-}
-
-func (_c *apiServiceCreateAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceCreateAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
-}
-
-func (_c *apiServiceCreateAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPIRaw(req)
-}
-
-func (_c *apiServiceCreateAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceCreateAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
-}
-
-func (_m *apiServiceMock) DeleteAPI(_ context.Context, namespace string, name string, lastKnownVersion string) error {
-	_ret := _m.Called(namespace, name, lastKnownVersion)
-
-	if _rf, ok := _ret.Get(0).(func(string, string, string) error); ok {
-		return _rf(namespace, name, lastKnownVersion)
-	}
-
-	_ra0 := _ret.Error(0)
-
-	return _ra0
-}
-
-func (_m *apiServiceMock) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
-	return &apiServiceDeleteAPICall{Call: _m.Mock.On("DeleteAPI", namespace, name, lastKnownVersion), Parent: _m}
-}
-
-func (_m *apiServiceMock) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
-	return &apiServiceDeleteAPICall{Call: _m.Mock.On("DeleteAPI", namespace, name, lastKnownVersion), Parent: _m}
-}
-
-type apiServiceDeleteAPICall struct {
-	*mock.Call
-	Parent *apiServiceMock
-}
-
-func (_c *apiServiceDeleteAPICall) Panic(msg string) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) Once() *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) Twice() *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) Times(i int) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) WaitUntil(w <-chan time.Time) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) After(d time.Duration) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) Run(fn func(args mock.Arguments)) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) Maybe() *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) TypedReturns(a error) *apiServiceDeleteAPICall {
-	_c.Call = _c.Return(a)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) ReturnsFn(fn func(string, string, string) error) *apiServiceDeleteAPICall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) TypedRun(fn func(string, string, string)) *apiServiceDeleteAPICall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_namespace := args.String(0)
-		_name := args.String(1)
-		_lastKnownVersion := args.String(2)
-		fn(_namespace, _name, _lastKnownVersion)
-	})
-	return _c
-}
-
-func (_c *apiServiceDeleteAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPI(req)
-}
-
-func (_c *apiServiceDeleteAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceDeleteAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
-}
-
-func (_c *apiServiceDeleteAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPIRaw(req)
-}
-
-func (_c *apiServiceDeleteAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceDeleteAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
-}
-
-func (_m *apiServiceMock) UpdateAPI(_ context.Context, namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) (*api.API, error) {
-	_ret := _m.Called(namespace, name, lastKnownVersion, req)
-
-	if _rf, ok := _ret.Get(0).(func(string, string, string, *platform.UpdateAPIReq) (*api.API, error)); ok {
-		return _rf(namespace, name, lastKnownVersion, req)
-	}
-
-	_ra0, _ := _ret.Get(0).(*api.API)
-	_rb1 := _ret.Error(1)
-
-	return _ra0, _rb1
-}
-
-func (_m *apiServiceMock) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
-	return &apiServiceUpdateAPICall{Call: _m.Mock.On("UpdateAPI", namespace, name, lastKnownVersion, req), Parent: _m}
-}
-
-func (_m *apiServiceMock) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
-	return &apiServiceUpdateAPICall{Call: _m.Mock.On("UpdateAPI", namespace, name, lastKnownVersion, req), Parent: _m}
-}
-
-type apiServiceUpdateAPICall struct {
-	*mock.Call
-	Parent *apiServiceMock
-}
-
-func (_c *apiServiceUpdateAPICall) Panic(msg string) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Panic(msg)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) Once() *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Once()
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) Twice() *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Twice()
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) Times(i int) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Times(i)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) WaitUntil(w <-chan time.Time) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.WaitUntil(w)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) After(d time.Duration) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.After(d)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) Run(fn func(args mock.Arguments)) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Run(fn)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) Maybe() *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Maybe()
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) TypedReturns(a *api.API, b error) *apiServiceUpdateAPICall {
-	_c.Call = _c.Return(a, b)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) ReturnsFn(fn func(string, string, string, *platform.UpdateAPIReq) (*api.API, error)) *apiServiceUpdateAPICall {
-	_c.Call = _c.Return(fn)
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) TypedRun(fn func(string, string, string, *platform.UpdateAPIReq)) *apiServiceUpdateAPICall {
-	_c.Call = _c.Call.Run(func(args mock.Arguments) {
-		_namespace := args.String(0)
-		_name := args.String(1)
-		_lastKnownVersion := args.String(2)
-		_req, _ := args.Get(3).(*platform.UpdateAPIReq)
-		fn(_namespace, _name, _lastKnownVersion, _req)
-	})
-	return _c
-}
-
-func (_c *apiServiceUpdateAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPI(req)
-}
-
-func (_c *apiServiceUpdateAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceUpdateAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
-}
-
-func (_c *apiServiceUpdateAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
-	return _c.Parent.OnCreateAPIRaw(req)
-}
-
-func (_c *apiServiceUpdateAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
-	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
-}
-
-func (_c *apiServiceUpdateAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
-	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
-}
-
 // portalServiceMock mock of portalService.
 type portalServiceMock struct{ mock.Mock }
 
@@ -1035,4 +692,688 @@ func (_c *gatewayServiceUpdateGatewayCall) OnDeleteGatewayRaw(name interface{}, 
 
 func (_c *gatewayServiceUpdateGatewayCall) OnUpdateGatewayRaw(name interface{}, lastKnownVersion interface{}, updateReq interface{}) *gatewayServiceUpdateGatewayCall {
 	return _c.Parent.OnUpdateGatewayRaw(name, lastKnownVersion, updateReq)
+}
+
+// apiServiceMock mock of apiService.
+type apiServiceMock struct{ mock.Mock }
+
+// newAPIServiceMock creates a new apiServiceMock.
+func newAPIServiceMock(tb testing.TB) *apiServiceMock {
+	tb.Helper()
+
+	m := &apiServiceMock{}
+	m.Mock.Test(tb)
+
+	tb.Cleanup(func() { m.AssertExpectations(tb) })
+
+	return m
+}
+
+func (_m *apiServiceMock) CreateAPI(_ context.Context, req *platform.CreateAPIReq) (*api.API, error) {
+	_ret := _m.Called(req)
+
+	if _rf, ok := _ret.Get(0).(func(*platform.CreateAPIReq) (*api.API, error)); ok {
+		return _rf(req)
+	}
+
+	_ra0, _ := _ret.Get(0).(*api.API)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *apiServiceMock) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
+	return &apiServiceCreateAPICall{Call: _m.Mock.On("CreateAPI", req), Parent: _m}
+}
+
+func (_m *apiServiceMock) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
+	return &apiServiceCreateAPICall{Call: _m.Mock.On("CreateAPI", req), Parent: _m}
+}
+
+type apiServiceCreateAPICall struct {
+	*mock.Call
+	Parent *apiServiceMock
+}
+
+func (_c *apiServiceCreateAPICall) Panic(msg string) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) Once() *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) Twice() *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) Times(i int) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) WaitUntil(w <-chan time.Time) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) After(d time.Duration) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) Run(fn func(args mock.Arguments)) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) Maybe() *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) TypedReturns(a *api.API, b error) *apiServiceCreateAPICall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) ReturnsFn(fn func(*platform.CreateAPIReq) (*api.API, error)) *apiServiceCreateAPICall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) TypedRun(fn func(*platform.CreateAPIReq)) *apiServiceCreateAPICall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_req, _ := args.Get(0).(*platform.CreateAPIReq)
+		fn(_req)
+	})
+	return _c
+}
+
+func (_c *apiServiceCreateAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPI(req)
+}
+
+func (_c *apiServiceCreateAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceCreateAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
+}
+
+func (_c *apiServiceCreateAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPIRaw(req)
+}
+
+func (_c *apiServiceCreateAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceCreateAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
+}
+
+func (_m *apiServiceMock) DeleteAPI(_ context.Context, namespace string, name string, lastKnownVersion string) error {
+	_ret := _m.Called(namespace, name, lastKnownVersion)
+
+	if _rf, ok := _ret.Get(0).(func(string, string, string) error); ok {
+		return _rf(namespace, name, lastKnownVersion)
+	}
+
+	_ra0 := _ret.Error(0)
+
+	return _ra0
+}
+
+func (_m *apiServiceMock) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
+	return &apiServiceDeleteAPICall{Call: _m.Mock.On("DeleteAPI", namespace, name, lastKnownVersion), Parent: _m}
+}
+
+func (_m *apiServiceMock) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
+	return &apiServiceDeleteAPICall{Call: _m.Mock.On("DeleteAPI", namespace, name, lastKnownVersion), Parent: _m}
+}
+
+type apiServiceDeleteAPICall struct {
+	*mock.Call
+	Parent *apiServiceMock
+}
+
+func (_c *apiServiceDeleteAPICall) Panic(msg string) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) Once() *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) Twice() *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) Times(i int) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) WaitUntil(w <-chan time.Time) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) After(d time.Duration) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) Run(fn func(args mock.Arguments)) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) Maybe() *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) TypedReturns(a error) *apiServiceDeleteAPICall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) ReturnsFn(fn func(string, string, string) error) *apiServiceDeleteAPICall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) TypedRun(fn func(string, string, string)) *apiServiceDeleteAPICall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_namespace := args.String(0)
+		_name := args.String(1)
+		_lastKnownVersion := args.String(2)
+		fn(_namespace, _name, _lastKnownVersion)
+	})
+	return _c
+}
+
+func (_c *apiServiceDeleteAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPI(req)
+}
+
+func (_c *apiServiceDeleteAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceDeleteAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
+}
+
+func (_c *apiServiceDeleteAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPIRaw(req)
+}
+
+func (_c *apiServiceDeleteAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceDeleteAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
+}
+
+func (_m *apiServiceMock) UpdateAPI(_ context.Context, namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) (*api.API, error) {
+	_ret := _m.Called(namespace, name, lastKnownVersion, req)
+
+	if _rf, ok := _ret.Get(0).(func(string, string, string, *platform.UpdateAPIReq) (*api.API, error)); ok {
+		return _rf(namespace, name, lastKnownVersion, req)
+	}
+
+	_ra0, _ := _ret.Get(0).(*api.API)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *apiServiceMock) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
+	return &apiServiceUpdateAPICall{Call: _m.Mock.On("UpdateAPI", namespace, name, lastKnownVersion, req), Parent: _m}
+}
+
+func (_m *apiServiceMock) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
+	return &apiServiceUpdateAPICall{Call: _m.Mock.On("UpdateAPI", namespace, name, lastKnownVersion, req), Parent: _m}
+}
+
+type apiServiceUpdateAPICall struct {
+	*mock.Call
+	Parent *apiServiceMock
+}
+
+func (_c *apiServiceUpdateAPICall) Panic(msg string) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) Once() *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) Twice() *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) Times(i int) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) WaitUntil(w <-chan time.Time) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) After(d time.Duration) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) Run(fn func(args mock.Arguments)) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) Maybe() *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) TypedReturns(a *api.API, b error) *apiServiceUpdateAPICall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) ReturnsFn(fn func(string, string, string, *platform.UpdateAPIReq) (*api.API, error)) *apiServiceUpdateAPICall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) TypedRun(fn func(string, string, string, *platform.UpdateAPIReq)) *apiServiceUpdateAPICall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_namespace := args.String(0)
+		_name := args.String(1)
+		_lastKnownVersion := args.String(2)
+		_req, _ := args.Get(3).(*platform.UpdateAPIReq)
+		fn(_namespace, _name, _lastKnownVersion, _req)
+	})
+	return _c
+}
+
+func (_c *apiServiceUpdateAPICall) OnCreateAPI(req *platform.CreateAPIReq) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPI(req)
+}
+
+func (_c *apiServiceUpdateAPICall) OnDeleteAPI(namespace string, name string, lastKnownVersion string) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPI(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceUpdateAPICall) OnUpdateAPI(namespace string, name string, lastKnownVersion string, req *platform.UpdateAPIReq) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPI(namespace, name, lastKnownVersion, req)
+}
+
+func (_c *apiServiceUpdateAPICall) OnCreateAPIRaw(req interface{}) *apiServiceCreateAPICall {
+	return _c.Parent.OnCreateAPIRaw(req)
+}
+
+func (_c *apiServiceUpdateAPICall) OnDeleteAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}) *apiServiceDeleteAPICall {
+	return _c.Parent.OnDeleteAPIRaw(namespace, name, lastKnownVersion)
+}
+
+func (_c *apiServiceUpdateAPICall) OnUpdateAPIRaw(namespace interface{}, name interface{}, lastKnownVersion interface{}, req interface{}) *apiServiceUpdateAPICall {
+	return _c.Parent.OnUpdateAPIRaw(namespace, name, lastKnownVersion, req)
+}
+
+// collectionServiceMock mock of collectionService.
+type collectionServiceMock struct{ mock.Mock }
+
+// newCollectionServiceMock creates a new collectionServiceMock.
+func newCollectionServiceMock(tb testing.TB) *collectionServiceMock {
+	tb.Helper()
+
+	m := &collectionServiceMock{}
+	m.Mock.Test(tb)
+
+	tb.Cleanup(func() { m.AssertExpectations(tb) })
+
+	return m
+}
+
+func (_m *collectionServiceMock) CreateCollection(_ context.Context, req *platform.CreateCollectionReq) (*api.Collection, error) {
+	_ret := _m.Called(req)
+
+	if _rf, ok := _ret.Get(0).(func(*platform.CreateCollectionReq) (*api.Collection, error)); ok {
+		return _rf(req)
+	}
+
+	_ra0, _ := _ret.Get(0).(*api.Collection)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *collectionServiceMock) OnCreateCollection(req *platform.CreateCollectionReq) *collectionServiceCreateCollectionCall {
+	return &collectionServiceCreateCollectionCall{Call: _m.Mock.On("CreateCollection", req), Parent: _m}
+}
+
+func (_m *collectionServiceMock) OnCreateCollectionRaw(req interface{}) *collectionServiceCreateCollectionCall {
+	return &collectionServiceCreateCollectionCall{Call: _m.Mock.On("CreateCollection", req), Parent: _m}
+}
+
+type collectionServiceCreateCollectionCall struct {
+	*mock.Call
+	Parent *collectionServiceMock
+}
+
+func (_c *collectionServiceCreateCollectionCall) Panic(msg string) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) Once() *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) Twice() *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) Times(i int) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) WaitUntil(w <-chan time.Time) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) After(d time.Duration) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) Run(fn func(args mock.Arguments)) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) Maybe() *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) TypedReturns(a *api.Collection, b error) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) ReturnsFn(fn func(*platform.CreateCollectionReq) (*api.Collection, error)) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) TypedRun(fn func(*platform.CreateCollectionReq)) *collectionServiceCreateCollectionCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_req, _ := args.Get(0).(*platform.CreateCollectionReq)
+		fn(_req)
+	})
+	return _c
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnCreateCollection(req *platform.CreateCollectionReq) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollection(req)
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnDeleteCollection(name string, lastKnownVersion string) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollection(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnUpdateCollection(name string, lastKnownVersion string, req *platform.UpdateCollectionReq) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollection(name, lastKnownVersion, req)
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnCreateCollectionRaw(req interface{}) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollectionRaw(req)
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnDeleteCollectionRaw(name interface{}, lastKnownVersion interface{}) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollectionRaw(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceCreateCollectionCall) OnUpdateCollectionRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollectionRaw(name, lastKnownVersion, req)
+}
+
+func (_m *collectionServiceMock) DeleteCollection(_ context.Context, name string, lastKnownVersion string) error {
+	_ret := _m.Called(name, lastKnownVersion)
+
+	if _rf, ok := _ret.Get(0).(func(string, string) error); ok {
+		return _rf(name, lastKnownVersion)
+	}
+
+	_ra0 := _ret.Error(0)
+
+	return _ra0
+}
+
+func (_m *collectionServiceMock) OnDeleteCollection(name string, lastKnownVersion string) *collectionServiceDeleteCollectionCall {
+	return &collectionServiceDeleteCollectionCall{Call: _m.Mock.On("DeleteCollection", name, lastKnownVersion), Parent: _m}
+}
+
+func (_m *collectionServiceMock) OnDeleteCollectionRaw(name interface{}, lastKnownVersion interface{}) *collectionServiceDeleteCollectionCall {
+	return &collectionServiceDeleteCollectionCall{Call: _m.Mock.On("DeleteCollection", name, lastKnownVersion), Parent: _m}
+}
+
+type collectionServiceDeleteCollectionCall struct {
+	*mock.Call
+	Parent *collectionServiceMock
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Panic(msg string) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Once() *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Twice() *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Times(i int) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) WaitUntil(w <-chan time.Time) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) After(d time.Duration) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Run(fn func(args mock.Arguments)) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) Maybe() *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) TypedReturns(a error) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) ReturnsFn(fn func(string, string) error) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) TypedRun(fn func(string, string)) *collectionServiceDeleteCollectionCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_name := args.String(0)
+		_lastKnownVersion := args.String(1)
+		fn(_name, _lastKnownVersion)
+	})
+	return _c
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnCreateCollection(req *platform.CreateCollectionReq) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollection(req)
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnDeleteCollection(name string, lastKnownVersion string) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollection(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnUpdateCollection(name string, lastKnownVersion string, req *platform.UpdateCollectionReq) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollection(name, lastKnownVersion, req)
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnCreateCollectionRaw(req interface{}) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollectionRaw(req)
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnDeleteCollectionRaw(name interface{}, lastKnownVersion interface{}) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollectionRaw(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceDeleteCollectionCall) OnUpdateCollectionRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollectionRaw(name, lastKnownVersion, req)
+}
+
+func (_m *collectionServiceMock) UpdateCollection(_ context.Context, name string, lastKnownVersion string, req *platform.UpdateCollectionReq) (*api.Collection, error) {
+	_ret := _m.Called(name, lastKnownVersion, req)
+
+	if _rf, ok := _ret.Get(0).(func(string, string, *platform.UpdateCollectionReq) (*api.Collection, error)); ok {
+		return _rf(name, lastKnownVersion, req)
+	}
+
+	_ra0, _ := _ret.Get(0).(*api.Collection)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *collectionServiceMock) OnUpdateCollection(name string, lastKnownVersion string, req *platform.UpdateCollectionReq) *collectionServiceUpdateCollectionCall {
+	return &collectionServiceUpdateCollectionCall{Call: _m.Mock.On("UpdateCollection", name, lastKnownVersion, req), Parent: _m}
+}
+
+func (_m *collectionServiceMock) OnUpdateCollectionRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *collectionServiceUpdateCollectionCall {
+	return &collectionServiceUpdateCollectionCall{Call: _m.Mock.On("UpdateCollection", name, lastKnownVersion, req), Parent: _m}
+}
+
+type collectionServiceUpdateCollectionCall struct {
+	*mock.Call
+	Parent *collectionServiceMock
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Panic(msg string) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Once() *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Twice() *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Times(i int) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) WaitUntil(w <-chan time.Time) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) After(d time.Duration) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Run(fn func(args mock.Arguments)) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) Maybe() *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) TypedReturns(a *api.Collection, b error) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) ReturnsFn(fn func(string, string, *platform.UpdateCollectionReq) (*api.Collection, error)) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) TypedRun(fn func(string, string, *platform.UpdateCollectionReq)) *collectionServiceUpdateCollectionCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_name := args.String(0)
+		_lastKnownVersion := args.String(1)
+		_req, _ := args.Get(2).(*platform.UpdateCollectionReq)
+		fn(_name, _lastKnownVersion, _req)
+	})
+	return _c
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnCreateCollection(req *platform.CreateCollectionReq) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollection(req)
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnDeleteCollection(name string, lastKnownVersion string) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollection(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnUpdateCollection(name string, lastKnownVersion string, req *platform.UpdateCollectionReq) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollection(name, lastKnownVersion, req)
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnCreateCollectionRaw(req interface{}) *collectionServiceCreateCollectionCall {
+	return _c.Parent.OnCreateCollectionRaw(req)
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnDeleteCollectionRaw(name interface{}, lastKnownVersion interface{}) *collectionServiceDeleteCollectionCall {
+	return _c.Parent.OnDeleteCollectionRaw(name, lastKnownVersion)
+}
+
+func (_c *collectionServiceUpdateCollectionCall) OnUpdateCollectionRaw(name interface{}, lastKnownVersion interface{}, req interface{}) *collectionServiceUpdateCollectionCall {
+	return _c.Parent.OnUpdateCollectionRaw(name, lastKnownVersion, req)
 }

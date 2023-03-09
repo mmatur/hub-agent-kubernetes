@@ -49,7 +49,7 @@ func NewPortal(client portalService) *Portal {
 
 // Review reviews the admission request.
 func (p *Portal) Review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, error) {
-	logger := log.Ctx(ctx)
+	logger := log.Ctx(ctx).With().Str("reviewer", "APIPortal").Logger()
 
 	logger.Info().Msg("Reviewing APIPortal resource")
 	ctx = logger.WithContext(ctx)

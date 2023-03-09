@@ -117,6 +117,14 @@ func (_c *platformClientGetAPIsCall) OnGetCertificateByDomains(domains []string)
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
 
+func (_c *platformClientGetAPIsCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetGateways() *platformClientGetGatewaysCall {
+	return _c.Parent.OnGetGateways()
+}
+
 func (_c *platformClientGetAPIsCall) OnGetPortals() *platformClientGetPortalsCall {
 	return _c.Parent.OnGetPortals()
 }
@@ -131,6 +139,14 @@ func (_c *platformClientGetAPIsCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
 
 func (_c *platformClientGetAPIsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetAPIsCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
+}
+
+func (_c *platformClientGetAPIsCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {
+	return _c.Parent.OnGetGatewaysRaw()
 }
 
 func (_c *platformClientGetAPIsCall) OnGetPortalsRaw() *platformClientGetPortalsCall {
@@ -233,6 +249,10 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomains(d
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
 
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
+}
+
 func (_c *platformClientGetCertificateByDomainsCall) OnGetGateways() *platformClientGetGatewaysCall {
 	return _c.Parent.OnGetGateways()
 }
@@ -253,6 +273,10 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetCertificateByDomainsRa
 	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
 }
 
+func (_c *platformClientGetCertificateByDomainsCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
+}
+
 func (_c *platformClientGetCertificateByDomainsCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {
 	return _c.Parent.OnGetGatewaysRaw()
 }
@@ -262,6 +286,137 @@ func (_c *platformClientGetCertificateByDomainsCall) OnGetPortalsRaw() *platform
 }
 
 func (_c *platformClientGetCertificateByDomainsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificateRaw()
+}
+
+func (_m *platformClientMock) GetCollections(_ context.Context) ([]Collection, error) {
+	_ret := _m.Called()
+
+	if _rf, ok := _ret.Get(0).(func() ([]Collection, error)); ok {
+		return _rf()
+	}
+
+	_ra0, _ := _ret.Get(0).([]Collection)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnGetCollections() *platformClientGetCollectionsCall {
+	return &platformClientGetCollectionsCall{Call: _m.Mock.On("GetCollections"), Parent: _m}
+}
+
+func (_m *platformClientMock) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return &platformClientGetCollectionsCall{Call: _m.Mock.On("GetCollections"), Parent: _m}
+}
+
+type platformClientGetCollectionsCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientGetCollectionsCall) Panic(msg string) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) Once() *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) Twice() *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) Times(i int) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) WaitUntil(w <-chan time.Time) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) After(d time.Duration) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) Run(fn func(args mock.Arguments)) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) Maybe() *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) TypedReturns(a []Collection, b error) *platformClientGetCollectionsCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) ReturnsFn(fn func() ([]Collection, error)) *platformClientGetCollectionsCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) TypedRun(fn func()) *platformClientGetCollectionsCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		fn()
+	})
+	return _c
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetGateways() *platformClientGetGatewaysCall {
+	return _c.Parent.OnGetGateways()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetPortals() *platformClientGetPortalsCall {
+	return _c.Parent.OnGetPortals()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetWildcardCertificate() *platformClientGetWildcardCertificateCall {
+	return _c.Parent.OnGetWildcardCertificate()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
+	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {
+	return _c.Parent.OnGetGatewaysRaw()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetPortalsRaw() *platformClientGetPortalsCall {
+	return _c.Parent.OnGetPortalsRaw()
+}
+
+func (_c *platformClientGetCollectionsCall) OnGetWildcardCertificateRaw() *platformClientGetWildcardCertificateCall {
 	return _c.Parent.OnGetWildcardCertificateRaw()
 }
 
@@ -348,8 +503,16 @@ func (_c *platformClientGetGatewaysCall) TypedRun(fn func()) *platformClientGetG
 	return _c
 }
 
+func (_c *platformClientGetGatewaysCall) OnGetAPIs() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIs()
+}
+
 func (_c *platformClientGetGatewaysCall) OnGetCertificateByDomains(domains []string) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomains(domains)
+}
+
+func (_c *platformClientGetGatewaysCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
 }
 
 func (_c *platformClientGetGatewaysCall) OnGetGateways() *platformClientGetGatewaysCall {
@@ -364,8 +527,16 @@ func (_c *platformClientGetGatewaysCall) OnGetWildcardCertificate() *platformCli
 	return _c.Parent.OnGetWildcardCertificate()
 }
 
+func (_c *platformClientGetGatewaysCall) OnGetAPIsRaw() *platformClientGetAPIsCall {
+	return _c.Parent.OnGetAPIsRaw()
+}
+
 func (_c *platformClientGetGatewaysCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetGatewaysCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
 }
 
 func (_c *platformClientGetGatewaysCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {
@@ -471,6 +642,10 @@ func (_c *platformClientGetPortalsCall) OnGetCertificateByDomains(domains []stri
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
 
+func (_c *platformClientGetPortalsCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
+}
+
 func (_c *platformClientGetPortalsCall) OnGetGateways() *platformClientGetGatewaysCall {
 	return _c.Parent.OnGetGateways()
 }
@@ -489,6 +664,10 @@ func (_c *platformClientGetPortalsCall) OnGetAPIsRaw() *platformClientGetAPIsCal
 
 func (_c *platformClientGetPortalsCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetPortalsCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
 }
 
 func (_c *platformClientGetPortalsCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {
@@ -594,6 +773,10 @@ func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomains(do
 	return _c.Parent.OnGetCertificateByDomains(domains)
 }
 
+func (_c *platformClientGetWildcardCertificateCall) OnGetCollections() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollections()
+}
+
 func (_c *platformClientGetWildcardCertificateCall) OnGetGateways() *platformClientGetGatewaysCall {
 	return _c.Parent.OnGetGateways()
 }
@@ -612,6 +795,10 @@ func (_c *platformClientGetWildcardCertificateCall) OnGetAPIsRaw() *platformClie
 
 func (_c *platformClientGetWildcardCertificateCall) OnGetCertificateByDomainsRaw(domains interface{}) *platformClientGetCertificateByDomainsCall {
 	return _c.Parent.OnGetCertificateByDomainsRaw(domains)
+}
+
+func (_c *platformClientGetWildcardCertificateCall) OnGetCollectionsRaw() *platformClientGetCollectionsCall {
+	return _c.Parent.OnGetCollectionsRaw()
 }
 
 func (_c *platformClientGetWildcardCertificateCall) OnGetGatewaysRaw() *platformClientGetGatewaysCall {

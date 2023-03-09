@@ -201,9 +201,10 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	router := chi.NewRouter()
 	router.Handle("/edge-ingress", edgeIngressAdmission)
 	if apiAdmission != nil {
-		router.Handle("/api", apiAdmission)
-		router.Handle("/api-gateway", apiAdmission)
 		router.Handle("/api-portal", apiAdmission)
+		router.Handle("/api-gateway", apiAdmission)
+		router.Handle("/api", apiAdmission)
+		router.Handle("/api-collection", apiAdmission)
 	}
 	router.Handle("/ingress", acpAdmission)
 	router.Handle("/acp", webAdmissionACP)
@@ -314,6 +315,9 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 		watcherAPI := api.NewWatcherAPI(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
 		go watcherAPI.Run(ctx)
+
+		watcherCollection := api.NewWatcherCollection(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+		go watcherCollection.Run(ctx)
 	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
@@ -329,9 +333,10 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 
 	if apiAvailable {
 		rev := []apiadmission.Reviewer{
-			apireviewer.NewAPI(platformClient),
 			apireviewer.NewPortal(platformClient),
 			apireviewer.NewGateway(platformClient),
+			apireviewer.NewAPI(platformClient),
+			apireviewer.NewCollection(platformClient),
 		}
 		apiHandler = apiadmission.NewHandler(rev)
 	}

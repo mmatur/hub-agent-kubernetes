@@ -40,6 +40,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/topology/state"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // APIError represents an error returned by the API.
@@ -128,16 +129,16 @@ type CreateAPIReq struct {
 
 	Labels map[string]string `json:"labels,omitempty"`
 
-	PathPrefix string     `json:"pathPrefix" bson:"pathPrefix"`
-	Service    APIService `json:"service" bson:"service"`
+	PathPrefix string     `json:"pathPrefix"`
+	Service    APIService `json:"service"`
 }
 
 // UpdateAPIReq is a request for updating an API.
 type UpdateAPIReq struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
-	PathPrefix string     `json:"pathPrefix" bson:"pathPrefix"`
-	Service    APIService `json:"service" bson:"service"`
+	PathPrefix string     `json:"pathPrefix"`
+	Service    APIService `json:"service"`
 }
 
 // APIService is a service used in API struct.
@@ -153,6 +154,21 @@ type OpenAPISpec struct {
 
 	Path string `json:"path,omitempty"`
 	Port int    `json:"port,omitempty"`
+}
+
+// CreateCollectionReq is the request for creating a collection.
+type CreateCollectionReq struct {
+	Name       string               `json:"name"`
+	Labels     map[string]string    `json:"labels,omitempty"`
+	PathPrefix string               `json:"pathPrefix,omitempty"`
+	Selector   metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+// UpdateCollectionReq is a request for updating a collection.
+type UpdateCollectionReq struct {
+	Labels     map[string]string    `json:"labels,omitempty"`
+	PathPrefix string               `json:"pathPrefix,omitempty"`
+	Selector   metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 // Command defines patch operation to apply on the cluster.
@@ -655,6 +671,104 @@ func (c *Client) DeleteGateway(ctx context.Context, name, lastKnownVersion strin
 	return nil
 }
 
+// CreateAPI creates an API.
+func (c *Client) CreateAPI(ctx context.Context, createReq *CreateAPIReq) (*api.API, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal api request: %w", err)
+	}
+
+	var a api.API
+	if err = c.createResource(ctx, "apis", body, &a); err != nil {
+		return nil, fmt.Errorf("create api: %w", err)
+	}
+
+	return &a, nil
+}
+
+// GetAPIs fetches the APIs available for this agent.
+func (c *Client) GetAPIs(ctx context.Context) ([]api.API, error) {
+	var apis []api.API
+	if err := c.listResource(ctx, "apis", &apis); err != nil {
+		return nil, fmt.Errorf("list apis: %w", err)
+	}
+
+	return apis, nil
+}
+
+// UpdateAPI updates an API.
+func (c *Client) UpdateAPI(ctx context.Context, namespace, name, lastKnownVersion string, updateReq *UpdateAPIReq) (*api.API, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal api request: %w", err)
+	}
+
+	var a api.API
+	if err = c.updateResource(ctx, "apis", name+"@"+namespace, lastKnownVersion, body, &a); err != nil {
+		return nil, fmt.Errorf("update api: %w", err)
+	}
+
+	return &a, nil
+}
+
+// DeleteAPI deletes an API.
+func (c *Client) DeleteAPI(ctx context.Context, namespace, name, lastKnownVersion string) error {
+	if err := c.deleteResource(ctx, "apis", name+"@"+namespace, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete api: %w", err)
+	}
+
+	return nil
+}
+
+// CreateCollection creates a collection.
+func (c *Client) CreateCollection(ctx context.Context, createReq *CreateCollectionReq) (*api.Collection, error) {
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal collection request: %w", err)
+	}
+
+	var collection api.Collection
+	if err = c.createResource(ctx, "collections", body, &collection); err != nil {
+		return nil, fmt.Errorf("create collection: %w", err)
+	}
+
+	return &collection, nil
+}
+
+// GetCollections fetches the collections available for this agent.
+func (c *Client) GetCollections(ctx context.Context) ([]api.Collection, error) {
+	var collections []api.Collection
+	if err := c.listResource(ctx, "collections", &collections); err != nil {
+		return nil, fmt.Errorf("list collections: %w", err)
+	}
+
+	return collections, nil
+}
+
+// UpdateCollection updates a collection.
+func (c *Client) UpdateCollection(ctx context.Context, name, lastKnownVersion string, updateReq *UpdateCollectionReq) (*api.Collection, error) {
+	body, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal collection request: %w", err)
+	}
+
+	var collection api.Collection
+	if err = c.updateResource(ctx, "collections", name, lastKnownVersion, body, &collection); err != nil {
+		return nil, fmt.Errorf("update collection: %w", err)
+	}
+
+	return &collection, nil
+}
+
+// DeleteCollection deletes a collection.
+func (c *Client) DeleteCollection(ctx context.Context, name, lastKnownVersion string) error {
+	if err := c.deleteResource(ctx, "collections", name, lastKnownVersion); err != nil {
+		return fmt.Errorf("delete collection: %w", err)
+	}
+
+	return nil
+}
+
 // GetWildcardCertificate gets a certificate for the workspace.
 func (c *Client) GetWildcardCertificate(ctx context.Context) (edgeingress.Certificate, error) {
 	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "wildcard-certificate"))
@@ -902,55 +1016,6 @@ func (c *Client) SubmitCommandReports(ctx context.Context, reports []CommandExec
 		}
 
 		return apiErr
-	}
-
-	return nil
-}
-
-// CreateAPI creates an API.
-func (c *Client) CreateAPI(ctx context.Context, createReq *CreateAPIReq) (*api.API, error) {
-	body, err := json.Marshal(createReq)
-	if err != nil {
-		return nil, fmt.Errorf("marshal api request: %w", err)
-	}
-
-	var a api.API
-	if err = c.createResource(ctx, "apis", body, &a); err != nil {
-		return nil, fmt.Errorf("create api: %w", err)
-	}
-
-	return &a, nil
-}
-
-// GetAPIs fetches the APIs available for this agent.
-func (c *Client) GetAPIs(ctx context.Context) ([]api.API, error) {
-	var apis []api.API
-	if err := c.listResource(ctx, "apis", &apis); err != nil {
-		return nil, fmt.Errorf("list apis: %w", err)
-	}
-
-	return apis, nil
-}
-
-// UpdateAPI updates an API.
-func (c *Client) UpdateAPI(ctx context.Context, namespace, name, lastKnownVersion string, updateReq *UpdateAPIReq) (*api.API, error) {
-	body, err := json.Marshal(updateReq)
-	if err != nil {
-		return nil, fmt.Errorf("marshal api request: %w", err)
-	}
-
-	var a api.API
-	if err = c.updateResource(ctx, "apis", name+"@"+namespace, lastKnownVersion, body, &a); err != nil {
-		return nil, fmt.Errorf("update api: %w", err)
-	}
-
-	return &a, nil
-}
-
-// DeleteAPI deletes a api.
-func (c *Client) DeleteAPI(ctx context.Context, namespace, name, lastKnownVersion string) error {
-	if err := c.deleteResource(ctx, "apis", name+"@"+namespace, lastKnownVersion); err != nil {
-		return fmt.Errorf("delete api: %w", err)
 	}
 
 	return nil

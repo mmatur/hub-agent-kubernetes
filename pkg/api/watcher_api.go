@@ -40,7 +40,7 @@ type WatcherAPI struct {
 	hubInformer  hubinformer.SharedInformerFactory
 }
 
-// NewWatcherAPI returns a new WatcherPortal API.
+// NewWatcherAPI returns a new WatcherAPI.
 func NewWatcherAPI(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, apiSyncInterval time.Duration) *WatcherAPI {
 	return &WatcherAPI{
 		apiSyncInterval: apiSyncInterval,
@@ -51,7 +51,7 @@ func NewWatcherAPI(client PlatformClient, hubClientSet hubclientset.Interface, h
 	}
 }
 
-// Run runs WatcherPortal.
+// Run runs WatcherAPI.
 func (w *WatcherAPI) Run(ctx context.Context) {
 	t := time.NewTicker(w.apiSyncInterval)
 	defer t.Stop()
@@ -83,23 +83,24 @@ func (w *WatcherAPI) syncAPIs(ctx context.Context) {
 		return
 	}
 
-	clusterAPIsByName := map[string]*hubv1alpha1.API{}
+	clusterAPIsByNameNamespace := map[string]*hubv1alpha1.API{}
 	for _, api := range clusterAPIs {
-		clusterAPIsByName[api.Name] = api
+		clusterAPIsByNameNamespace[api.Name+"@"+api.Namespace] = api
 	}
 
 	for _, api := range platformAPIs {
 		platformAPI := api
 
-		clusterAPI, found := clusterAPIsByName[platformAPI.Name]
+		clusterAPI, found := clusterAPIsByNameNamespace[platformAPI.Name+"@"+platformAPI.Namespace]
 
 		// APIs that will remain in the map will be deleted.
-		delete(clusterAPIsByName, platformAPI.Name)
+		delete(clusterAPIsByNameNamespace, platformAPI.Name+"@"+platformAPI.Namespace)
 
 		if !found {
 			if err = w.createAPI(ctx, &platformAPI); err != nil {
 				log.Error().Err(err).
 					Str("name", platformAPI.Name).
+					Str("namespace", platformAPI.Namespace).
 					Msg("Unable to create API")
 			}
 			continue
@@ -108,11 +109,12 @@ func (w *WatcherAPI) syncAPIs(ctx context.Context) {
 		if err = w.updateAPI(ctx, clusterAPI, &platformAPI); err != nil {
 			log.Error().Err(err).
 				Str("name", platformAPI.Name).
+				Str("namespace", platformAPI.Namespace).
 				Msg("Unable to update API")
 		}
 	}
 
-	w.cleanPortals(ctx, clusterAPIsByName)
+	w.cleanAPIs(ctx, clusterAPIsByNameNamespace)
 }
 
 func (w *WatcherAPI) createAPI(ctx context.Context, api *API) error {
@@ -128,6 +130,7 @@ func (w *WatcherAPI) createAPI(ctx context.Context, api *API) error {
 
 	log.Debug().
 		Str("name", obj.Name).
+		Str("namespace", obj.Namespace).
 		Msg("API created")
 
 	return nil
@@ -150,13 +153,14 @@ func (w *WatcherAPI) updateAPI(ctx context.Context, oldAPI *hubv1alpha1.API, new
 
 		log.Debug().
 			Str("name", obj.Name).
+			Str("namespace", obj.Namespace).
 			Msg("API updated")
 	}
 
 	return nil
 }
 
-func (w *WatcherAPI) cleanPortals(ctx context.Context, apis map[string]*hubv1alpha1.API) {
+func (w *WatcherAPI) cleanAPIs(ctx context.Context, apis map[string]*hubv1alpha1.API) {
 	for _, api := range apis {
 		// Foreground propagation allow us to delete all resources owned by the API.
 		policy := metav1.DeletePropagationForeground
@@ -173,6 +177,7 @@ func (w *WatcherAPI) cleanPortals(ctx context.Context, apis map[string]*hubv1alp
 
 		log.Debug().
 			Str("name", api.Name).
+			Str("namespace", api.Namespace).
 			Msg("API deleted")
 	}
 }

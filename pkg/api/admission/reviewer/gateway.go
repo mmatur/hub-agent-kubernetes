@@ -49,7 +49,7 @@ func NewGateway(client gatewayService) *Gateway {
 
 // Review reviews the admission request.
 func (g *Gateway) Review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, error) {
-	logger := log.Ctx(ctx)
+	logger := log.Ctx(ctx).With().Str("reviewer", "APIGateway").Logger()
 
 	logger.Info().Msg("Reviewing APIGateway resource")
 	ctx = logger.WithContext(ctx)

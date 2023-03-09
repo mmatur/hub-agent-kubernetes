@@ -49,7 +49,7 @@ func NewAPI(client apiService) *API {
 
 // Review reviews the admission request.
 func (a *API) Review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, error) {
-	logger := log.Ctx(ctx)
+	logger := log.Ctx(ctx).With().Str("reviewer", "API").Logger()
 
 	logger.Info().Msg("Reviewing API resource")
 	ctx = logger.WithContext(ctx)
@@ -94,6 +94,10 @@ func (a *API) Review(ctx context.Context, req *admv1.AdmissionRequest) ([]byte, 
 func (a *API) reviewCreateOperation(ctx context.Context, apiCRD *hubv1alpha1.API) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Creating API resource")
 
+	if apiCRD.Namespace == "" {
+		apiCRD.Namespace = "default"
+	}
+
 	createReq := &platform.CreateAPIReq{
 		Name:       apiCRD.Name,
 		Namespace:  apiCRD.Namespace,
@@ -120,6 +124,10 @@ func (a *API) reviewCreateOperation(ctx context.Context, apiCRD *hubv1alpha1.API
 
 func (a *API) reviewUpdateOperation(ctx context.Context, oldAPI, newAPI *hubv1alpha1.API) ([]byte, error) {
 	log.Ctx(ctx).Info().Msg("Updating API resource")
+
+	if newAPI.Namespace == "" {
+		newAPI.Namespace = "default"
+	}
 
 	updateReq := &platform.UpdateAPIReq{
 		Labels:     newAPI.Labels,
