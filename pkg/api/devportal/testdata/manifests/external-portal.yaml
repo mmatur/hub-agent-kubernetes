@@ -1,0 +1,128 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIPortal
+metadata:
+  name: external-portal
+spec:
+  description: A portal for external partners
+  apiGateway: external-gateway
+  customDomains:
+    - external.example.com
+    - www.external.example.com
+status:
+  hubDomain: majestic-beaver-123.hub-traefik.io
+  customDomains:
+    - external.example.com
+    - www.external.example.com
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIGateway
+metadata:
+  name: external-gateway
+spec:
+  apiAccesses:
+    - products
+    - search
+  customDomains:
+    - external.api.example.com
+    - www.external.api.example.com
+    - external.api.not-verified.example.com
+status:
+  hubDomain: brave-lion-123.hub-traefik.io
+  customDomains:
+    - external.api.example.com
+    - www.external.api.example.com
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIAccess
+metadata:
+  name: products
+spec:
+  groups:
+    - supplier
+  apiCollectionSelector:
+    matchLabels:
+      area: product
+      version: v1
+status:
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIAccess
+metadata:
+  name: search
+spec:
+  groups:
+    - consumer
+  apiSelector:
+    matchLabels:
+      area: search
+status:
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APICollection
+metadata:
+  name: products
+  labels:
+    area: product
+    version: v1
+spec:
+  pathPrefix: /products
+  apiSelector:
+    matchExpressions:
+      - key: product
+        operator: In
+        values:
+          - books
+          - toys
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: books
+  namespace: products-ns
+  labels:
+    product: books
+spec:
+  pathPrefix: "/books"
+  service:
+    name:  book-svc
+    port:
+      number: 8080
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: toys
+  namespace: products-ns
+  labels:
+    product: toys
+spec:
+  pathPrefix: "/toys"
+  service:
+    name:  toy-svc
+    port:
+      number: 8080
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: search
+  namespace: default
+  labels:
+    area: search
+spec:
+  pathPrefix: "/search"
+  service:
+    name:  search-svc
+    port:
+      number: 8080

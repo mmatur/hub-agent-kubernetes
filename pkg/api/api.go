@@ -79,9 +79,6 @@ func (a *API) Resource() (*hubv1alpha1.API, error) {
 				OpenAPISpec: hubv1alpha1.OpenAPISpec{
 					URL:  a.Service.OpenAPISpec.URL,
 					Path: a.Service.OpenAPISpec.Path,
-					Port: hubv1alpha1.APIServiceBackendPort{
-						Number: int32(a.Service.OpenAPISpec.Port),
-					},
 				},
 			},
 		},
@@ -89,6 +86,12 @@ func (a *API) Resource() (*hubv1alpha1.API, error) {
 			Version:  a.Version,
 			SyncedAt: metav1.Now(),
 		},
+	}
+
+	if a.Service.OpenAPISpec.Port != 0 {
+		api.Spec.Service.OpenAPISpec.Port = &hubv1alpha1.APIServiceBackendPort{
+			Number: int32(a.Service.OpenAPISpec.Port),
+		}
 	}
 
 	apiHash, err := HashAPI(api)
@@ -101,6 +104,7 @@ func (a *API) Resource() (*hubv1alpha1.API, error) {
 	return api, nil
 }
 
+// TODO(jspdown): Labels needs to be hashed but key order matters.
 type apiHash struct {
 	PathPrefix string                 `json:"pathPrefix,omitempty"`
 	Service    hubv1alpha1.APIService `json:"service"`

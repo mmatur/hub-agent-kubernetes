@@ -1,0 +1,61 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIPortal
+metadata:
+  name: internal-portal
+spec:
+  description: A portal for internal APIs
+  apiGateway: internal-gateway
+  customDomains:
+    - internal.example.com
+    - www.internal.example.com
+status:
+  hubDomain: majestic-cat-123.hub-traefik.io
+  customDomains:
+    - internal.example.com
+    - www.internal.example.com
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIGateway
+metadata:
+  name: internal-gateway
+spec:
+  apiAccesses:
+    - accounting
+  customDomains:
+    - internal.api.example.com
+status:
+  hubDomain: brave-cat-123.hub-traefik.io
+  customDomains:
+    - internal.api.example.com
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIAccess
+metadata:
+  name: accounting
+spec:
+  groups:
+    - accounting-team
+  apiSelector:
+    matchLabels:
+      area: accounting
+status:
+  hash: h
+
+---
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: accounting-reports
+  namespace: accounting-ns
+  labels:
+    area: accounting
+spec:
+  pathPrefix: "/reports"
+  service:
+    name:  accounting-report-svc
+    port:
+      number: 8080

@@ -72,6 +72,7 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 	return collection, nil
 }
 
+// TODO(jspdown): Labels needs to be hashed but key order matters.
 type collectionHash struct {
 	PathPrefix  string               `json:"pathPrefix,omitempty"`
 	APISelector metav1.LabelSelector `json:"apiSelector"`

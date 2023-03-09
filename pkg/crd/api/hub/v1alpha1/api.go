@@ -76,7 +76,9 @@ type OpenAPISpec struct {
 	// +optional
 	Path string `json:"path,omitempty"`
 	// +optional
-	Port APIServiceBackendPort `json:"port,omitempty"`
+	Port *APIServiceBackendPort `json:"port,omitempty"`
+	// +optional
+	Protocol string `json:"protocol,omitempty"`
 }
 
 // APIStatus is the status of an API.

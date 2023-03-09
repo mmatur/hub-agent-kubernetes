@@ -109,9 +109,12 @@ func (a *API) reviewCreateOperation(ctx context.Context, apiCRD *hubv1alpha1.API
 			OpenAPISpec: platform.OpenAPISpec{
 				URL:  apiCRD.Spec.Service.OpenAPISpec.URL,
 				Path: apiCRD.Spec.Service.OpenAPISpec.Path,
-				Port: int(apiCRD.Spec.Service.OpenAPISpec.Port.Number),
 			},
 		},
+	}
+
+	if apiCRD.Spec.Service.OpenAPISpec.Port != nil {
+		createReq.Service.OpenAPISpec.Port = int(apiCRD.Spec.Service.OpenAPISpec.Port.Number)
 	}
 
 	createdAPI, err := a.platform.CreateAPI(ctx, createReq)
@@ -138,9 +141,12 @@ func (a *API) reviewUpdateOperation(ctx context.Context, oldAPI, newAPI *hubv1al
 			OpenAPISpec: platform.OpenAPISpec{
 				URL:  newAPI.Spec.Service.OpenAPISpec.URL,
 				Path: newAPI.Spec.Service.OpenAPISpec.Path,
-				Port: int(newAPI.Spec.Service.OpenAPISpec.Port.Number),
 			},
 		},
+	}
+
+	if newAPI.Spec.Service.OpenAPISpec.Port != nil {
+		updateReq.Service.OpenAPISpec.Port = int(newAPI.Spec.Service.OpenAPISpec.Port.Number)
 	}
 
 	updateAPI, err := a.platform.UpdateAPI(ctx, oldAPI.Namespace, oldAPI.Name, oldAPI.Status.Version, updateReq)

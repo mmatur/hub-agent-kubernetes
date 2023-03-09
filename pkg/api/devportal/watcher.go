@@ -19,103 +19,146 @@ package devportal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"html/template"
-	"net/http"
-	"net/url"
-	"path"
-	"sync"
+	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-chi/chi/v5"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/mitchellh/hashstructure/v2"
 	"github.com/rs/zerolog/log"
-	"github.com/traefik/hub-agent-kubernetes/pkg/api"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
-	"github.com/traefik/hub-agent-kubernetes/portal"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	kerror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
-// NOTE: if we use the same watcher for all resources, then we need to restart it when new CRDs are
-// created/removed like for example when Traefik is installed and IngressRoutes are added.
-// Always listening to non-existing resources would cause errors.
-// Also, if multiple clients of this watcher are not interested in the same resources
-// add a parameter to NewWatcher to subscribe only to a subset of events.
+type portal struct {
+	hubv1alpha1.APIPortal
+
+	Gateway gateway
+}
+
+type gateway struct {
+	hubv1alpha1.APIGateway
+
+	Collections map[string]collection
+	APIs        map[string]hubv1alpha1.API
+}
+
+type collection struct {
+	hubv1alpha1.APICollection
+
+	APIs map[string]hubv1alpha1.API
+}
+
+// UpdatableHandler is an updatable HTTP handler for serving dev portals.
+type UpdatableHandler interface {
+	Update(portals []portal) error
+}
 
 // Watcher watches APIPortals resources and builds configurations out of them.
 type Watcher struct {
-	portalsMu   sync.RWMutex
-	portals     map[string]api.Portal
-	hostPortals map[string]*api.Portal
-	previous    uint64
+	portals     v1alpha1.APIPortalLister
+	gateways    v1alpha1.APIGatewayLister
+	apis        v1alpha1.APILister
+	collections v1alpha1.APICollectionLister
+	accesses    v1alpha1.APIAccessLister
 
-	refresh chan struct{}
+	refresh          chan struct{}
+	debounceDelay    time.Duration
+	maxDebounceDelay time.Duration
 
-	switcher   *HTTPHandlerSwitcher
-	httpClient *http.Client
-
-	indexTemplate *template.Template
+	handler UpdatableHandler
 }
 
-// NewWatcher returns a new watcher to track APIPortal resources. It calls the given Updater when an APIPortal is modified at most
-// once every throttle.
-func NewWatcher(switcher *HTTPHandlerSwitcher) (*Watcher, error) {
-	client := retryablehttp.NewClient()
-	client.RetryMax = 4
-	client.Logger = logger.NewRetryableHTTPWrapper(log.Logger.With().Str("component", "watcher_portal_client").Logger())
-
-	indexTemplate, err := template.ParseFS(portal.WebUI, "index.html")
-	if err != nil {
-		return nil, fmt.Errorf("parse index.html template: %w", err)
-	}
-
+// NewWatcher returns a new watcher to track API management resources. It calls the given UpdatableHandler when
+// a resource is modified.
+func NewWatcher(handler UpdatableHandler,
+	portals v1alpha1.APIPortalLister,
+	gateways v1alpha1.APIGatewayLister,
+	apis v1alpha1.APILister,
+	collections v1alpha1.APICollectionLister,
+	accesses v1alpha1.APIAccessLister,
+) *Watcher {
 	return &Watcher{
-		portals:       make(map[string]api.Portal),
-		hostPortals:   make(map[string]*api.Portal),
-		refresh:       make(chan struct{}, 1),
-		switcher:      switcher,
-		httpClient:    client.StandardClient(),
-		indexTemplate: indexTemplate,
-	}, nil
+		portals:     portals,
+		gateways:    gateways,
+		apis:        apis,
+		collections: collections,
+		accesses:    accesses,
+
+		refresh:          make(chan struct{}, 1),
+		debounceDelay:    2 * time.Second,
+		maxDebounceDelay: 10 * time.Second,
+
+		handler: handler,
+	}
 }
 
-// Run launches listener if the watcher is dirty.
+// Run starts listening for changes on the cluster.
 func (w *Watcher) Run(ctx context.Context) {
+	refresh := debounce(ctx, w.refresh, w.debounceDelay, w.maxDebounceDelay)
+
 	for {
 		select {
-		case <-w.refresh:
-			w.portalsMu.RLock()
-
-			hash, err := hashstructure.Hash(w.portals, hashstructure.FormatV2, nil)
+		case <-refresh:
+			portals, err := w.getPortals()
 			if err != nil {
-				log.Error().Err(err).Msg("Unable to hash")
-			}
-
-			w.portalsMu.RUnlock()
-
-			if err == nil && w.previous == hash {
+				log.Error().Err(err).Msg("Unable to get portals")
 				continue
 			}
 
-			w.previous = hash
-
-			log.Debug().Msg("Refreshing APIPortal handlers")
-
-			w.switcher.UpdateHandler(w.buildRoutes())
-
+			if err = w.handler.Update(portals); err != nil {
+				log.Error().Err(err).Msg("Unable to update handler")
+				continue
+			}
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
+// debounce listen for events on the source chan and emit an event on the debounced channel after waiting for
+// the given `delay` duration. Each additional event will wait an additional `delay` duration until it reach
+// the `maxDelay`.
+func debounce(ctx context.Context, sourceCh <-chan struct{}, delay, maxDelay time.Duration) <-chan struct{} {
+	debouncedCh := make(chan struct{})
+	var (
+		delayCh    <-chan time.Time
+		maxDelayCh <-chan time.Time
+	)
+
+	go func() {
+		for {
+			select {
+			case <-sourceCh:
+				delayCh = time.After(delay)
+				if maxDelayCh == nil {
+					maxDelayCh = time.After(maxDelay)
+				}
+
+			case <-delayCh:
+				delayCh, maxDelayCh = nil, nil
+				debouncedCh <- struct{}{}
+			case <-maxDelayCh:
+				delayCh, maxDelayCh = nil, nil
+				debouncedCh <- struct{}{}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return debouncedCh
+}
+
 // OnAdd implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
 func (w *Watcher) OnAdd(obj interface{}) {
-	switch v := obj.(type) {
+	switch obj.(type) {
 	case *hubv1alpha1.APIPortal:
-		w.updatePortalsFromCRD(v)
+	case *hubv1alpha1.APIGateway:
+	case *hubv1alpha1.API:
+	case *hubv1alpha1.APICollection:
+	case *hubv1alpha1.APIAccess:
 
 	default:
 		log.Error().
@@ -132,16 +175,40 @@ func (w *Watcher) OnAdd(obj interface{}) {
 }
 
 // OnUpdate implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
-func (w *Watcher) OnUpdate(_, newObj interface{}) {
+func (w *Watcher) OnUpdate(oldObj, newObj interface{}) {
+	logger := log.With().
+		Str("component", "api_portal_watcher").
+		Str("type", fmt.Sprintf("%T", newObj)).
+		Logger()
+
 	switch v := newObj.(type) {
 	case *hubv1alpha1.APIPortal:
-		w.updatePortalsFromCRD(v)
-
+		if oldObj.(*hubv1alpha1.APIPortal).Status.Hash == v.Status.Hash {
+			logger.Debug().Msg("No change detected on APIPortal, skipping")
+			return
+		}
+	case *hubv1alpha1.APIGateway:
+		if oldObj.(*hubv1alpha1.APIGateway).Status.Hash == v.Status.Hash {
+			logger.Debug().Msg("No change detected on APIGateway, skipping")
+			return
+		}
+	case *hubv1alpha1.API:
+		if oldObj.(*hubv1alpha1.API).Status.Hash == v.Status.Hash {
+			logger.Debug().Msg("No change detected on API, skipping")
+			return
+		}
+	case *hubv1alpha1.APICollection:
+		if oldObj.(*hubv1alpha1.APICollection).Status.Hash == v.Status.Hash {
+			logger.Debug().Msg("No change detected on APICollection, skipping")
+			return
+		}
+	case *hubv1alpha1.APIAccess:
+		if oldObj.(*hubv1alpha1.APIAccess).Status.Hash == v.Status.Hash {
+			logger.Debug().Msg("No change detected on APIAccess, skipping")
+			return
+		}
 	default:
-		log.Error().
-			Str("component", "api_portal_watcher").
-			Str("type", fmt.Sprintf("%T", newObj)).
-			Msg("Received update event of unknown type")
+		logger.Error().Msg("Received update event of unknown type")
 		return
 	}
 
@@ -152,15 +219,18 @@ func (w *Watcher) OnUpdate(_, newObj interface{}) {
 }
 
 // OnDelete implements Kubernetes cache.ResourceEventHandler so it can be used as an informer event handler.
-func (w *Watcher) OnDelete(obj interface{}) {
-	switch v := obj.(type) {
+func (w *Watcher) OnDelete(oldObj interface{}) {
+	switch oldObj.(type) {
 	case *hubv1alpha1.APIPortal:
-		w.deletePortal(v.Name)
+	case *hubv1alpha1.APIGateway:
+	case *hubv1alpha1.API:
+	case *hubv1alpha1.APICollection:
+	case *hubv1alpha1.APIAccess:
 
 	default:
 		log.Error().
 			Str("component", "api_portal_watcher").
-			Str("type", fmt.Sprintf("%T", obj)).
+			Str("type", fmt.Sprintf("%T", oldObj)).
 			Msg("Received delete event of unknown type")
 		return
 	}
@@ -171,258 +241,145 @@ func (w *Watcher) OnDelete(obj interface{}) {
 	}
 }
 
-func (w *Watcher) updatePortalsFromCRD(p *hubv1alpha1.APIPortal) {
-	w.portalsMu.Lock()
-	defer w.portalsMu.Unlock()
-
-	hubDomain := p.Status.HubDomain
-
-	pc := api.Portal{
-		Name:          p.Name,
-		Description:   p.Spec.Description,
-		Gateway:       p.Spec.APIGateway,
-		HubDomain:     hubDomain,
-		CustomDomains: p.Spec.CustomDomains,
-	}
-
-	w.portals[p.Name] = pc
-	w.hostPortals[hubDomain] = &pc
-}
-
-func (w *Watcher) deletePortal(name string) {
-	w.portalsMu.Lock()
-	defer w.portalsMu.Unlock()
-
-	c, ok := w.portals[name]
-	if !ok {
-		return
-	}
-
-	delete(w.hostPortals, c.HubDomain)
-	delete(w.portals, c.Name)
-}
-
-func (w *Watcher) buildRoutes() http.Handler {
-	w.portalsMu.RLock()
-	defer w.portalsMu.RUnlock()
-
-	router := chi.NewRouter()
-	for name := range w.portals {
-		router.Mount("/api/"+name, w.buildRoute(name))
-	}
-
-	router.Get("/", func(rw http.ResponseWriter, req *http.Request) {
-		w.portalsMu.RLock()
-		c, ok := w.hostPortals[req.Host]
-		w.portalsMu.RUnlock()
-
-		if !ok {
-			log.Debug().Str("host", req.Host).Msg("APIPortal not found")
-			rw.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		data := struct {
-			Name        string
-			Description string
-		}{
-			Name:        c.Name,
-			Description: c.Description,
-		}
-
-		if err := w.indexTemplate.Execute(rw, data); err != nil {
-			log.Error().Err(err).
-				Str("host", req.Host).
-				Str("api_portal_name", data.Name).
-				Msg("Unable to execute index template")
-
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	})
-
-	router.Method(http.MethodGet, "/*", http.FileServer(http.FS(portal.WebUI)))
-
-	return router
-}
-
-func (w *Watcher) buildRoute(name string) http.Handler {
-	var apis []string
-
-	urlByName := map[string]string{}
-	pathPrefixByName := map[string]string{}
-	// TODO: fill apis, urlByName, pathPrefixByName and oasBasePathByName from portal APIAccesses
-
-	router := chi.NewRouter()
-	router.Get("/apis", func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-
-		if err := json.NewEncoder(rw).Encode(apis); err != nil {
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Msg("Encode APIs")
-		}
-	})
-	router.Get("/apis/{api}", func(rw http.ResponseWriter, req *http.Request) {
-		apiName := chi.URLParam(req, "api")
-
-		u, found := urlByName[apiName]
-		if !found {
-			log.Debug().
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Msg("API not found")
-			rw.WriteHeader(http.StatusNotFound)
-
-			return
-		}
-
-		r, err := http.NewRequestWithContext(req.Context(), http.MethodGet, u, http.NoBody)
-		if err != nil {
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Msg("New request")
-			rw.WriteHeader(http.StatusInternalServerError)
-
-			return
-		}
-
-		resp, err := w.httpClient.Do(r)
-		if err != nil {
-			rw.WriteHeader(http.StatusBadGateway)
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Msg("Do request")
-
-			return
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		if resp.StatusCode < 200 || resp.StatusCode > 300 {
-			rw.WriteHeader(http.StatusBadGateway)
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Int("status_code", resp.StatusCode).
-				Msg("Unexpected status code")
-
-			return
-		}
-
-		var oas openapi3.T
-		if err := json.NewDecoder(resp.Body).Decode(&oas); err != nil {
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Msg("Decode open api spec")
-
-			return
-		}
-
-		if err := overrideServersAndSecurity(&oas, pathPrefixByName[apiName]); err != nil {
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Msg("Override servers and security")
-
-			return
-		}
-
-		rw.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-		rw.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(rw).Encode(oas); err != nil {
-			log.Error().Err(err).
-				Str("api_portal_name", name).
-				Str("api_name", apiName).
-				Str("url", u).
-				Msg("Write content")
-		}
-	})
-
-	return router
-}
-
-func overrideServersAndSecurity(oas *openapi3.T, apiPathPrefix string) error {
-	var domains []string
-	// TODO: fill domains with gateways custom domains or hub domain
-
-	var err error
-	oas.Servers, err = serversWithDomains(oas.Servers, domains, apiPathPrefix)
+func (w *Watcher) getPortals() ([]portal, error) {
+	apiPortals, err := w.portals.List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("unable to build oas servers: %w", err)
+		return nil, fmt.Errorf("list APIPortals: %w", err)
 	}
-	oas.Security = nil
 
-	for i := range oas.Paths {
-		if len(oas.Paths[i].Servers) > 0 {
-			oas.Paths[i].Servers, err = serversWithDomains(oas.Paths[i].Servers, domains, apiPathPrefix)
+	apiAccesses, err := w.accesses.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("list APIAccesses: %w", err)
+	}
+	apiAccessByName := make(map[string]*hubv1alpha1.APIAccess)
+	for _, apiAccess := range apiAccesses {
+		apiAccessByName[apiAccess.Name] = apiAccess
+	}
+
+	var portals []portal
+	for _, apiPortal := range apiPortals {
+		var apiGateway *hubv1alpha1.APIGateway
+
+		apiGateway, err = w.gateways.Get(apiPortal.Spec.APIGateway)
+		if err != nil {
+			if kerror.IsNotFound(err) {
+				log.Error().
+					Str("portal_name", apiPortal.Name).
+					Str("gateway_name", apiPortal.Spec.APIGateway).
+					Msg("Unable to find APIGateway")
+
+				continue
+			}
+
+			return nil, fmt.Errorf("get APIGateway %q: %w", apiPortal.Spec.APIGateway, err)
+		}
+
+		g := gateway{
+			APIGateway:  *apiGateway,
+			Collections: make(map[string]collection),
+			APIs:        make(map[string]hubv1alpha1.API),
+		}
+
+		for _, apiAccessName := range apiGateway.Spec.APIAccesses {
+			apiAccess := apiAccessByName[apiAccessName]
+			if apiAccess == nil {
+				log.Error().
+					Str("api_gateway_name", apiPortal.Spec.APIGateway).
+					Str("api_access_name", apiAccessName).
+					Msg("Unable to find APIAccess")
+
+				continue
+			}
+
+			accessAPIs, err := w.findAPIs(apiAccess.Spec.APISelector)
 			if err != nil {
-				return fmt.Errorf("unable to build path servers: %w", err)
+				return nil, fmt.Errorf("find APIAccess %q APIs: %w", apiAccessName, err)
+			}
+
+			for k := range accessAPIs {
+				g.APIs[k] = accessAPIs[k]
+			}
+
+			collectionAPIs, err := w.findCollections(apiAccess.Spec.APICollectionSelector)
+			if err != nil {
+				return nil, fmt.Errorf("find APIAccess %q APICollections: %w", apiAccessName, err)
+			}
+
+			for k := range collectionAPIs {
+				g.Collections[k] = collectionAPIs[k]
 			}
 		}
 
-		for method := range oas.Paths[i].Operations() {
-			operation := oas.Paths[i].GetOperation(method)
+		portals = append(portals, portal{
+			APIPortal: *apiPortal,
+			Gateway:   g,
+		})
+	}
 
-			if len(*operation.Servers) > 0 {
-				servers, err := serversWithDomains(*operation.Servers, domains, apiPathPrefix)
-				if err != nil {
-					return fmt.Errorf("unable to build operation servers: %w", err)
-				}
-				operation.Servers = &servers
-			}
-			operation.Security = nil
+	return portals, nil
+}
 
-			oas.Paths[i].SetOperation(method, operation)
+func (w *Watcher) findAPIs(labelSelector *metav1.LabelSelector) (map[string]hubv1alpha1.API, error) {
+	if labelSelector == nil {
+		return nil, nil
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		log.Error().Err(err).
+			Str("selector", labelSelector.String()).
+			Msg("Invalid selector")
+		return nil, nil
+	}
+
+	apis, err := w.apis.List(selector)
+	if err != nil {
+		return nil, fmt.Errorf("list APIs using selector %q: %w", labelSelector.String(), err)
+	}
+
+	foundAPIs := make(map[string]hubv1alpha1.API)
+	for _, a := range apis {
+		namespace := a.Namespace
+		if namespace == "" {
+			namespace = "default"
+		}
+
+		foundAPIs[a.Name+"@"+namespace] = *a
+	}
+
+	return foundAPIs, nil
+}
+
+func (w *Watcher) findCollections(labelSelector *metav1.LabelSelector) (map[string]collection, error) {
+	if labelSelector == nil {
+		return nil, nil
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		log.Error().Err(err).
+			Str("selector", selector.String()).
+			Msg("Invalid selector")
+		return nil, nil
+	}
+
+	collections, err := w.collections.List(selector)
+	if err != nil {
+		return nil, fmt.Errorf("list APICollections using selector %q: %w", labelSelector.String(), err)
+	}
+
+	foundCollections := make(map[string]collection)
+	for _, c := range collections {
+		apis, err := w.findAPIs(&c.Spec.APISelector)
+		if err != nil {
+			return nil, fmt.Errorf("find APICollection %q APIs: %w", c.Name, err)
+		}
+
+		foundCollections[c.Name] = collection{
+			APICollection: *c,
+			APIs:          apis,
 		}
 	}
 
-	return nil
-}
-
-func serversWithDomains(servers openapi3.Servers, domains []string, prefix string) (openapi3.Servers, error) {
-	baseServer := &openapi3.Server{}
-	if len(servers) != 0 {
-		baseServer = servers[0]
-	}
-
-	pathS, err := pathServers(servers)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get path servers: %w", err)
-	}
-
-	var mergedServers openapi3.Servers
-	for _, domain := range domains {
-		s := *baseServer
-		s.URL = "https://" + domain + path.Join(prefix, pathS)
-
-		mergedServers = append(mergedServers, &s)
-	}
-
-	return mergedServers, nil
-}
-
-func pathServers(servers openapi3.Servers) (string, error) {
-	if len(servers) == 0 {
-		return "", nil
-	}
-
-	if servers[0].URL == "" {
-		return "", nil
-	}
-
-	u, err := url.Parse(servers[0].URL)
-	if err != nil {
-		return "", fmt.Errorf("parse url: %w", err)
-	}
-
-	return u.Path, nil
+	return foundCollections, nil
 }

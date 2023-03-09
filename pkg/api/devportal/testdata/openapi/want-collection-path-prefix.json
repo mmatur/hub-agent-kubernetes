@@ -6,20 +6,20 @@
   },
   "servers": [
     {
-      "url": "https://generated.hub.domain/prefix/api/v3"
+      "url": "https://majestic-beaver-123.hub-traefik.io/collection-prefix/api-prefix/api/v3"
     }
   ],
   "paths": {
     "/users/{id}": {
       "servers": [
         {
-          "url": "https://generated.hub.domain/prefix/path-custom"
+          "url": "https://majestic-beaver-123.hub-traefik.io/collection-prefix/api-prefix/path-custom"
         }
       ],
       "get": {
         "servers": [
           {
-            "url": "https://generated.hub.domain/prefix/path-method"
+            "url": "https://majestic-beaver-123.hub-traefik.io/collection-prefix/api-prefix/path-method"
           }
         ],
         "operationId": "getUserItem",

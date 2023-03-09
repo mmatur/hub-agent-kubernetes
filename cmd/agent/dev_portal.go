@@ -34,6 +34,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
+	"k8s.io/client-go/tools/cache"
 )
 
 type devPortalCmd struct {
@@ -81,15 +82,33 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Hub client set: %w", err)
 	}
 
-	switcher := devportal.NewHandlerSwitcher()
-	portalWatcher, err := devportal.NewWatcher(switcher)
-	if err != nil {
-		return fmt.Errorf("create portal watcher: %w", err)
-	}
-
 	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	if _, errInformer := hubInformer.Hub().V1alpha1().APIPortals().Informer().AddEventHandler(portalWatcher); errInformer != nil {
-		return fmt.Errorf("add portal watcher: %w", errInformer)
+
+	portalInformer := hubInformer.Hub().V1alpha1().APIPortals()
+	gatewayInformer := hubInformer.Hub().V1alpha1().APIGateways()
+	apiInformer := hubInformer.Hub().V1alpha1().APIs()
+	collectionInformer := hubInformer.Hub().V1alpha1().APICollections()
+	accessInformer := hubInformer.Hub().V1alpha1().APIAccesses()
+
+	handler := devportal.NewHandler()
+	portalWatcher := devportal.NewWatcher(handler,
+		portalInformer.Lister(),
+		gatewayInformer.Lister(),
+		apiInformer.Lister(),
+		collectionInformer.Lister(),
+		accessInformer.Lister())
+
+	informers := []cache.SharedInformer{
+		portalInformer.Informer(),
+		gatewayInformer.Informer(),
+		apiInformer.Informer(),
+		collectionInformer.Informer(),
+		accessInformer.Informer(),
+	}
+	for _, informer := range informers {
+		if _, errInformer := informer.AddEventHandler(portalWatcher); errInformer != nil {
+			return fmt.Errorf("add event handler: %w", errInformer)
+		}
 	}
 
 	hubInformer.Start(cliCtx.Context.Done())
@@ -113,7 +132,7 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 		rw.WriteHeader(http.StatusOK)
 	}))
 
-	mux.Handle("/", switcher)
+	mux.Handle("/", handler)
 
 	server := &http.Server{
 		Addr:              listenAddr,
