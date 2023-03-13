@@ -104,7 +104,6 @@ func (a *API) Resource() (*hubv1alpha1.API, error) {
 	return api, nil
 }
 
-// TODO(jspdown): Labels needs to be hashed but key order matters.
 type apiHash struct {
 	PathPrefix string                 `json:"pathPrefix,omitempty"`
 	Service    hubv1alpha1.APIService `json:"service"`

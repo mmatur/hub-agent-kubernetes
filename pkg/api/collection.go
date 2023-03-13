@@ -72,18 +72,17 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 	return collection, nil
 }
 
-// TODO(jspdown): Labels needs to be hashed but key order matters.
 type collectionHash struct {
-	PathPrefix  string               `json:"pathPrefix,omitempty"`
-	APISelector metav1.LabelSelector `json:"apiSelector"`
-	Labels      sortedMap[string]    `json:"labels,omitempty"`
+	PathPrefix  string            `json:"pathPrefix,omitempty"`
+	APISelector string            `json:"apiSelector"`
+	Labels      sortedMap[string] `json:"labels,omitempty"`
 }
 
 // HashCollection generates the hash of the APICollection.
 func HashCollection(c *hubv1alpha1.APICollection) (string, error) {
 	ch := collectionHash{
 		PathPrefix:  c.Spec.PathPrefix,
-		APISelector: c.Spec.APISelector,
+		APISelector: c.Spec.APISelector.String(),
 		Labels:      newSortedMap(c.Labels),
 	}
 

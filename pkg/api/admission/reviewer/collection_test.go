@@ -99,7 +99,7 @@ func TestCollection_Review_createOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APICollectionStatus{
 					Version:  "version-1",
 					SyncedAt: now,
-					Hash:     "89accpfIS0Yby3nS/ub9PLnyCF4=",
+					Hash:     "XrYSYUqKbEn+omNot2rSM9GTxMs=",
 				}},
 			}),
 		},
@@ -270,7 +270,7 @@ func TestCollection_Review_updateOperation(t *testing.T) {
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APICollectionStatus{
 					Version:  "version-2",
 					SyncedAt: now,
-					Hash:     "lHNGV9wiaJQ2LMo8PJ6oR413oRE=",
+					Hash:     "K93Yd3LNurYamfSBMYDock3kfJw=",
 				}},
 			}),
 		},
