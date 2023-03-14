@@ -106,6 +106,11 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
 	hubFactory.Hub().V1alpha1().AccessControlPolicies().Informer()
 	hubFactory.Hub().V1alpha1().EdgeIngresses().Informer()
+	hubFactory.Hub().V1alpha1().APIs().Informer()
+	hubFactory.Hub().V1alpha1().APIAccesses().Informer()
+	hubFactory.Hub().V1alpha1().APICollections().Informer()
+	hubFactory.Hub().V1alpha1().APIPortals().Informer()
+	hubFactory.Hub().V1alpha1().APIGateways().Informer()
 
 	kubernetesFactory.Start(ctx.Done())
 	hubFactory.Start(ctx.Done())
@@ -165,6 +170,31 @@ func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
 	}
 
 	cluster.EdgeIngresses, err = f.getEdgeIngresses()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.APIs, err = f.getAPIs()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.APIAccesses, err = f.getAPIAccesses()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.APICollections, err = f.getAPICollections()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.APIPortals, err = f.getAPIPortals()
+	if err != nil {
+		return nil, err
+	}
+
+	cluster.APIGateways, err = f.getAPIGateways()
 	if err != nil {
 		return nil, err
 	}

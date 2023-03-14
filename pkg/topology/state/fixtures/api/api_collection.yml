@@ -1,0 +1,20 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APICollection
+metadata:
+  name: collection
+  labels:
+    key: value
+spec:
+  pathPrefix: /collection
+  apiSelector:
+    matchLabels:
+      key: value
+    matchExpressions:
+      - key: key
+        operator: in
+        values:
+          - value1
+          - value2
+status:
+  version: version-1
+  hash: "HtPv59eS2+R4jrHZHiRuGwDUgAw="

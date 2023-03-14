@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
@@ -33,8 +34,11 @@ import (
 
 // Mandatory to be able to parse traefik.containo.us/v1alpha1 resources.
 func init() {
-	err := traefikv1alpha1.AddToScheme(scheme.Scheme)
-	if err != nil {
+	if err := traefikv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		panic(err)
+	}
+
+	if err := hubv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		panic(err)
 	}
 }

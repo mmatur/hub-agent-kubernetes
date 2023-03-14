@@ -1,0 +1,14 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: APIPortal
+metadata:
+  name: portal
+spec:
+  description: description
+  apiGateway: api-gateway
+  customDomains:
+    - example.com
+    - example.org
+status:
+  version: version-1
+  hubDomain: hub.example.com
+  hash: "HtPv59eS2+R4jrHZHiRuGwDUgAw="
