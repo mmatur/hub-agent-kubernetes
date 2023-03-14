@@ -252,6 +252,10 @@ func overrideServersAndSecurity(spec *openapi3.T, domains []string, pathPrefix s
 		for method := range spec.Paths[p].Operations() {
 			operation := spec.Paths[p].GetOperation(method)
 
+			if operation == nil || operation.Servers == nil {
+				continue
+			}
+
 			servers, err = overrideServerDomains(*operation.Servers, domains, pathPrefix)
 			if err != nil {
 				return fmt.Errorf("override path %q server domains for method %q: %w", p, method, err)
