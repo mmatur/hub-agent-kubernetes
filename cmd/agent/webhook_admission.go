@@ -379,6 +379,7 @@ func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInforme
 	hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
 	if apiAvailable {
+		hubInformer.Hub().V1alpha1().APIAccesses().Informer()
 		hubInformer.Hub().V1alpha1().APIPortals().Informer()
 		hubInformer.Hub().V1alpha1().APIGateways().Informer()
 		hubInformer.Hub().V1alpha1().APICollections().Informer()
