@@ -428,6 +428,10 @@ func (w *WatcherGateway) apisByNamespace(ctx context.Context, gateway *hubv1alph
 	var foundAPIs []*hubv1alpha1.API
 	for _, accessName := range gateway.Spec.APIAccesses {
 		access, err := w.hubClientSet.HubV1alpha1().APIAccesses().Get(ctx, accessName, metav1.GetOptions{})
+		if err != nil && kerror.IsNotFound(err) {
+			continue
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("get access: %w", err)
 		}
