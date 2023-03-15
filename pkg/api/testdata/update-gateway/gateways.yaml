@@ -5,15 +5,11 @@ metadata:
   labels:
     area: users
 spec:
-  apiAccesses:
-    - users
   customDomains:
     - "api.hello.example.com"
     - "api.welcome.example.com"
     - "not-verified.example.com"
 status:
-  accesses:
-    - users
   version: version-1
   hubDomain: brave-lion-123.hub-traefik.io
   customDomains:

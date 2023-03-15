@@ -1,0 +1,16 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: my-bookstore-api
+  namespace: books
+  labels:
+    area: products
+    product: books
+spec:
+  pathPrefix: "/bookstore"
+  service:
+    openApiSpec:
+      url: https://example.com/api/v3/openapi.json
+    name: bookstore-svc
+    port:
+      number: 443

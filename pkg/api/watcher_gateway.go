@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -164,7 +165,12 @@ func (w *WatcherGateway) syncCertificates(ctx context.Context) error {
 	}
 
 	for _, gateway := range clusterGateways {
-		err = w.setupCertificates(ctx, gateway)
+		apisByNamespace, err := w.apisByNamespace(ctx, gateway)
+		if err != nil {
+			return fmt.Errorf("unable to load gateway APIs by namespace: %w", err)
+		}
+
+		err = w.setupCertificates(ctx, gateway, apisByNamespace, wildcardCert)
 		if err != nil {
 			log.Error().Err(err).
 				Str("name", gateway.Name).
@@ -176,9 +182,12 @@ func (w *WatcherGateway) syncCertificates(ctx context.Context) error {
 	return nil
 }
 
-func (w *WatcherGateway) setupCertificates(ctx context.Context, gateway *hubv1alpha1.APIGateway) error {
-	apisNamespaces := make(map[string]struct{})
-	// TODO: fill apisNamespaces from gateway APIAccesses
+func (w *WatcherGateway) setupCertificates(ctx context.Context, gateway *hubv1alpha1.APIGateway, apisByNamespace map[string][]*hubv1alpha1.API, certificate edgeingress.Certificate) error {
+	for namespace := range apisByNamespace {
+		if err := w.upsertSecret(ctx, certificate, hubDomainSecretName, namespace, gateway); err != nil {
+			return fmt.Errorf("upsert secret: %w", err)
+		}
+	}
 
 	if len(gateway.Status.CustomDomains) == 0 {
 		return nil
@@ -194,7 +203,7 @@ func (w *WatcherGateway) setupCertificates(ctx context.Context, gateway *hubv1al
 		return fmt.Errorf("get custom domains secret name: %w", err)
 	}
 
-	for namespace := range apisNamespaces {
+	for namespace := range apisByNamespace {
 		if err := w.upsertSecret(ctx, cert, secretName, namespace, gateway); err != nil {
 			return fmt.Errorf("upsert secret: %w", err)
 		}
@@ -389,27 +398,116 @@ func (w *WatcherGateway) cleanGateways(ctx context.Context, gateways map[string]
 }
 
 func (w *WatcherGateway) syncChildResources(ctx context.Context, gateway *hubv1alpha1.APIGateway) error {
-	if err := w.setupCertificates(ctx, gateway); err != nil {
+	apisByNamespace, err := w.apisByNamespace(ctx, gateway)
+	if err != nil {
+		return fmt.Errorf("unable to load gateway APIs by namespace: %w", err)
+	}
+
+	w.wildCardCertMu.RLock()
+	certificate := w.wildCardCert
+	w.wildCardCertMu.RUnlock()
+
+	if err := w.setupCertificates(ctx, gateway, apisByNamespace, certificate); err != nil {
 		return fmt.Errorf("unable to setup APIGateway certificates: %w", err)
 	}
 
-	if err := w.cleanupIngresses(ctx, gateway); err != nil {
+	if err := w.cleanupIngresses(ctx, gateway, apisByNamespace); err != nil {
 		return fmt.Errorf("clean up ingresses: %w", err)
 	}
 
-	if err := w.upsertIngresses(ctx, gateway); err != nil {
+	if err := w.upsertIngresses(ctx, gateway, apisByNamespace); err != nil {
 		return fmt.Errorf("upsert ingresses: %w", err)
 	}
 
 	return nil
 }
 
-func (w *WatcherGateway) upsertIngresses(ctx context.Context, gateway *hubv1alpha1.APIGateway) error {
-	apisByNamespace := make(map[string][]hubv1alpha1.API)
-	// TODO: fill apisByNamespace from gateway APIAccesses
+func (w *WatcherGateway) apisByNamespace(ctx context.Context, gateway *hubv1alpha1.APIGateway) (map[string][]*hubv1alpha1.API, error) {
+	apisByNamespace := make(map[string][]*hubv1alpha1.API)
 
+	var foundAPIs []*hubv1alpha1.API
+	for _, accessName := range gateway.Spec.APIAccesses {
+		access, err := w.hubClientSet.HubV1alpha1().APIAccesses().Get(ctx, accessName, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("get access: %w", err)
+		}
+
+		apis, err := w.findAPIs(access.Spec.APISelector)
+		if err != nil {
+			return nil, fmt.Errorf("find APIs: %w", err)
+		}
+		foundAPIs = append(foundAPIs, apis...)
+
+		collections, err := w.findCollections(access.Spec.APICollectionSelector)
+		if err != nil {
+			return nil, fmt.Errorf("find collections: %w", err)
+		}
+
+		for _, collection := range collections {
+			collectionAPIs, err := w.findAPIs(&collection.Spec.APISelector)
+			if err != nil {
+				return nil, fmt.Errorf("find APIs: %w", err)
+			}
+
+			if collection.Spec.PathPrefix == "" {
+				foundAPIs = append(foundAPIs, collectionAPIs...)
+				continue
+			}
+
+			for _, collectionAPI := range collectionAPIs {
+				api := *collectionAPI
+				api.Spec.PathPrefix = path.Join(collection.Spec.PathPrefix, api.Spec.PathPrefix)
+				foundAPIs = append(foundAPIs, &api)
+			}
+		}
+	}
+
+	for _, api := range foundAPIs {
+		apisByNamespace[api.Namespace] = append(apisByNamespace[api.Namespace], api)
+	}
+
+	return apisByNamespace, nil
+}
+
+func (w *WatcherGateway) findAPIs(selector *metav1.LabelSelector) ([]*hubv1alpha1.API, error) {
+	if selector == nil {
+		return nil, nil
+	}
+
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, fmt.Errorf("convert APIs label selector: %w", err)
+	}
+
+	apis, err := w.hubInformer.Hub().V1alpha1().APIs().Lister().List(labelSelector)
+	if err != nil {
+		return nil, fmt.Errorf("list APIs: %w", err)
+	}
+
+	return apis, nil
+}
+
+func (w *WatcherGateway) findCollections(selector *metav1.LabelSelector) ([]*hubv1alpha1.APICollection, error) {
+	if selector == nil {
+		return nil, nil
+	}
+
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, fmt.Errorf("convert collections label selector: %w", err)
+	}
+
+	collections, err := w.hubInformer.Hub().V1alpha1().APICollections().Lister().List(labelSelector)
+	if err != nil {
+		return nil, fmt.Errorf("list collections: %w", err)
+	}
+
+	return collections, nil
+}
+
+func (w *WatcherGateway) upsertIngresses(ctx context.Context, gateway *hubv1alpha1.APIGateway, apisByNamespace map[string][]*hubv1alpha1.API) error {
 	for namespace, apis := range apisByNamespace {
-		traefikMiddlewareName, err := w.setupStripPrefixMiddleware(ctx, gateway, apis, namespace)
+		traefikMiddlewareName, err := w.setupStripPrefixMiddleware(ctx, gateway.Name, apis, namespace)
 		if err != nil {
 			return fmt.Errorf("setup stripPrefix middleware: %w", err)
 		}
@@ -438,8 +536,8 @@ func (w *WatcherGateway) upsertIngresses(ctx context.Context, gateway *hubv1alph
 	return nil
 }
 
-func (w *WatcherGateway) setupStripPrefixMiddleware(ctx context.Context, gateway *hubv1alpha1.APIGateway, apis []hubv1alpha1.API, namespace string) (string, error) {
-	name, err := getStripPrefixMiddlewareName(gateway.Name)
+func (w *WatcherGateway) setupStripPrefixMiddleware(ctx context.Context, gatewayName string, apis []*hubv1alpha1.API, namespace string) (string, error) {
+	name, err := getStripPrefixMiddlewareName(gatewayName)
 	if err != nil {
 		return "", fmt.Errorf("get stripPrefix middleware name: %w", err)
 	}
@@ -451,7 +549,7 @@ func (w *WatcherGateway) setupStripPrefixMiddleware(ctx context.Context, gateway
 
 	middleware := newStripPrefixMiddleware(name, namespace, apis)
 
-	traefikMiddlewareName, err := getTraefikStripPrefixMiddlewareName(namespace, gateway)
+	traefikMiddlewareName, err := getTraefikStripPrefixMiddlewareName(namespace, gatewayName)
 	if err != nil {
 		return "", fmt.Errorf("get Traefik stripPrefix middleware name: %w", err)
 	}
@@ -518,7 +616,7 @@ func (w *WatcherGateway) upsertIngress(ctx context.Context, ingress *netv1.Ingre
 }
 
 // cleanupIngresses deletes the ingresses from namespaces that are no longer referenced in the APIGateway.
-func (w *WatcherGateway) cleanupIngresses(ctx context.Context, gateway *hubv1alpha1.APIGateway) error {
+func (w *WatcherGateway) cleanupIngresses(ctx context.Context, gateway *hubv1alpha1.APIGateway, apisByNamespace map[string][]*hubv1alpha1.API) error {
 	managedByHub, err := labels.NewRequirement("app.kubernetes.io/managed-by", selection.Equals, []string{"traefik-hub"})
 	if err != nil {
 		return fmt.Errorf("create managed by hub requirement: %w", err)
@@ -538,15 +636,12 @@ func (w *WatcherGateway) cleanupIngresses(ctx context.Context, gateway *hubv1alp
 		return fmt.Errorf("get ingress name for custom domains: %w", err)
 	}
 
-	apisNamespaces := make(map[string]struct{})
-	// TODO: fill apisNamespaces from gateway APIAccesses
-
 	for _, ingress := range hubIngresses {
 		if ingress.Name != hubDomainIngressName && ingress.Name != customDomainsIngressName {
 			continue
 		}
 
-		if _, ok := apisNamespaces[ingress.Namespace]; !ok {
+		if _, ok := apisByNamespace[ingress.Namespace]; !ok {
 			err = w.kubeClientSet.CoreV1().
 				Secrets(ingress.Namespace).
 				Delete(ctx, ingress.Spec.TLS[0].SecretName, metav1.DeleteOptions{})
@@ -610,7 +705,7 @@ func (w *WatcherGateway) cleanupIngresses(ctx context.Context, gateway *hubv1alp
 	return nil
 }
 
-func (w *WatcherGateway) buildHubDomainIngress(namespace string, gateway *hubv1alpha1.APIGateway, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
+func (w *WatcherGateway) buildHubDomainIngress(namespace string, gateway *hubv1alpha1.APIGateway, apis []*hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	name, err := getHubDomainIngressName(gateway.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get hub domain ingress name: %w", err)
@@ -626,7 +721,7 @@ func (w *WatcherGateway) buildHubDomainIngress(namespace string, gateway *hubv1a
 	}, nil
 }
 
-func (w *WatcherGateway) buildCustomDomainsIngress(namespace string, gateway *hubv1alpha1.APIGateway, apis []hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
+func (w *WatcherGateway) buildCustomDomainsIngress(namespace string, gateway *hubv1alpha1.APIGateway, apis []*hubv1alpha1.API, traefikMiddlewareName string) (*netv1.Ingress, error) {
 	ingressName, err := getCustomDomainsIngressName(gateway.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get custom domains ingress name: %w", err)
@@ -671,7 +766,7 @@ func (w *WatcherGateway) buildIngressObjectMeta(namespace, name string, gateway 
 	}
 }
 
-func (w *WatcherGateway) buildIngressSpec(domains []string, apis []hubv1alpha1.API, tlsSecretName string) netv1.IngressSpec {
+func (w *WatcherGateway) buildIngressSpec(domains []string, apis []*hubv1alpha1.API, tlsSecretName string) netv1.IngressSpec {
 	pathType := netv1.PathTypePrefix
 
 	var paths []netv1.HTTPIngressPath
@@ -681,7 +776,7 @@ func (w *WatcherGateway) buildIngressSpec(domains []string, apis []hubv1alpha1.A
 			Path:     api.Spec.PathPrefix,
 			Backend: netv1.IngressBackend{
 				Service: &netv1.IngressServiceBackend{
-					Name: api.Name,
+					Name: api.Spec.Service.Name,
 					Port: netv1.ServiceBackendPort(api.Spec.Service.Port),
 				},
 			},
@@ -712,7 +807,7 @@ func (w *WatcherGateway) buildIngressSpec(domains []string, apis []hubv1alpha1.A
 	}
 }
 
-func newStripPrefixMiddleware(name, namespace string, apis []hubv1alpha1.API) traefikv1alpha1.Middleware {
+func newStripPrefixMiddleware(name, namespace string, apis []*hubv1alpha1.API) traefikv1alpha1.Middleware {
 	var prefixes []string
 	for _, api := range apis {
 		prefixes = append(prefixes, api.Spec.PathPrefix)
@@ -752,8 +847,8 @@ func getStripPrefixMiddlewareName(gatewayName string) (string, error) {
 	return fmt.Sprintf("%s-%d-stripprefix", gatewayName, h), nil
 }
 
-func getTraefikStripPrefixMiddlewareName(namespace string, gateway *hubv1alpha1.APIGateway) (string, error) {
-	middlewareName, err := getStripPrefixMiddlewareName(gateway.Name)
+func getTraefikStripPrefixMiddlewareName(namespace, gatewayName string) (string, error) {
+	middlewareName, err := getStripPrefixMiddlewareName(gatewayName)
 	if err != nil {
 		return "", fmt.Errorf("get stripPrefix middleware name: %w", err)
 	}

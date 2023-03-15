@@ -1,0 +1,18 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: API
+metadata:
+  name: my-petstore-api
+  namespace: default
+  labels:
+    area: products
+    product: pets
+spec:
+  pathPrefix: "/petstore"
+  service:
+    openApiSpec:
+      path: /api/v3/openapi.json
+      port:
+        number: 8080
+    name: petstore-svc
+    port:
+      number: 8080

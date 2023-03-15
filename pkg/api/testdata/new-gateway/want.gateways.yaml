@@ -3,21 +3,19 @@ kind: APIGateway
 metadata:
   name: new-gateway
   labels:
-    area: users
+    area: stores
 spec:
   apiAccesses:
-    - users
+    - products
   customDomains:
     - "api.hello.example.com"
     - "api.welcome.example.com"
     - "not-verified.example.com"
 status:
-  accesses:
-    - users
   version: version-1
   hubDomain: brave-lion-123.hub-traefik.io
   customDomains:
     - api.hello.example.com
     - api.welcome.example.com
   urls: "https://api.hello.example.com,https://api.welcome.example.com,https://brave-lion-123.hub-traefik.io"
-  hash: "2LP89ymc+XNxkp+PG5x2Vw=="
+  hash: "lJ7NWT5GDPOJPHgsXroSbw=="

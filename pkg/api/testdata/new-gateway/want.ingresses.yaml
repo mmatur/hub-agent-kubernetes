@@ -1,0 +1,100 @@
+# Ingress for hub domain in the default namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: new-gateway-3695162296-hub
+  namespace: default
+  ownerReferences:
+    - apiVersion: hub.traefik.io/v1alpha1
+      kind: APIGateway
+      name: new-gateway
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
+spec:
+  ingressClassName: ingress-class
+  rules:
+    - host: brave-lion-123.hub-traefik.io
+      http:
+        paths:
+          - path: /petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+          - path: /stores/petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+  tls:
+    - secretName: hub-certificate
+      hosts:
+        - brave-lion-123.hub-traefik.io
+
+---
+# Ingress for custom domains in the default namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: new-gateway-3695162296
+  namespace: default
+  ownerReferences:
+    - apiVersion: hub.traefik.io/v1alpha1
+      kind: APIGateway
+      name: new-gateway
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
+spec:
+  ingressClassName: ingress-class
+  rules:
+    - host: api.hello.example.com
+      http:
+        paths:
+          - path: /petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+          - path: /stores/petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+    - host: api.welcome.example.com
+      http:
+        paths:
+          - path: /petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+          - path: /stores/petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+  tls:
+    - secretName: hub-certificate-custom-domains-3695162296
+      hosts:
+        - api.hello.example.com
+        - api.welcome.example.com

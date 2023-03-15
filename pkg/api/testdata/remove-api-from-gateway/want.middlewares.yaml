@@ -1,0 +1,10 @@
+# Middleware in the books namespace.
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: modified-gateway-713459761-stripprefix
+  namespace: books
+spec:
+  stripPrefix:
+    prefixes:
+      - /stores/bookstore

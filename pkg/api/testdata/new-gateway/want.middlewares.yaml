@@ -1,0 +1,11 @@
+# Middleware in the default namespace.
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: new-gateway-3695162296-stripprefix
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - /stores/petstore
+      - /petstore
