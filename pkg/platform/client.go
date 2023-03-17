@@ -75,7 +75,8 @@ type ACP struct {
 
 // Config holds the configuration of the offer.
 type Config struct {
-	Metrics MetricsConfig `json:"metrics"`
+	Metrics  MetricsConfig `json:"metrics"`
+	Features []string      `json:"features"`
 }
 
 // MetricsConfig holds the metrics part of the offer config.

@@ -59,6 +59,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -73,6 +74,8 @@ const (
 	flagDevPortalServiceName              = "dev-portal.service-name"
 	flagDevPortalPort                     = "dev-portal.port"
 )
+
+const apiManagementFeature = "api-management"
 
 func devPortalFlags() []cli.Flag {
 	return []cli.Flag{
@@ -144,7 +147,7 @@ func admissionFlags() []cli.Flag {
 	}
 }
 
-func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client) error {
+func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *platform.Client, cfgWatcher *platform.ConfigWatcher) error {
 	var (
 		listenAddr     = cliCtx.String(flagACPServerListenAddr)
 		certFile       = cliCtx.String(flagACPServerCertificate)
@@ -191,7 +194,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		CertRetryInterval:       time.Minute,
 	}
 
-	acpAdmission, edgeIngressAdmission, apiAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, portalWatcherCfg, gatewayWatcherCfg)
+	acpAdmission, edgeIngressAdmission, apiAdmission, err := setupAdmissionHandlers(ctx, platformClient, authServerAddr, edgeIngressWatcherCfg, portalWatcherCfg, gatewayWatcherCfg, cfgWatcher)
 	if err != nil {
 		return fmt.Errorf("create admission handler: %w", err)
 	}
@@ -245,7 +248,7 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	return nil
 }
 
-func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, portalWatcherCfg *api.WatcherPortalConfig, gatewayWatcherCfg *api.WatcherGatewayConfig) (acpHandler, edgeIngressHandler, apiHandler http.Handler, err error) {
+func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client, authServerAddr string, edgeIngressWatcherCfg edgeingress.WatcherConfig, portalWatcherCfg *api.WatcherPortalConfig, gatewayWatcherCfg *api.WatcherGatewayConfig, cfgWatcher *platform.ConfigWatcher) (acpHandler, edgeIngressHandler, apiHandler http.Handler, err error) {
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -287,12 +290,12 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
 
-	apiAvailable, err := isAPIAvailable(kubeClientSet)
+	isAPIManagementCRDsAvailable, err := hasAPIManagementCRDs(kubeClientSet)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("API available: %w", err)
 	}
 
-	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, apiAvailable)
+	err = startHubInformer(ctx, hubInformer, ingClassWatcher, acpEventHandler, isAPIManagementCRDsAvailable)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("start kube informer: %w", err)
 	}
@@ -307,21 +310,14 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	go acpWatcher.Run(ctx)
 	go ingressUpdater.Run(ctx)
 	go edgeIngressWatcher.Run(ctx)
-	if apiAvailable {
-		watcherPortal := api.NewWatcherPortal(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, portalWatcherCfg)
-		go watcherPortal.Run(ctx)
 
-		gatewayWatcher := api.NewWatcherGateway(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, gatewayWatcherCfg)
-		go gatewayWatcher.Run(ctx)
-
-		watcherAPI := api.NewWatcherAPI(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
-		go watcherAPI.Run(ctx)
-
-		watcherCollection := api.NewWatcherCollection(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
-		go watcherCollection.Run(ctx)
-
-		watcherAccess := api.NewWatcherAccess(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
-		go watcherAccess.Run(ctx)
+	if isAPIManagementCRDsAvailable {
+		if err = setupAPIManagementWatcher(ctx,
+			platformClient, kubeClientSet, hubClientSet,
+			traefikClientSet, kubeInformer, hubInformer,
+			portalWatcherCfg, gatewayWatcherCfg, cfgWatcher); err != nil {
+			return nil, nil, nil, fmt.Errorf("setup API management watcher: %w", err)
+		}
 	}
 
 	polGetter := reviewer.NewPolGetter(hubInformer)
@@ -335,7 +331,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		traefikReviewer,
 	}
 
-	if apiAvailable {
+	if isAPIManagementCRDsAvailable {
 		rev := []apiadmission.Reviewer{
 			apireviewer.NewAPI(platformClient),
 			apireviewer.NewCollection(platformClient),
@@ -347,6 +343,59 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	}
 
 	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), apiHandler, nil
+}
+
+func setupAPIManagementWatcher(ctx context.Context, platformClient *platform.Client,
+	kubeClientSet *clientset.Clientset, hubClientSet *hubclientset.Clientset, traefikClientSet v1alpha1.TraefikV1alpha1Interface,
+	kubeInformer informers.SharedInformerFactory, hubInformer hubinformer.SharedInformerFactory,
+	portalWatcherCfg *api.WatcherPortalConfig, gatewayWatcherCfg *api.WatcherGatewayConfig, cfgWatcher *platform.ConfigWatcher,
+) error {
+	portalWatcher := api.NewWatcherPortal(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, portalWatcherCfg)
+	gatewayWatcher := api.NewWatcherGateway(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, gatewayWatcherCfg)
+	apiWatcher := api.NewWatcherAPI(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+	collectionWatcher := api.NewWatcherCollection(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+	accessWatcher := api.NewWatcherAccess(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+
+	var cancel func()
+	var watcherStarted bool
+	startWatchers := func(ctx context.Context) {
+		var apiCtx context.Context
+		apiCtx, cancel = context.WithCancel(ctx)
+
+		go portalWatcher.Run(apiCtx)
+		go gatewayWatcher.Run(apiCtx)
+		go apiWatcher.Run(apiCtx)
+		go collectionWatcher.Run(apiCtx)
+		go accessWatcher.Run(apiCtx)
+
+		watcherStarted = true
+	}
+
+	stopWatchers := func() {
+		cancel()
+		watcherStarted = false
+	}
+
+	cfg, err := platformClient.GetConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get config: %w", err)
+	}
+
+	if slices.Contains(cfg.Features, apiManagementFeature) {
+		startWatchers(ctx)
+	}
+
+	cfgWatcher.AddListener(func(cfg platform.Config) {
+		if slices.Contains(cfg.Features, apiManagementFeature) {
+			if !watcherStarted {
+				startWatchers(ctx)
+			}
+		} else if watcherStarted {
+			stopWatchers()
+		}
+	})
+
+	return nil
 }
 
 func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
@@ -478,7 +527,7 @@ func hasMiddlewareCRD(clientSet discovery.DiscoveryInterface) (bool, error) {
 	return true, nil
 }
 
-func isAPIAvailable(clientSet discovery.DiscoveryInterface) (bool, error) {
+func hasAPIManagementCRDs(clientSet discovery.DiscoveryInterface) (bool, error) {
 	crdList, err := clientSet.ServerResourcesForGroupVersion(hubv1alpha1.SchemeGroupVersion.String())
 	if err != nil {
 		if kerror.IsNotFound(err) {
