@@ -230,45 +230,65 @@ func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hub
 		return fmt.Errorf("get edge ingress name: %w", err)
 	}
 
+	ing := &hubv1alpha1.EdgeIngress{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "hub.traefik.io/v1alpha1",
+			Kind:       "EdgeIngress",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ingName,
+			Namespace: w.config.AgentNamespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "traefik-hub",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: portal.APIVersion,
+					Kind:       portal.Kind,
+					Name:       portal.Name,
+					UID:        portal.UID,
+				},
+			},
+		},
+		Spec: hubv1alpha1.EdgeIngressSpec{
+			Service: hubv1alpha1.EdgeIngressService{
+				Name: w.config.DevPortalServiceName,
+				Port: w.config.DevPortalPort,
+			},
+			CustomDomains: portal.Spec.CustomDomains,
+		},
+	}
+
 	clusterIng, err := w.hubClientSet.HubV1alpha1().EdgeIngresses(w.config.AgentNamespace).Get(ctx, ingName, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get edge ingress: %w", err)
 	}
 
 	if kerror.IsNotFound(err) {
-		ing := &hubv1alpha1.EdgeIngress{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "hub.traefik.io/v1alpha1",
-				Kind:       "EdgeIngress",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ingName,
-				Namespace: w.config.AgentNamespace,
-				Labels: map[string]string{
-					"app.kubernetes.io/managed-by": "traefik-hub",
-				},
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: portal.APIVersion,
-						Kind:       portal.Kind,
-						Name:       portal.Name,
-						UID:        portal.UID,
-					},
-				},
-			},
-			Spec: hubv1alpha1.EdgeIngressSpec{
-				Service: hubv1alpha1.EdgeIngressService{
-					Name: w.config.DevPortalServiceName,
-					Port: w.config.DevPortalPort,
-				},
-				CustomDomains: portal.Spec.CustomDomains,
-			},
-		}
-
 		clusterIng, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(w.config.AgentNamespace).Create(ctx, ing, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create edge ingress: %w", err)
 		}
+
+		log.Debug().
+			Str("name", clusterIng.Name).
+			Str("namespace", w.config.AgentNamespace).
+			Msg("Edge ingress created")
+	} else {
+		clusterIng.Spec = ing.Spec
+		// Override Annotations and Labels in case new values are added in the future.
+		clusterIng.ObjectMeta.Annotations = ing.ObjectMeta.Annotations
+		clusterIng.ObjectMeta.Labels = ing.ObjectMeta.Labels
+
+		clusterIng, err = w.hubClientSet.HubV1alpha1().EdgeIngresses(w.config.AgentNamespace).Update(ctx, clusterIng, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("update edge ingress: %w", err)
+		}
+
+		log.Debug().
+			Str("name", clusterIng.Name).
+			Str("namespace", w.config.AgentNamespace).
+			Msg("Edge ingress updated")
 	}
 
 	// Set the APIPortal HubDomain with the domain obtained from the EdgeIngress.

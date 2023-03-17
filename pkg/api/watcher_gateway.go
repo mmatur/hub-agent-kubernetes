@@ -616,6 +616,11 @@ func (w *WatcherGateway) upsertIngress(ctx context.Context, ingress *netv1.Ingre
 		return fmt.Errorf("update ingress: %w", err)
 	}
 
+	log.Debug().
+		Str("name", ingress.Name).
+		Str("namespace", ingress.Namespace).
+		Msg("Ingress updated")
+
 	return nil
 }
 
