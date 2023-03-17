@@ -26,8 +26,8 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APICollection defines a collection of APIs exposed within an APIPortal.
-// +kubebuilder:printcolumn:name="PathPrefix",type=string,JSONPath=`.pathPrefix`
-// +kubebuilder:printcolumn:name="APISelector",type=string,JSONPath=`.apiSelector`
+// +kubebuilder:printcolumn:name="PathPrefix",type=string,JSONPath=`.spec.pathPrefix`
+// +kubebuilder:printcolumn:name="APISelector",type=string,JSONPath=`.status.apiSelector`
 // +kubebuilder:resource:scope=Cluster
 type APICollection struct {
 	metav1.TypeMeta `json:",inline"`
@@ -54,8 +54,9 @@ type APICollectionSpec struct {
 
 // APICollectionStatus is the status of an APICollection.
 type APICollectionStatus struct {
-	Version  string      `json:"version,omitempty"`
-	SyncedAt metav1.Time `json:"syncedAt,omitempty"`
+	APISelector string      `json:"apiSelector,omitempty"`
+	Version     string      `json:"version,omitempty"`
+	SyncedAt    metav1.Time `json:"syncedAt,omitempty"`
 	// Hash is a hash representing the APICollection.
 	Hash string `json:"hash,omitempty"`
 }

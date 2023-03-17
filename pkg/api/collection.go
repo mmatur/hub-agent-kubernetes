@@ -69,6 +69,13 @@ func (c *Collection) Resource() (*hubv1alpha1.APICollection, error) {
 
 	collection.Status.Hash = collectionHash
 
+	selector, err := metav1.LabelSelectorAsSelector(&collection.Spec.APISelector)
+	if err != nil {
+		return nil, fmt.Errorf("compute selector: %w", err)
+	}
+
+	collection.Status.APISelector = selector.String()
+
 	return collection, nil
 }
 

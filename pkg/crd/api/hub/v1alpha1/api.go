@@ -25,9 +25,9 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // API defines an API exposed within a portal.
-// +kubebuilder:printcolumn:name="PathPrefix",type=string,JSONPath=`.pathPrefix`
-// +kubebuilder:printcolumn:name="ServiceName",type=string,JSONPath=`.service.name`
-// +kubebuilder:printcolumn:name="ServicePort",type=string,JSONPath=`.service.port`
+// +kubebuilder:printcolumn:name="PathPrefix",type=string,JSONPath=`.spec.pathPrefix`
+// +kubebuilder:printcolumn:name="ServiceName",type=string,JSONPath=`.spec.service.name`
+// +kubebuilder:printcolumn:name="ServicePort",type=string,JSONPath=`.spec.service.port.number`
 type API struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

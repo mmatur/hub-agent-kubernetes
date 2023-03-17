@@ -95,10 +95,10 @@ func (c *Collection) reviewCreateOperation(ctx context.Context, collectionCRD *h
 	log.Ctx(ctx).Info().Msg("Creating APICollection resource")
 
 	createReq := &platform.CreateCollectionReq{
-		Name:       collectionCRD.Name,
-		Labels:     collectionCRD.Labels,
-		PathPrefix: collectionCRD.Spec.PathPrefix,
-		Selector:   collectionCRD.Spec.APISelector,
+		Name:        collectionCRD.Name,
+		Labels:      collectionCRD.Labels,
+		PathPrefix:  collectionCRD.Spec.PathPrefix,
+		APISelector: collectionCRD.Spec.APISelector,
 	}
 
 	createdCollection, err := c.platform.CreateCollection(ctx, createReq)
@@ -113,9 +113,9 @@ func (c *Collection) reviewUpdateOperation(ctx context.Context, oldCollection, n
 	log.Ctx(ctx).Info().Msg("Updating APICollection resource")
 
 	updateReq := &platform.UpdateCollectionReq{
-		Labels:     newCollection.Labels,
-		PathPrefix: newCollection.Spec.PathPrefix,
-		Selector:   newCollection.Spec.APISelector,
+		Labels:      newCollection.Labels,
+		PathPrefix:  newCollection.Spec.PathPrefix,
+		APISelector: newCollection.Spec.APISelector,
 	}
 
 	updateCollection, err := c.platform.UpdateCollection(ctx, oldCollection.Name, oldCollection.Status.Version, updateReq)

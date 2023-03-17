@@ -159,17 +159,17 @@ type OpenAPISpec struct {
 
 // CreateCollectionReq is the request for creating a collection.
 type CreateCollectionReq struct {
-	Name       string               `json:"name"`
-	Labels     map[string]string    `json:"labels,omitempty"`
-	PathPrefix string               `json:"pathPrefix,omitempty"`
-	Selector   metav1.LabelSelector `json:"selector,omitempty"`
+	Name        string               `json:"name"`
+	Labels      map[string]string    `json:"labels,omitempty"`
+	PathPrefix  string               `json:"pathPrefix,omitempty"`
+	APISelector metav1.LabelSelector `json:"apiSelector,omitempty"`
 }
 
 // UpdateCollectionReq is a request for updating a collection.
 type UpdateCollectionReq struct {
-	Labels     map[string]string    `json:"labels,omitempty"`
-	PathPrefix string               `json:"pathPrefix,omitempty"`
-	Selector   metav1.LabelSelector `json:"selector,omitempty"`
+	Labels      map[string]string    `json:"labels,omitempty"`
+	PathPrefix  string               `json:"pathPrefix,omitempty"`
+	APISelector metav1.LabelSelector `json:"apiSelector,omitempty"`
 }
 
 // CreateAccessReq is the request for creating an API access.
