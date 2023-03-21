@@ -54,7 +54,7 @@ dev: image-dev
 	kubectl rollout restart deployment -n hub-agent hub-agent-dev-portal
 
 ## Build Multi archs Docker image
-multi-arch-image-%:
+multi-arch-image-%: build-portal
 	docker buildx build $(DOCKER_BUILDX_ARGS) --build-arg VERSION=$(VERSION) -t ghcr.io/traefik/$(BIN_NAME):$* --platform=$(DOCKER_BUILD_PLATFORMS) -f buildx.Dockerfile .
 
 publish:

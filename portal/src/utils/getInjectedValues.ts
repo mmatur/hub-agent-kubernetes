@@ -12,33 +12,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Container not found')
+interface InjectedValues {
+  portalName?: string
+  portalDescription?: string
 }
 
-function prepare() {
-  if (process.env.NODE_ENV === 'development') {
-    return import('./mocks/browser').then(({ worker }) =>
-      worker.start({
-        onUnhandledRequest: 'bypass',
-      }),
-    )
-  }
+export const getInjectedValues = (): InjectedValues => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { portalName, portalDescription } = window as any
 
-  return Promise.resolve()
+  return { portalName, portalDescription }
 }
-
-const root = createRoot(container)
-
-prepare().then(() => {
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  )
-})

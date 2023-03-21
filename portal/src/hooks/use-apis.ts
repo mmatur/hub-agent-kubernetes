@@ -12,33 +12,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
+import axios from 'axios'
+import { useQuery } from 'react-query'
+import { getInjectedValues } from 'utils/getInjectedValues'
 
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Container not found')
-}
+const { portalName } = getInjectedValues()
 
-function prepare() {
-  if (process.env.NODE_ENV === 'development') {
-    return import('./mocks/browser').then(({ worker }) =>
-      worker.start({
-        onUnhandledRequest: 'bypass',
-      }),
-    )
-  }
+export const useAPIs = () => {
+  const fetchUrl = `/api/${portalName}/apis`
 
-  return Promise.resolve()
-}
-
-const root = createRoot(container)
-
-prepare().then(() => {
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
+  return useQuery(fetchUrl, () =>
+    axios
+      .get(fetchUrl)
+      .then(({ data }) => data)
+      .catch((error) => console.log(error)),
   )
-})
+}

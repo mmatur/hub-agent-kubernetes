@@ -12,33 +12,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
+/* eslint-disable react/prop-types */
 import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
+import { Link, styled } from '@traefiklabs/faency'
 
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Container not found')
-}
+const CustomLink = styled(Link, {
+  textDecoration: 'none',
 
-function prepare() {
-  if (process.env.NODE_ENV === 'development') {
-    return import('./mocks/browser').then(({ worker }) =>
-      worker.start({
-        onUnhandledRequest: 'bypass',
-      }),
-    )
-  }
-
-  return Promise.resolve()
-}
-
-const root = createRoot(container)
-
-prepare().then(() => {
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  )
+  '&:hover': {
+    color: '$textDefault',
+  },
+  length: undefined,
 })
+
+const SubtleLink = ({ css = {}, ...props }) => (
+  <CustomLink as="p" css={{ color: '$textSubtle', mt: 0, ...css }} variant="subtle" {...props} />
+)
+
+export default SubtleLink

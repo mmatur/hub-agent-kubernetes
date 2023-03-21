@@ -13,32 +13,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
 import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
+import { Box, H3, Text } from '@traefiklabs/faency'
+import { getInjectedValues } from 'utils/getInjectedValues'
 
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Container not found')
-}
+const { portalName, portalDescription } = getInjectedValues()
 
-function prepare() {
-  if (process.env.NODE_ENV === 'development') {
-    return import('./mocks/browser').then(({ worker }) =>
-      worker.start({
-        onUnhandledRequest: 'bypass',
-      }),
-    )
-  }
-
-  return Promise.resolve()
-}
-
-const root = createRoot(container)
-
-prepare().then(() => {
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
+const Dashboard = () => {
+  return (
+    <Box>
+      <H3>{portalName}</H3>
+      <Text>{portalDescription}</Text>
+    </Box>
   )
-})
+}
+
+export default Dashboard

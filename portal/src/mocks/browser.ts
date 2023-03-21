@@ -12,33 +12,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
+// src/mocks/browser.js
+import { setupWorker } from 'msw'
+import { handlers } from './handlers'
 
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Container not found')
-}
-
-function prepare() {
-  if (process.env.NODE_ENV === 'development') {
-    return import('./mocks/browser').then(({ worker }) =>
-      worker.start({
-        onUnhandledRequest: 'bypass',
-      }),
-    )
-  }
-
-  return Promise.resolve()
-}
-
-const root = createRoot(container)
-
-prepare().then(() => {
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  )
-})
+// This configures a Service Worker with the given request handlers.
+export const worker = setupWorker(...handlers)
