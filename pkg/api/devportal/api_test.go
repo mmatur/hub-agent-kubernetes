@@ -184,20 +184,21 @@ func TestPortalAPI_Router_listAPIs(t *testing.T) {
 	assert.Equal(t, listResp{
 		Collections: []collectionResp{
 			{
-				Name: "products",
+				Name:       "products",
+				PathPrefix: "/products",
 				APIs: []apiResp{
-					{Name: "books", SpecLink: "/collections/products/apis/books@products-ns"},
-					{Name: "furnitures", SpecLink: "/collections/products/apis/furnitures@products-ns"},
-					{Name: "groceries", SpecLink: "/collections/products/apis/groceries@products-ns"},
-					{Name: "toys", SpecLink: "/collections/products/apis/toys@products-ns"},
+					{Name: "books", PathPrefix: "/products/books", SpecLink: "/collections/products/apis/books@products-ns"},
+					{Name: "furnitures", PathPrefix: "/products/furnitures", SpecLink: "/collections/products/apis/furnitures@products-ns"},
+					{Name: "groceries", PathPrefix: "/products/groceries", SpecLink: "/collections/products/apis/groceries@products-ns"},
+					{Name: "toys", PathPrefix: "/products/toys", SpecLink: "/collections/products/apis/toys@products-ns"},
 				},
 			},
 		},
 		APIs: []apiResp{
-			{Name: "health", SpecLink: "/apis/health@default"},
-			{Name: "managers", SpecLink: "/apis/managers@people-ns"},
-			{Name: "metrics", SpecLink: "/apis/metrics@default"},
-			{Name: "notifications", SpecLink: "/apis/notifications@default"},
+			{Name: "health", PathPrefix: "/health", SpecLink: "/apis/health@default"},
+			{Name: "managers", PathPrefix: "/managers", SpecLink: "/apis/managers@people-ns"},
+			{Name: "metrics", PathPrefix: "/metrics", SpecLink: "/apis/metrics@default"},
+			{Name: "notifications", PathPrefix: "/notifications", SpecLink: "/apis/notifications@default"},
 		},
 	}, got)
 }

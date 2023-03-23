@@ -299,27 +299,31 @@ type listResp struct {
 }
 
 type collectionResp struct {
-	Name string    `json:"name"`
-	APIs []apiResp `json:"apis"`
+	Name       string    `json:"name"`
+	PathPrefix string    `json:"pathPrefix,omitempty"`
+	APIs       []apiResp `json:"apis"`
 }
 
 type apiResp struct {
-	Name     string `json:"name"`
-	SpecLink string `json:"specLink"`
+	Name       string `json:"name"`
+	PathPrefix string `json:"pathPrefix"`
+	SpecLink   string `json:"specLink"`
 }
 
 func buildListResp(p *portal) listResp {
 	var resp listResp
 	for collectionName, c := range p.Gateway.Collections {
 		cr := collectionResp{
-			Name: collectionName,
-			APIs: make([]apiResp, 0, len(c.APIs)),
+			Name:       collectionName,
+			PathPrefix: c.Spec.PathPrefix,
+			APIs:       make([]apiResp, 0, len(c.APIs)),
 		}
 
 		for apiNameNamespace, a := range c.APIs {
 			cr.APIs = append(cr.APIs, apiResp{
-				Name:     a.Name,
-				SpecLink: fmt.Sprintf("/collections/%s/apis/%s", collectionName, apiNameNamespace),
+				Name:       a.Name,
+				PathPrefix: path.Join(cr.PathPrefix, a.Spec.PathPrefix),
+				SpecLink:   fmt.Sprintf("/collections/%s/apis/%s", collectionName, apiNameNamespace),
 			})
 		}
 		sortAPIsResp(cr.APIs)
@@ -330,8 +334,9 @@ func buildListResp(p *portal) listResp {
 
 	for apiNameNamespace, a := range p.Gateway.APIs {
 		resp.APIs = append(resp.APIs, apiResp{
-			Name:     a.Name,
-			SpecLink: fmt.Sprintf("/apis/%s", apiNameNamespace),
+			Name:       a.Name,
+			PathPrefix: a.Spec.PathPrefix,
+			SpecLink:   fmt.Sprintf("/apis/%s", apiNameNamespace),
 		})
 	}
 	sortAPIsResp(resp.APIs)
