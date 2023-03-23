@@ -57,8 +57,11 @@ func NewPortalUI(portals []portal) (*PortalUI, error) {
 		templatedIndexes: templatedIndexes,
 	}
 
-	h.router.Get("/", h.handleIndex)
-	h.router.Method(http.MethodGet, "/*", http.FileServer(http.FS(portalui.WebUI)))
+	fileServer := http.FileServer(http.FS(portalui.WebUI))
+	h.router.Handle("/static/*", fileServer)
+	h.router.Handle("/robots.txt", fileServer)
+
+	h.router.Get("/*", h.handleIndex)
 
 	return h, nil
 }
