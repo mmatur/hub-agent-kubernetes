@@ -37,8 +37,8 @@ type Portal struct {
 
 	Version string `json:"version"`
 
-	HubDomain     string   `json:"hubDomain,omitempty"`
-	CustomDomains []string `json:"customDomains,omitempty"`
+	HubDomain     string         `json:"hubDomain,omitempty"`
+	CustomDomains []CustomDomain `json:"customDomains,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -52,15 +52,26 @@ type CustomDomain struct {
 
 // Resource builds the v1alpha1 APIPortal resource.
 func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
+	var customDomains []string
+	for _, domain := range p.CustomDomains {
+		customDomains = append(customDomains, domain.Name)
+	}
+
 	spec := hubv1alpha1.APIPortalSpec{
 		Description:   p.Description,
 		APIGateway:    p.Gateway,
-		CustomDomains: p.CustomDomains,
+		CustomDomains: customDomains,
 	}
 
 	var urls []string
+	var verifiedCustomDomains []string
 	for _, customDomain := range p.CustomDomains {
-		urls = append(urls, "https://"+customDomain)
+		if !customDomain.Verified {
+			continue
+		}
+
+		urls = append(urls, "https://"+customDomain.Name)
+		verifiedCustomDomains = append(verifiedCustomDomains, customDomain.Name)
 	}
 	if p.HubDomain != "" {
 		urls = append(urls, "https://"+p.HubDomain)
@@ -77,17 +88,17 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 			Version:       p.Version,
 			SyncedAt:      metav1.Now(),
 			HubDomain:     p.HubDomain,
-			CustomDomains: p.CustomDomains,
+			CustomDomains: verifiedCustomDomains,
 			URLs:          strings.Join(urls, ","),
 		},
 	}
 
-	portalHash, err := HashPortal(portal)
+	h, err := HashPortal(portal)
 	if err != nil {
 		return nil, fmt.Errorf("compute APIPortal hash: %w", err)
 	}
 
-	portal.Status.Hash = portalHash
+	portal.Status.Hash = h
 
 	return portal, nil
 }
@@ -108,10 +119,10 @@ func HashPortal(p *hubv1alpha1.APIPortal) (string, error) {
 		CustomDomains: p.Spec.CustomDomains,
 	}
 
-	hash, err := sum(ph)
+	h, err := sum(ph)
 	if err != nil {
 		return "", fmt.Errorf("sum object: %w", err)
 	}
 
-	return base64.StdEncoding.EncodeToString(hash), nil
+	return base64.StdEncoding.EncodeToString(h), nil
 }

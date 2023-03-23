@@ -31,7 +31,9 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -59,9 +61,12 @@ func Test_WatcherRun(t *testing.T) {
 
 		clusterPortals       string
 		clusterEdgeIngresses string
+		clusterIngresses     string
 
 		wantPortals       string
 		wantEdgeIngresses string
+		wantIngresses     string
+		wantSecrets       string
 	}{
 		{
 			desc: "new portal present on the platform needs to be created on the cluster",
@@ -71,40 +76,47 @@ func Test_WatcherRun(t *testing.T) {
 					Description: "My new portal",
 					Gateway:     "gateway",
 					Version:     "version-1",
-					CustomDomains: []string{
-						"hello.example.com",
-						"welcome.example.com",
+					HubDomain:   "majestic-beaver-123.hub-traefik.io",
+					CustomDomains: []CustomDomain{
+						{Name: "hello.example.com", Verified: true},
+						{Name: "welcome.example.com", Verified: true},
 					},
 				},
 			},
 			wantPortals:       "testdata/new-portal/want.portals.yaml",
 			wantEdgeIngresses: "testdata/new-portal/want.edge-ingresses.yaml",
+			wantIngresses:     "testdata/new-portal/want.ingresses.yaml",
+			wantSecrets:       "testdata/new-portal/want.secrets.yaml",
 		},
 		{
 			desc: "modified portal on the platform needs to be updated on the cluster",
 			platformPortals: []Portal{
 				{
-					Name:        "modified-portal",
+					Name:        "portal",
 					Description: "My modified portal",
 					Gateway:     "modified-gateway",
 					Version:     "version-2",
-					CustomDomains: []string{
-						"hello.example.com",
-						"new.example.com",
+					HubDomain:   "majestic-beaver-123.hub-traefik.io",
+					CustomDomains: []CustomDomain{
+						{Name: "hello.example.com", Verified: true},
+						{Name: "new.example.com", Verified: true},
+						{Name: "not-yet-verified.example.com", Verified: false},
 					},
 				},
 			},
 			clusterPortals:       "testdata/update-portal/portals.yaml",
 			clusterEdgeIngresses: "testdata/update-portal/edge-ingresses.yaml",
+			clusterIngresses:     "testdata/update-portal/ingresses.yaml",
 			wantPortals:          "testdata/update-portal/want.portals.yaml",
 			wantEdgeIngresses:    "testdata/update-portal/want.edge-ingresses.yaml",
+			wantIngresses:        "testdata/update-portal/want.ingresses.yaml",
+			wantSecrets:          "testdata/update-portal/want.secrets.yaml",
 		},
 		{
 			desc:                 "deleted portal on the platform needs to be deleted on the cluster",
 			platformPortals:      []Portal{},
 			clusterPortals:       "testdata/delete-portal/portals.yaml",
 			clusterEdgeIngresses: "testdata/delete-portal/edge-ingresses.yaml",
-			wantEdgeIngresses:    "testdata/delete-portal/want.edge-ingresses.yaml",
 		},
 	}
 
@@ -112,14 +124,15 @@ func Test_WatcherRun(t *testing.T) {
 		test := test
 
 		t.Run(test.desc, func(t *testing.T) {
-			wantPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.wantPortals)
-			wantEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.wantEdgeIngresses)
-
 			clusterPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.clusterPortals)
 			clusterEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.clusterEdgeIngresses)
+			clusterIngresses := loadFixtures[netv1.Ingress](t, test.clusterIngresses)
 
 			var kubeObjects []runtime.Object
 			kubeObjects = append(kubeObjects, services...)
+			for _, clusterIngress := range clusterIngresses {
+				kubeObjects = append(kubeObjects, clusterIngress.DeepCopy())
+			}
 
 			var hubObjects []runtime.Object
 			for _, clusterPortal := range clusterPortals {
@@ -157,6 +170,23 @@ func Test_WatcherRun(t *testing.T) {
 				}
 			})
 
+			var wantCustomDomains []string
+			for _, platformPortal := range test.platformPortals {
+				for _, customDomain := range platformPortal.CustomDomains {
+					if customDomain.Verified {
+						wantCustomDomains = append(wantCustomDomains, customDomain.Name)
+					}
+				}
+			}
+
+			if len(wantCustomDomains) > 0 {
+				client.OnGetCertificateByDomains(wantCustomDomains).
+					TypedReturns(edgeingress.Certificate{
+						Certificate: []byte("cert"),
+						PrivateKey:  []byte("private"),
+					}, nil)
+			}
+
 			w := NewWatcherPortal(client, kubeClientSet, kubeInformer, hubClientSet, hubInformer, &WatcherPortalConfig{
 				IngressClassName:        "ingress-class",
 				AgentNamespace:          "agent-ns",
@@ -165,6 +195,8 @@ func Test_WatcherRun(t *testing.T) {
 				DevPortalServiceName:    "dev-portal-service-name",
 				DevPortalPort:           8080,
 				PortalSyncInterval:      time.Millisecond,
+				CertSyncInterval:        time.Millisecond,
+				CertRetryInterval:       time.Millisecond,
 			})
 
 			stop := make(chan struct{})
@@ -175,8 +207,22 @@ func Test_WatcherRun(t *testing.T) {
 
 			<-stop
 
-			assertPortalsMatches(t, hubClientSet, wantPortals)
-			assertEdgeIngressesMatches(t, hubClientSet, "agent-ns", wantEdgeIngresses)
+			if test.wantPortals != "" {
+				wantPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.wantPortals)
+				assertPortalsMatches(t, hubClientSet, wantPortals)
+			}
+			if test.wantEdgeIngresses != "" {
+				wantEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.wantEdgeIngresses)
+				assertEdgeIngressesMatches(t, hubClientSet, "agent-ns", wantEdgeIngresses)
+			}
+			if test.wantIngresses != "" {
+				wantIngresses := loadFixtures[netv1.Ingress](t, test.wantIngresses)
+				assertIngressesMatches(t, kubeClientSet, []string{"agent-ns"}, wantIngresses)
+			}
+			if test.wantSecrets != "" {
+				wantSecrets := loadFixtures[corev1.Secret](t, test.wantSecrets)
+				assertSecretsMatches(t, kubeClientSet, []string{"agent-ns"}, wantSecrets)
+			}
 		})
 	}
 }
@@ -222,10 +268,10 @@ func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientse
 	require.NoError(t, err)
 
 	var gotEdgeIngresses []hubv1alpha1.EdgeIngress
-	for _, portal := range edgeIngresses.Items {
-		portal.Status.SyncedAt = metav1.Time{}
+	for _, edgeIngress := range edgeIngresses.Items {
+		edgeIngress.Status.SyncedAt = metav1.Time{}
 
-		gotEdgeIngresses = append(gotEdgeIngresses, portal)
+		gotEdgeIngresses = append(gotEdgeIngresses, edgeIngress)
 	}
 
 	sort.Slice(gotEdgeIngresses, func(i, j int) bool {

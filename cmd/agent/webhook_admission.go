@@ -182,6 +182,8 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 		DevPortalServiceName:    cliCtx.String(flagDevPortalServiceName),
 		DevPortalPort:           cliCtx.Int(flagDevPortalPort),
 		PortalSyncInterval:      time.Minute,
+		CertSyncInterval:        time.Hour,
+		CertRetryInterval:       time.Minute,
 	}
 
 	gatewayWatcherCfg := &api.WatcherGatewayConfig{

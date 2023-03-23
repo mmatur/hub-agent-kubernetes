@@ -35,7 +35,7 @@ import (
 var testPortalSpec = hubv1alpha1.APIPortalSpec{
 	Description:   "desc",
 	APIGateway:    "gateway",
-	CustomDomains: []string{"customDomain"},
+	CustomDomains: []string{"example.com"},
 }
 
 func TestPortal_Review_createOperation(t *testing.T) {
@@ -77,13 +77,15 @@ func TestPortal_Review_createOperation(t *testing.T) {
 				Name:          "portal-name",
 				Description:   "desc",
 				Gateway:       "gateway",
-				CustomDomains: []string{"customDomain"},
+				CustomDomains: []string{"example.com"},
 			},
 			wantPatch: mustMarshal(t, []patch{
 				{Op: "replace", Path: "/status", Value: hubv1alpha1.APIPortalStatus{
-					Version:  "version-1",
-					SyncedAt: now,
-					Hash:     "7z8bBr7Yav5c/oZ/W/Qy8Q==",
+					Version:       "version-1",
+					SyncedAt:      now,
+					URLs:          "https://example.com",
+					CustomDomains: []string{"example.com"},
+					Hash:          "j4SP57OtltRAVw+lrQTh0A==",
 				}},
 			}),
 		},
@@ -94,7 +96,7 @@ func TestPortal_Review_createOperation(t *testing.T) {
 				Name:          "portal-name",
 				Description:   "desc",
 				Gateway:       "gateway",
-				CustomDomains: []string{"customDomain"},
+				CustomDomains: []string{"example.com"},
 			},
 			errCreate: errors.New("boom"),
 		},
@@ -109,6 +111,9 @@ func TestPortal_Review_createOperation(t *testing.T) {
 				Version:   "version-1",
 				CreatedAt: time.Now().Add(-time.Hour).UTC().Truncate(time.Millisecond),
 				UpdatedAt: time.Now().UTC().Truncate(time.Millisecond),
+				CustomDomains: []api.CustomDomain{
+					{Name: "example.com", Verified: true},
+				},
 			}
 
 			client := newPortalServiceMock(t)

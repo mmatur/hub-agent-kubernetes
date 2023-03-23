@@ -21,7 +21,9 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -42,12 +44,12 @@ type portalIndexData struct {
 
 // NewPortalUI creates a new PortalUI handler.
 func NewPortalUI(portals []portal) (*PortalUI, error) {
-	indexTemplate, err := template.ParseFS(portalui.WebUI, "index.html")
+	tmpl, err := template.ParseFS(portalui.WebUI, "index.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse index.html template: %w", err)
 	}
 
-	templatedIndexes, err := templatePortalIndexes(indexTemplate, portals)
+	templatedIndexes, err := templatePortalIndexes(tmpl, portals)
 	if err != nil {
 		return nil, fmt.Errorf("template portal indexes: %w", err)
 	}
@@ -72,9 +74,10 @@ func (p *PortalUI) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (p *PortalUI) handleIndex(rw http.ResponseWriter, req *http.Request) {
-	index, ok := p.templatedIndexes[req.Host]
+	host := stripHostPort(req.Host)
+	index, ok := p.templatedIndexes[host]
 	if !ok {
-		log.Debug().Str("host", req.Host).Msg("APIPortal not found for host")
+		log.Debug().Str("host", host).Msg("APIPortal not found for host")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -106,10 +109,23 @@ func templatePortalIndexes(indexTemplate *template.Template, portals []portal) (
 		for _, customDomain := range p.Status.CustomDomains {
 			indexes[customDomain] = templated
 		}
-		if len(p.Status.CustomDomains) == 0 {
-			indexes[p.Status.HubDomain] = templated
-		}
+		indexes[p.Status.HubDomain] = templated
 	}
 
 	return indexes, nil
+}
+
+// stripHostPort returns host without any trailing ":<port>".
+// https://github.com/golang/go/blob/cdf77c7209a497825b2956ec0360c6e7e4ae0acd/src/net/http/server.go#L2358-L2368
+func stripHostPort(host string) string {
+	// If no port on host, return unchanged
+	if !strings.Contains(host, ":") {
+		return host
+	}
+
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		return host // on error, return unchanged
+	}
+	return h
 }

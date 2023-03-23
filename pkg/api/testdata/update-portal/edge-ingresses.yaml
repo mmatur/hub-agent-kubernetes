@@ -1,7 +1,7 @@
 apiVersion: hub.traefik.io/v1alpha1
 kind: EdgeIngress
 metadata:
-  name: portal-3684986092-portal
+  name: portal-3118032615-portal
   namespace: agent-ns
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
@@ -13,6 +13,3 @@ spec:
   service:
     name: dev-portal-service-name
     port: 8080
-  customDomains:
-    - hello.example.com
-    - welcome.example.com

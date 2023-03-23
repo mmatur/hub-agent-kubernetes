@@ -13,6 +13,3 @@ spec:
   service:
     name: dev-portal-service-name
     port: 8080
-  customDomains:
-    - hello.example.com
-    - welcome.example.com

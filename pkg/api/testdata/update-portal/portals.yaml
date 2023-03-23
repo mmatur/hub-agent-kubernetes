@@ -7,11 +7,9 @@ spec:
   gateway: gateway
   customDomains:
     - "hello.example.com"
-    - "welcome.example.com"
 status:
   version: version-1
   customDomains:
     - hello.example.com
-    - welcome.example.com
   urls: "https://hello.example.com,https://welcome.example.com"
   hash: "HtPv59eS2+R4jrHZHiRuGwDUgAw="

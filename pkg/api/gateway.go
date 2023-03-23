@@ -87,12 +87,12 @@ func (g *Gateway) Resource() (*hubv1alpha1.APIGateway, error) {
 		},
 	}
 
-	gatewayHash, err := HashGateway(gateway)
+	h, err := HashGateway(gateway)
 	if err != nil {
 		return nil, fmt.Errorf("compute APIGateway hash: %w", err)
 	}
 
-	gateway.Status.Hash = gatewayHash
+	gateway.Status.Hash = h
 
 	return gateway, nil
 }
@@ -113,10 +113,10 @@ func HashGateway(g *hubv1alpha1.APIGateway) (string, error) {
 		CustomDomains: g.Spec.CustomDomains,
 	}
 
-	hash, err := sum(gh)
+	h, err := sum(gh)
 	if err != nil {
 		return "", fmt.Errorf("sum object: %w", err)
 	}
 
-	return base64.StdEncoding.EncodeToString(hash), nil
+	return base64.StdEncoding.EncodeToString(h), nil
 }

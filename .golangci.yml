@@ -266,3 +266,6 @@ issues:
     - path: pkg/api/watcher_gateway_test.go
       linters:
         - gocognit
+    - path: pkg/api/watcher_portal_test.go
+      linters:
+        - gocognit
