@@ -71,3 +71,8 @@ jobs:
         run: |
           make multi-arch-image-latest
           make multi-arch-image-${{github.ref_name}}
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
