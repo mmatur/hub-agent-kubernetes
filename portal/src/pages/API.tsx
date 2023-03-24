@@ -18,6 +18,8 @@ import { Box } from '@traefiklabs/faency'
 import { useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import SwaggerUI from 'swagger-ui-react'
+
+import { AugmentedLayoutPlugin } from 'components/layouts/AugmentedLayout'
 import { getInjectedValues } from 'utils/getInjectedValues'
 
 // const requestInterceptor = (req) => {
@@ -48,7 +50,7 @@ const API = () => {
         <title>{apiName || 'API Portal'}</title>
       </Helmet>
       <Box>
-        <SwaggerUI url={specUrl} />
+        <SwaggerUI layout="AugmentedLayout" plugins={[AugmentedLayoutPlugin]} url={specUrl} />
       </Box>
     </Box>
   )
