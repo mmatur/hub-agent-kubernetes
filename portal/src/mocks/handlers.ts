@@ -47,6 +47,10 @@ export const handlers = [
       ctx.json({
         collections: [
           {
+            name: 'my-empty-store-collection',
+            apis: [],
+          },
+          {
             name: 'my-store-collection',
             pathPrefix: '/api',
             apis: [

@@ -23,7 +23,7 @@ import {
   NavigationTreeContainer,
   NavigationTreeItem as FaencyNavTreeItem,
 } from '@traefiklabs/faency'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAPIs } from 'hooks/use-apis'
 // import { FiPower } from 'react-icons/fi'
 import { FaFolder, FaFolderOpen, FaFileAlt } from 'react-icons/fa'
@@ -38,6 +38,8 @@ const NavigationTreeItem = ({
   type,
   children,
   specLink,
+  disabled,
+  defaultExpanded,
   ...props
 }: {
   key: string
@@ -46,6 +48,8 @@ const NavigationTreeItem = ({
   type: string
   children?: React.ReactNode
   specLink?: string
+  disabled?: boolean
+  defaultExpanded?: boolean
 }) => {
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -54,10 +58,16 @@ const NavigationTreeItem = ({
     <FaencyNavTreeItem
       active={pathname === specLink}
       onClick={() => navigate(specLink as string)}
-      css={{ textAlign: 'justify', width: '100%' }}
+      css={
+        disabled
+          ? { textAlign: 'justify', width: '100%', opacity: 0.5, '&:hover': { cursor: 'default' } }
+          : { textAlign: 'justify', width: '100%' }
+      }
       label={name}
       subtitle={subtitle}
       startAdornment={type === 'api' ? <FaFileAlt /> : null}
+      disabled={disabled}
+      defaultExpanded={defaultExpanded}
       {...props}
     >
       {children}
@@ -71,6 +81,7 @@ const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
   // const { user } = useAuthState()
 
   const navigate = useNavigate()
+  const { collectionName } = useParams()
 
   return (
     <NavigationDrawer css={{ width: 240 }}>
@@ -88,7 +99,7 @@ const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
               <H1>{portalTitle}</H1>
             </Flex>
           </Link>
-          <H3>Available APIs</H3>
+          {apis?.collections?.length || apis?.apis?.length ? <H3>Available APIs</H3> : null}
           <Flex direction="column" css={{ mt: '$5' }}>
             <NavigationTreeContainer defaultCollapseIcon={<FaFolderOpen />} defaultExpandIcon={<FaFolder />}>
               {apis?.collections?.map((collection, index: number) => (
@@ -97,6 +108,8 @@ const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
                   name={collection.name}
                   subtitle={collection.pathPrefix}
                   type="collection"
+                  disabled={!collection.apis?.length}
+                  defaultExpanded={collection.name === collectionName}
                 >
                   {collection.apis?.length &&
                     collection.apis.map((api: { name: string; specLink: string; pathPrefix: string }, idx: number) => (

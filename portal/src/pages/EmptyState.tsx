@@ -13,10 +13,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
 import React from 'react'
-import { Box } from '@traefiklabs/faency'
+import { Flex, H1 } from '@traefiklabs/faency'
 
-const Dashboard = () => {
-  return <Box />
+const EmptyState = () => {
+  return (
+    <Flex direction="column" gap={3} align="center" justify="center" css={{ height: 500 }}>
+      <H1>No API is shared yet</H1>
+      {/* <Link>See how to create one</Link> */}
+    </Flex>
+  )
 }
 
-export default Dashboard
+export default EmptyState
