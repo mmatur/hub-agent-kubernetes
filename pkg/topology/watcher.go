@@ -68,7 +68,7 @@ func (w *Watcher) Start(ctx context.Context) {
 			log.Info().Msg("Stopping topology watcher")
 			return
 		case <-tick.C:
-			s, err := w.k8s.FetchState(ctx)
+			s, err := w.k8s.FetchState()
 			if err != nil {
 				log.Error().Err(err).Msg("create state")
 				continue

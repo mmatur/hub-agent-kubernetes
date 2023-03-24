@@ -62,7 +62,7 @@ func NewClient(client *http.Client, baseURL, token string) (*Client, error) {
 }
 
 // GetPreviousData gets the agent configuration.
-func (c *Client) GetPreviousData(ctx context.Context, startup bool) (map[string][]DataPointGroup, error) {
+func (c *Client) GetPreviousData(ctx context.Context) (map[string][]DataPointGroup, error) {
 	endpoint, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "data"))
 	if err != nil {
 		return nil, fmt.Errorf("creating metrics previous data url: %w", err)

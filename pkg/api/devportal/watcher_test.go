@@ -209,10 +209,16 @@ func TestWatcher_OnUpdate(t *testing.T) {
 		wantUpdate bool
 	}{
 		{
-			desc:       "APIPortal: same hash",
-			oldObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1"}},
-			newObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1"}},
+			desc:       "APIPortal: same hash and urls",
+			oldObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1", URLs: "http://url.com"}},
+			newObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1", URLs: "http://url.com"}},
 			wantUpdate: false,
+		},
+		{
+			desc:       "APIPortal: same hash and different urls",
+			oldObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1", URLs: "http://url.com"}},
+			newObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v1", URLs: "http://url.com, http://other.com"}},
+			wantUpdate: true,
 		},
 		{
 			desc:       "APIPortal: different hash",
@@ -220,12 +226,17 @@ func TestWatcher_OnUpdate(t *testing.T) {
 			newObject:  &hubv1alpha1.APIPortal{Status: hubv1alpha1.APIPortalStatus{Hash: "v2"}},
 			wantUpdate: true,
 		},
-
 		{
-			desc:       "APIGateway: same hash",
-			oldObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1"}},
-			newObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1"}},
+			desc:       "APIGateway: same hash and urls",
+			oldObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1", URLs: "http://url.com"}},
+			newObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1", URLs: "http://url.com"}},
 			wantUpdate: false,
+		},
+		{
+			desc:       "APIGateway: same hash and different urls",
+			oldObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1", URLs: "http://url.com"}},
+			newObject:  &hubv1alpha1.APIGateway{Status: hubv1alpha1.APIGatewayStatus{Hash: "v1", URLs: "http://url.com, http://other.com"}},
+			wantUpdate: true,
 		},
 		{
 			desc:       "APIGateway: different hash",

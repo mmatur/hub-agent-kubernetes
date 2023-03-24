@@ -62,7 +62,7 @@ func TestClient_GetPreviousData(t *testing.T) {
 	client, err := metrics.NewClient(http.DefaultClient, srv.URL, "some_test_token")
 	require.NoError(t, err)
 
-	got, err := client.GetPreviousData(context.Background(), true)
+	got, err := client.GetPreviousData(context.Background())
 	require.NoError(t, err)
 
 	want := map[string][]metrics.DataPointGroup{
@@ -92,7 +92,7 @@ func TestClient_GetPreviousDataHandlesHTTPError(t *testing.T) {
 	client, err := metrics.NewClient(http.DefaultClient, srv.URL, "some_test_token")
 	require.NoError(t, err)
 
-	_, err = client.GetPreviousData(context.Background(), true)
+	_, err = client.GetPreviousData(context.Background())
 
 	assert.Error(t, err)
 }

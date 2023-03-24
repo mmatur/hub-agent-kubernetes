@@ -80,7 +80,7 @@ func (m *Manager) TopologyStateChanged(_ context.Context, cluster *state.Cluster
 
 // Run runs the metrics manager. This is a blocking method.
 func (m *Manager) Run(ctx context.Context) error {
-	prevData, err := m.client.GetPreviousData(ctx, true)
+	prevData, err := m.client.GetPreviousData(ctx)
 	if err != nil {
 		return err
 	}

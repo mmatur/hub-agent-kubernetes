@@ -144,7 +144,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 }
 
 // FetchState assembles a cluster state from Kubernetes resources.
-func (f *Fetcher) FetchState(ctx context.Context) (*Cluster, error) {
+func (f *Fetcher) FetchState() (*Cluster, error) {
 	var cluster Cluster
 
 	var err error
