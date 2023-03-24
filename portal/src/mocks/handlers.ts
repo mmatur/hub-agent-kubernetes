@@ -48,12 +48,27 @@ export const handlers = [
         collections: [
           {
             name: 'my-store-collection',
+            pathPrefix: '/api',
             apis: [
-              { name: 'my-petstore-api', specLink: '/collections/my-store-collection/apis/my-petstore-api@petstore' },
+              {
+                name: 'my-petstore-api',
+                specLink: '/collections/my-store-collection/apis/my-petstore-api@petstore',
+                pathPrefix: '/prefix',
+              },
+            ],
+          },
+          {
+            name: 'my-store-collection-2',
+            apis: [
+              {
+                name: 'my-petstore-api-2',
+                specLink: '/collections/my-store-collection/apis/my-petstore-api@petstore',
+                pathPrefix: '/path',
+              },
             ],
           },
         ],
-        apis: [{ name: 'my-petstore-api', specLink: '/apis/my-petstore-api@petstore' }],
+        apis: [{ name: 'my-petstore-api', specLink: '/apis/my-petstore-api@petstore', pathPrefix: '/api' }],
       }),
     )
     // } else {

@@ -34,6 +34,7 @@ import { FaFolder, FaFolderOpen, FaFileAlt } from 'react-icons/fa'
 
 const NavigationTreeItem = ({
   name,
+  subtitle,
   type,
   children,
   specLink,
@@ -41,6 +42,7 @@ const NavigationTreeItem = ({
 }: {
   key: string
   name: string
+  subtitle?: string
   type: string
   children?: React.ReactNode
   specLink?: string
@@ -54,6 +56,7 @@ const NavigationTreeItem = ({
       onClick={() => navigate(specLink as string)}
       css={{ textAlign: 'justify', width: '100%' }}
       label={name}
+      subtitle={subtitle}
       startAdornment={type === 'api' ? <FaFileAlt /> : null}
       {...props}
     >
@@ -89,12 +92,18 @@ const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
           <Flex direction="column" css={{ mt: '$5' }}>
             <NavigationTreeContainer defaultCollapseIcon={<FaFolderOpen />} defaultExpandIcon={<FaFolder />}>
               {apis?.collections?.map((collection, index: number) => (
-                <NavigationTreeItem key={`sidenav-${index}`} name={collection.name} type="collection">
+                <NavigationTreeItem
+                  key={`sidenav-${index}`}
+                  name={collection.name}
+                  subtitle={collection.pathPrefix}
+                  type="collection"
+                >
                   {collection.apis?.length &&
-                    collection.apis.map((api: { name: string; specLink: string }, idx: number) => (
+                    collection.apis.map((api: { name: string; specLink: string; pathPrefix: string }, idx: number) => (
                       <NavigationTreeItem
                         key={`sidenav-${index}-${idx}`}
                         name={api.name}
+                        subtitle={api.pathPrefix}
                         specLink={api.specLink}
                         type="api"
                       />
@@ -103,7 +112,13 @@ const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
               ))}
             </NavigationTreeContainer>
             {apis?.apis?.map((api, index: number) => (
-              <NavigationTreeItem key={`sidenav-api-${index}`} name={api.name} specLink={api.specLink} type="api" />
+              <NavigationTreeItem
+                key={`sidenav-api-${index}`}
+                name={api.name}
+                subtitle={api.pathPrefix}
+                specLink={api.specLink}
+                type="api"
+              />
             ))}
           </Flex>
         </>

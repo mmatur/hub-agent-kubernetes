@@ -24,7 +24,7 @@
     ]
   },
   "dependencies": {
-    "@traefiklabs/faency": "^9.2.0",
+    "@traefiklabs/faency": "^9.3.0",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
     "@types/react-helmet": "^6.1.6",

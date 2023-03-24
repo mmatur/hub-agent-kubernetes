@@ -2382,10 +2382,10 @@
   resolved "https://registry.yarnpkg.com/@tootallnate/once/-/once-1.1.2.tgz#ccb91445360179a04e7fe6aff78c00ffc1eeaf82"
   integrity sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==
 
-"@traefiklabs/faency@^9.2.0":
-  version "9.2.0"
-  resolved "https://registry.yarnpkg.com/@traefiklabs/faency/-/faency-9.2.0.tgz#740720f6000a80b3820af52a5f1e225a945b5437"
-  integrity sha512-lKSSVWXLBf3WZTOAJFAqIOplDX3HGSonPQEtBoYA6AKGBMit82eq1tVRIUQwGF0zO/5R2/joQxCG+ULPHayQZQ==
+"@traefiklabs/faency@^9.3.0":
+  version "9.3.0"
+  resolved "https://registry.yarnpkg.com/@traefiklabs/faency/-/faency-9.3.0.tgz#a002bcea507c83a94fe056599960697942ad460c"
+  integrity sha512-MgT4Iv9Q+t+doPa6fIBD4uKguPEI6dSUhzKnt6cnjt3asKVWD3LFYjfDeFgySWYCUSMf0kMnNH/fhuF78td4Qw==
   dependencies:
     "@radix-ui/colors" "^0.1.8"
     "@radix-ui/react-accordion" "^1.0.1"
