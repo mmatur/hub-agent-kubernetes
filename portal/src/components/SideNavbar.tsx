@@ -17,9 +17,7 @@ import {
   NavigationDrawer,
   NavigationContainer,
   H3,
-  H1,
   Flex,
-  Link,
   NavigationTreeContainer,
   NavigationTreeItem as FaencyNavTreeItem,
 } from '@traefiklabs/faency'
@@ -60,8 +58,14 @@ const NavigationTreeItem = ({
       onClick={() => navigate(specLink as string)}
       css={
         disabled
-          ? { textAlign: 'justify', width: '100%', opacity: 0.5, '&:hover': { cursor: 'default' } }
-          : { textAlign: 'justify', width: '100%' }
+          ? {
+              textAlign: 'justify',
+              width: '100%',
+              opacity: 0.5,
+              '&:hover': { cursor: 'default' },
+              mt: '8px !important',
+            }
+          : { textAlign: 'justify', width: '100%', mt: '8px !important' }
       }
       label={name}
       subtitle={subtitle}
@@ -75,32 +79,27 @@ const NavigationTreeItem = ({
   )
 }
 
-const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
+const SideNavbar = () => {
   const { data: apis } = useAPIs()
   // const authDispatch = useAuthDispatch()
   // const { user } = useAuthState()
 
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
+
   const { collectionName } = useParams()
 
   return (
-    <NavigationDrawer css={{ width: 240 }}>
+    <NavigationDrawer css={{ backgroundColor: 'white', borderRight: '1px solid $gray4', width: 240 }} elevation={1}>
       <NavigationContainer
         css={{
           flexGrow: 1,
         }}
       >
         <>
-          <Link
-            onClick={() => navigate(`/`)}
-            css={{ textDecoration: 'none', '&:hover': { textDecoration: 'none', cursor: 'pointer' } }}
-          >
-            <Flex css={{ height: '$10' }}>
-              <H1>{portalTitle}</H1>
-            </Flex>
-          </Link>
-          {apis?.collections?.length || apis?.apis?.length ? <H3>Available APIs</H3> : null}
-          <Flex direction="column" css={{ mt: '$5' }}>
+          {apis?.collections?.length || apis?.apis?.length ? (
+            <H3 css={{ color: '$gray9', fontSize: '$3', margin: '$4 0 0 $2' }}>Available APIs</H3>
+          ) : null}
+          <Flex direction="column" css={{ mt: '$2' }}>
             <NavigationTreeContainer defaultCollapseIcon={<FaFolderOpen />} defaultExpandIcon={<FaFolder />}>
               {apis?.collections?.map((collection, index: number) => (
                 <NavigationTreeItem

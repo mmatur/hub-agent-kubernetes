@@ -13,12 +13,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 
 import React from 'react'
-import { Flex, Container, VariantProps, CSS } from '@traefiklabs/faency'
+import { Card, Container, Flex, H1, Text, VariantProps, CSS } from '@traefiklabs/faency'
 import { Helmet } from 'react-helmet-async'
+
 import SideNavbar from 'components/SideNavbar'
 import { getInjectedValues } from 'utils/getInjectedValues'
 
-const { portalTitle } = getInjectedValues()
+const { portalDescription, portalTitle } = getInjectedValues()
 
 type Props = {
   title?: string
@@ -42,10 +43,36 @@ const PageLayout = ({
       <Helmet>
         <title>{title || 'API Portal'}</title>
       </Helmet>
+      <Flex
+        align="center"
+        css={{
+          background: '#fff',
+          color: '#222',
+          width: '100%',
+          borderBottom: '1px solid $gray4',
+          padding: '$3',
+          gap: '$2',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        <H1 css={{ fontSize: '$6', color: 'inherit' }}>{portalTitle as string}</H1>
+        <Text css={{ color: 'inherit', opacity: 0.7 }}>{portalDescription as string}</Text>
+      </Flex>
       <Flex>
-        <SideNavbar portalTitle={portalTitle as string} />
-        <Flex direction="column" css={{ flex: 1, height: '100vh', overflowY: 'auto', position: 'relative', pb: '$3' }}>
-          <Flex direction="column" css={{ flex: 1, pb: noGutter ? 0 : '$2', px: noGutter ? 0 : '$2' }}>
+        <SideNavbar />
+        <Flex
+          direction="column"
+          css={{
+            backgroundColor: '$gray2',
+            flex: 1,
+            height: '100vh',
+            overflowY: 'auto',
+            position: 'relative',
+            py: '$3',
+          }}
+        >
+          <Flex direction="column" css={{ flex: 1, pb: noGutter ? 0 : '$2' }}>
             <Container
               size={containerSize}
               noGutter={noGutter}
@@ -59,7 +86,7 @@ const PageLayout = ({
               }}
             >
               <Flex direction="column" css={{ flex: 1 }}>
-                {children}
+                <Card css={{ backgroundColor: 'white' }}>{children}</Card>
               </Flex>
               {/* <Footer /> */}
             </Container>
