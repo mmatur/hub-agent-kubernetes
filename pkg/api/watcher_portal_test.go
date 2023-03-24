@@ -73,6 +73,7 @@ func Test_WatcherRun(t *testing.T) {
 			platformPortals: []Portal{
 				{
 					Name:        "new-portal",
+					Title:       "Portal",
 					Description: "My new portal",
 					Gateway:     "gateway",
 					Version:     "version-1",
@@ -93,6 +94,7 @@ func Test_WatcherRun(t *testing.T) {
 			platformPortals: []Portal{
 				{
 					Name:        "portal",
+					Title:       "Portal",
 					Description: "My modified portal",
 					Gateway:     "modified-gateway",
 					Version:     "version-2",

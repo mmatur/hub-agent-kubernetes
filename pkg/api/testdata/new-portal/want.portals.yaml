@@ -3,6 +3,7 @@ kind: APIPortal
 metadata:
   name: new-portal
 spec:
+  title: Portal
   description: "My new portal"
   apiGateway: gateway
   customDomains:
@@ -14,4 +15,4 @@ status:
     - hello.example.com
     - welcome.example.com
   urls: "https://hello.example.com,https://welcome.example.com,https://majestic-beaver-123.hub-traefik.io"
-  hash: "QQGPDsihfKKyX11RxFd9fw=="
+  hash: "uQybb1kY5C+KTruEZl8CSQ=="

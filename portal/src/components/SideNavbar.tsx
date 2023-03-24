@@ -62,7 +62,7 @@ const NavigationTreeItem = ({
   )
 }
 
-const SideNavbar = ({ portalName }: { portalName: string }) => {
+const SideNavbar = ({ portalTitle }: { portalTitle: string }) => {
   const { data: apis } = useAPIs()
   // const authDispatch = useAuthDispatch()
   // const { user } = useAuthState()
@@ -82,7 +82,7 @@ const SideNavbar = ({ portalName }: { portalName: string }) => {
             css={{ textDecoration: 'none', '&:hover': { textDecoration: 'none', cursor: 'pointer' } }}
           >
             <Flex css={{ height: '$10' }}>
-              <H1>{portalName}</H1>
+              <H1>{portalTitle}</H1>
             </Flex>
           </Link>
           <H3>Available APIs</H3>

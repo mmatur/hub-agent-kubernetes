@@ -3,6 +3,7 @@ kind: APIPortal
 metadata:
   name: external-portal
 spec:
+  title: External Portal
   description: A portal for external partners
   apiGateway: external-gateway
   customDomains:

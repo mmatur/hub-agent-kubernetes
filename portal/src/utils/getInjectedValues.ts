@@ -14,12 +14,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 interface InjectedValues {
   portalName?: string
+  portalTitle?: string
   portalDescription?: string
 }
 
 export const getInjectedValues = (): InjectedValues => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { portalName, portalDescription } = window as any
+  const { portalName, portalTitle, portalDescription } = window as any
 
-  return { portalName, portalDescription }
+  return { portalName, portalTitle, portalDescription }
 }

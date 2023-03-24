@@ -32,16 +32,17 @@ type Portal struct {
 	WorkspaceID string `json:"workspaceId"`
 	ClusterID   string `json:"clusterId"`
 	Name        string `json:"name"`
+
+	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	Gateway     string `json:"gateway"`
-
-	Version string `json:"version"`
 
 	HubDomain     string         `json:"hubDomain,omitempty"`
 	CustomDomains []CustomDomain `json:"customDomains,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	Version   string    `json:"version"`
 }
 
 // CustomDomain holds domain information.
@@ -58,6 +59,7 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 	}
 
 	spec := hubv1alpha1.APIPortalSpec{
+		Title:         p.Title,
 		Description:   p.Description,
 		APIGateway:    p.Gateway,
 		CustomDomains: customDomains,
@@ -104,6 +106,7 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 }
 
 type portalHash struct {
+	Title         string   `json:"title,omitempty"`
 	Description   string   `json:"description,omitempty"`
 	Gateway       string   `json:"gateway"`
 	HubDomain     string   `json:"hubDomain,omitempty"`
@@ -113,6 +116,7 @@ type portalHash struct {
 // HashPortal generates the hash of the APIPortal.
 func HashPortal(p *hubv1alpha1.APIPortal) (string, error) {
 	ph := portalHash{
+		Title:         p.Spec.Title,
 		Description:   p.Spec.Description,
 		Gateway:       p.Spec.APIGateway,
 		HubDomain:     p.Status.HubDomain,

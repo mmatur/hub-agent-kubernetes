@@ -36,6 +36,7 @@ func TestPortalUI_ServeHTTP(t *testing.T) {
 			APIPortal: hubv1alpha1.APIPortal{
 				ObjectMeta: metav1.ObjectMeta{Name: "external-portal"},
 				Spec: hubv1alpha1.APIPortalSpec{
+					Title:       "External Portal",
 					Description: "A portal for external partners",
 				},
 				Status: hubv1alpha1.APIPortalStatus{
@@ -63,13 +64,17 @@ func TestPortalUI_ServeHTTP(t *testing.T) {
 			},
 		},
 	}
+	wantTitles := []string{
+		"External Portal",
+		"internal-portal",
+	}
 
 	handler, err := NewPortalUI(portals)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(handler)
 
-	for _, p := range portals {
+	for i, p := range portals {
 		domains := p.Status.CustomDomains
 		if len(domains) == 0 {
 			domains = []string{p.Status.HubDomain}
@@ -90,6 +95,7 @@ func TestPortalUI_ServeHTTP(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Contains(t, string(got), fmt.Sprintf("portalName=%q", p.Name))
+			assert.Contains(t, string(got), fmt.Sprintf("portalTitle=%q", wantTitles[i]))
 			assert.Contains(t, string(got), fmt.Sprintf("portalDescription=%q", p.Spec.Description))
 		}
 	}

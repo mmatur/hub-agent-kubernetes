@@ -32,7 +32,7 @@ const INITIAL_VALUES = {
   password: '',
 }
 
-const LogIn = ({ portalName }: { portalName: string }) => {
+const LogIn = ({ portalTitle }: { portalTitle: string }) => {
   const authDispatch = useAuthDispatch()
   const { error, isLoggedIn } = useAuthState()
   const [errorMsg, setErrorMsg] = useState()
@@ -67,7 +67,7 @@ const LogIn = ({ portalName }: { portalName: string }) => {
         >
           <Box css={{ mt: 40, minWidth: 320 }}>
             <Box as="header" css={{ mb: '$6', textAlign: 'center' }}>
-              <H1 css={{ fontSize: '$10', lineHeight: 1.33 }}>{portalName}</H1>
+              <H1 css={{ fontSize: '$10', lineHeight: 1.33 }}>{portalTitle}</H1>
             </Box>
             {errorMsg && (
               <Box className="error-wrapper" css={{ my: '$2', maxWidth: 440 }}>

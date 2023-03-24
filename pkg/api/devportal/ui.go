@@ -39,6 +39,7 @@ type PortalUI struct {
 
 type portalIndexData struct {
 	Name        string
+	Title       string
 	Description string
 }
 
@@ -94,8 +95,14 @@ func (p *PortalUI) handleIndex(rw http.ResponseWriter, req *http.Request) {
 func templatePortalIndexes(indexTemplate *template.Template, portals []portal) (map[string][]byte, error) {
 	indexes := make(map[string][]byte)
 	for _, p := range portals {
+		title := p.Spec.Title
+		if title == "" {
+			title = p.Name
+		}
+
 		data := portalIndexData{
 			Name:        p.Name,
+			Title:       title,
 			Description: p.Spec.Description,
 		}
 

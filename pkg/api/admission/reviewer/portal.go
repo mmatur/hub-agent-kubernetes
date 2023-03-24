@@ -96,6 +96,7 @@ func (p *Portal) reviewCreateOperation(ctx context.Context, portal *hubv1alpha1.
 
 	createReq := &platform.CreatePortalReq{
 		Name:          portal.Name,
+		Title:         portal.Spec.Title,
 		Description:   portal.Spec.Description,
 		Gateway:       portal.Spec.APIGateway,
 		CustomDomains: portal.Spec.CustomDomains,
@@ -113,6 +114,7 @@ func (p *Portal) reviewUpdateOperation(ctx context.Context, oldPortal, newPortal
 	log.Ctx(ctx).Info().Msg("Updating APIPortal resource")
 
 	updateReq := &platform.UpdatePortalReq{
+		Title:         newPortal.Spec.Title,
 		Description:   newPortal.Spec.Description,
 		Gateway:       newPortal.Spec.APIGateway,
 		HubDomain:     newPortal.Status.HubDomain,

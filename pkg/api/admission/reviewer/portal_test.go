@@ -33,6 +33,7 @@ import (
 )
 
 var testPortalSpec = hubv1alpha1.APIPortalSpec{
+	Title:         "title",
 	Description:   "desc",
 	APIGateway:    "gateway",
 	CustomDomains: []string{"example.com"},
@@ -75,6 +76,7 @@ func TestPortal_Review_createOperation(t *testing.T) {
 			req:  createReq,
 			wantCreateReq: &platform.CreatePortalReq{
 				Name:          "portal-name",
+				Title:         "title",
 				Description:   "desc",
 				Gateway:       "gateway",
 				CustomDomains: []string{"example.com"},
@@ -94,6 +96,7 @@ func TestPortal_Review_createOperation(t *testing.T) {
 			req:  createReq,
 			wantCreateReq: &platform.CreatePortalReq{
 				Name:          "portal-name",
+				Title:         "title",
 				Description:   "desc",
 				Gateway:       "gateway",
 				CustomDomains: []string{"example.com"},
@@ -152,6 +155,7 @@ func TestPortal_Review_updateOperation(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{Name: "portal-name"},
 				Spec: hubv1alpha1.APIPortalSpec{
+					Title:         "newTitle",
 					Description:   "newDesc",
 					APIGateway:    "newGateway",
 					CustomDomains: []string{"newCustomDomain"},
@@ -185,6 +189,7 @@ func TestPortal_Review_updateOperation(t *testing.T) {
 			desc: "call APIPortal service on update admission request",
 			req:  updateReq,
 			wantUpdateReq: &platform.UpdatePortalReq{
+				Title:         "newTitle",
 				Description:   "newDesc",
 				Gateway:       "newGateway",
 				CustomDomains: []string{"newCustomDomain"},
@@ -201,6 +206,7 @@ func TestPortal_Review_updateOperation(t *testing.T) {
 			desc: "APIPortal service is broken",
 			req:  updateReq,
 			wantUpdateReq: &platform.UpdatePortalReq{
+				Title:         "newTitle",
 				Description:   "newDesc",
 				Gateway:       "newGateway",
 				CustomDomains: []string{"newCustomDomain"},

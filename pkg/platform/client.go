@@ -95,6 +95,7 @@ type UpdateEdgeIngressReq struct {
 // CreatePortalReq is the request for creating a portal.
 type CreatePortalReq struct {
 	Name          string   `json:"name"`
+	Title         string   `json:"title"`
 	Description   string   `json:"description"`
 	Gateway       string   `json:"gateway"`
 	CustomDomains []string `json:"customDomains"`
@@ -102,6 +103,7 @@ type CreatePortalReq struct {
 
 // UpdatePortalReq is a request for updating a portal.
 type UpdatePortalReq struct {
+	Title         string   `json:"title"`
 	Description   string   `json:"description"`
 	Gateway       string   `json:"gateway"`
 	HubDomain     string   `json:"hubDomain"`

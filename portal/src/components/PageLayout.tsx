@@ -18,7 +18,7 @@ import { Helmet } from 'react-helmet-async'
 import SideNavbar from 'components/SideNavbar'
 import { getInjectedValues } from 'utils/getInjectedValues'
 
-const { portalName } = getInjectedValues()
+const { portalTitle } = getInjectedValues()
 
 type Props = {
   title?: string
@@ -43,7 +43,7 @@ const PageLayout = ({
         <title>{title || 'API Portal'}</title>
       </Helmet>
       <Flex>
-        <SideNavbar portalName={portalName as string} />
+        <SideNavbar portalTitle={portalTitle as string} />
         <Flex direction="column" css={{ flex: 1, height: '100vh', overflowY: 'auto', position: 'relative', pb: '$3' }}>
           <Flex direction="column" css={{ flex: 1, pb: noGutter ? 0 : '$2', px: noGutter ? 0 : '$2' }}>
             <Container

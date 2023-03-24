@@ -657,6 +657,7 @@ func TestClient_CreatePortal(t *testing.T) {
 			desc: "create portal",
 			createReq: &CreatePortalReq{
 				Name:          "name",
+				Title:         "Portal",
 				Description:   "My awesome portal",
 				Gateway:       "gateway-1",
 				CustomDomains: []string{"hello.example.com"},
@@ -667,6 +668,7 @@ func TestClient_CreatePortal(t *testing.T) {
 				WorkspaceID:   "workspace-id",
 				ClusterID:     "cluster-id",
 				Name:          "name",
+				Title:         "Portal",
 				Description:   "My awesome portal",
 				Gateway:       "gateway-1",
 				Version:       "version-1",
@@ -749,6 +751,7 @@ func TestClient_UpdatePortal(t *testing.T) {
 			name:    "name",
 			version: "version-1",
 			updateReq: &UpdatePortalReq{
+				Title:         "Portal",
 				Description:   "My updated description",
 				Gateway:       "gateway-1",
 				HubDomain:     "majestic-beaver-123.hub-traefik.io",
@@ -760,6 +763,7 @@ func TestClient_UpdatePortal(t *testing.T) {
 				WorkspaceID:   "workspace-id",
 				ClusterID:     "cluster-id",
 				Name:          "name",
+				Title:         "Portal",
 				Description:   "My updated description",
 				Gateway:       "gateway-1",
 				Version:       "version-1",
