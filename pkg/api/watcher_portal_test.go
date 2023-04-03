@@ -197,8 +197,9 @@ func Test_WatcherRun(t *testing.T) {
 				DevPortalServiceName:    "dev-portal-service-name",
 				DevPortalPort:           8080,
 				PortalSyncInterval:      time.Millisecond,
-				CertSyncInterval:        time.Millisecond,
-				CertRetryInterval:       time.Millisecond,
+				// we don't want to test certSync here.
+				CertSyncInterval:  10 * time.Second,
+				CertRetryInterval: time.Millisecond,
 			})
 
 			stop := make(chan struct{})
