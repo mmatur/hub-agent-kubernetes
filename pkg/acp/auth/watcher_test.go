@@ -29,13 +29,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/informers"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestWatcher_CreateOIDCACP(t *testing.T) {
@@ -52,10 +52,10 @@ func TestWatcher_CreateOIDCACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
 
 	// Initialize this client set with the required "hub-secret".
-	kubeClientSet := kubemock.NewSimpleClientset(
+	kubeClientSet := kubefake.NewSimpleClientset(
 		createSecret("default", "hub-secret", "key", "1234567891234567"),
 	)
-	hubClientSet := hubkubemock.NewSimpleClientset()
+	hubClientSet := hubfake.NewSimpleClientset()
 	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
 	// Create an ACP referencing a secret that does not exist yet.
@@ -100,10 +100,10 @@ func TestWatcher_CreateACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
 
 	// Initialize this client set with the required "hub-secret".
-	kubeClientSet := kubemock.NewSimpleClientset(
+	kubeClientSet := kubefake.NewSimpleClientset(
 		createSecret("default", "hub-secret", "key", "1234567891234567"),
 	)
-	hubClientSet := hubkubemock.NewSimpleClientset()
+	hubClientSet := hubfake.NewSimpleClientset()
 	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
 	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
@@ -185,10 +185,10 @@ func TestWatcher_UpdateACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
 
 	// Initialize this client set with the required "hub-secret".
-	kubeClientSet := kubemock.NewSimpleClientset(
+	kubeClientSet := kubefake.NewSimpleClientset(
 		createSecret("default", "hub-secret", "key", "1234567891234567"),
 	)
-	hubClientSet := hubkubemock.NewSimpleClientset()
+	hubClientSet := hubfake.NewSimpleClientset()
 	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
 	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
@@ -249,10 +249,10 @@ func TestWatcher_DeleteACP(t *testing.T) {
 	switcher := NewHandlerSwitcher()
 
 	// Initialize this client set with the required "hub-secret".
-	kubeClientSet := kubemock.NewSimpleClientset(
+	kubeClientSet := kubefake.NewSimpleClientset(
 		createSecret("default", "hub-secret", "key", "1234567891234567"),
 	)
-	hubClientSet := hubkubemock.NewSimpleClientset()
+	hubClientSet := hubfake.NewSimpleClientset()
 	startWatcher(t, switcher, kubeClientSet, hubClientSet)
 
 	_, err := hubClientSet.HubV1alpha1().AccessControlPolicies().Create(
@@ -337,11 +337,11 @@ func TestWatcher_DeleteACP(t *testing.T) {
 	}
 }
 
-func startWatcher(t *testing.T, switcher *HTTPHandlerSwitcher, kubeClientSet *kubemock.Clientset, hubClientSet *hubkubemock.Clientset) {
+func startWatcher(t *testing.T, switcher *HTTPHandlerSwitcher, kubeClientSet *kubefake.Clientset, hubClientSet *hubfake.Clientset) {
 	t.Helper()
 
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
-	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
 
 	watcher := NewWatcher(
 		switcher,

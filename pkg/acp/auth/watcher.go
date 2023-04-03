@@ -32,7 +32,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oauthintro"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubv1alpha1lister "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	hublistersv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -49,7 +49,7 @@ type Watcher struct {
 	configs   map[string]*acp.Config
 	previous  uint64
 
-	acps               hubv1alpha1lister.AccessControlPolicyLister
+	acps               hublistersv1alpha1.AccessControlPolicyLister
 	secrets            acp.SecretGetter
 	secretRefCounterMu sync.RWMutex
 	secretRefCounter   map[string]int
@@ -61,7 +61,7 @@ type Watcher struct {
 
 // NewWatcher returns a new watcher to track ACP resources. It calls the given Updater when an ACP is modified at most
 // once every throttle.
-func NewWatcher(switcher *HTTPHandlerSwitcher, acps hubv1alpha1lister.AccessControlPolicyLister, secrets acp.SecretGetter) *Watcher {
+func NewWatcher(switcher *HTTPHandlerSwitcher, acps hublistersv1alpha1.AccessControlPolicyLister, secrets acp.SecretGetter) *Watcher {
 	return &Watcher{
 		configs:          make(map[string]*acp.Config),
 		acps:             acps,

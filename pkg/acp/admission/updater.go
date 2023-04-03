@@ -26,14 +26,14 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 // IngressUpdater handles ingress updates when ACP configurations are modified.
 type IngressUpdater struct {
-	informer  informers.SharedInformerFactory
-	clientSet clientset.Interface
+	informer  kinformers.SharedInformerFactory
+	clientSet kclientset.Interface
 
 	cancelUpd map[string]context.CancelFunc
 
@@ -43,7 +43,7 @@ type IngressUpdater struct {
 }
 
 // NewIngressUpdater return a new IngressUpdater.
-func NewIngressUpdater(informer informers.SharedInformerFactory, clientSet clientset.Interface, kubeVersion string) *IngressUpdater {
+func NewIngressUpdater(informer kinformers.SharedInformerFactory, clientSet kclientset.Interface, kubeVersion string) *IngressUpdater {
 	return &IngressUpdater{
 		informer:               informer,
 		clientSet:              clientSet,

@@ -24,10 +24,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
-	kubemock "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 func TestFetcher_GetEdgeIngresses(t *testing.T) {
@@ -101,7 +101,7 @@ func TestFetcher_GetEdgeIngresses(t *testing.T) {
 		},
 	}
 
-	err := hubv1alpha1.AddToScheme(scheme.Scheme)
+	err := hubv1alpha1.AddToScheme(kscheme.Scheme)
 	require.NoError(t, err)
 
 	for _, test := range tests {
@@ -112,9 +112,9 @@ func TestFetcher_GetEdgeIngresses(t *testing.T) {
 
 			objects := loadK8sObjects(t, test.fixture)
 
-			kubeClient := kubemock.NewSimpleClientset()
-			traefikClient := traefikkubemock.NewSimpleClientset()
-			hubClient := hubkubemock.NewSimpleClientset(objects...)
+			kubeClient := kubefake.NewSimpleClientset()
+			traefikClient := traefikcrdfake.NewSimpleClientset()
+			hubClient := hubfake.NewSimpleClientset(objects...)
 
 			f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 			require.NoError(t, err)

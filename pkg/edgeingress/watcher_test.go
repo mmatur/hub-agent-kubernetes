@@ -26,13 +26,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 )
@@ -85,11 +85,11 @@ var toDelete = hubv1alpha1.EdgeIngress{
 }
 
 func Test_WatcherRun(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{&toUpdate, &toDelete}...)
-	clientSet := kubemock.NewSimpleClientset()
+	clientSetHub := hubfake.NewSimpleClientset([]runtime.Object{&toUpdate, &toDelete}...)
+	clientSet := kubefake.NewSimpleClientset()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 
 	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
@@ -136,7 +136,7 @@ func Test_WatcherRun(t *testing.T) {
 			}
 		})
 
-	traefikClientSet := traefikkubemock.NewSimpleClientset()
+	traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
@@ -251,11 +251,11 @@ func Test_WatcherRun(t *testing.T) {
 }
 
 func Test_WatcherRun_appends_owner_reference(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset()
-	clientSet := kubemock.NewSimpleClientset()
+	clientSetHub := hubfake.NewSimpleClientset()
+	clientSet := kubefake.NewSimpleClientset()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 
 	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
@@ -297,7 +297,7 @@ func Test_WatcherRun_appends_owner_reference(t *testing.T) {
 			}
 		})
 
-	traefikClientSet := traefikkubemock.NewSimpleClientset()
+	traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
@@ -341,11 +341,11 @@ func Test_WatcherRun_appends_owner_reference(t *testing.T) {
 }
 
 func Test_WatcherRun_handle_custom_domains(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset(&toUpdate)
-	clientSet := kubemock.NewSimpleClientset()
+	clientSetHub := hubfake.NewSimpleClientset(&toUpdate)
+	clientSet := kubefake.NewSimpleClientset()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 
 	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
@@ -395,7 +395,7 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 			}
 		})
 
-	traefikClientSet := traefikkubemock.NewSimpleClientset()
+	traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",
@@ -544,11 +544,11 @@ func Test_WatcherRun_handle_custom_domains(t *testing.T) {
 }
 
 func Test_WatcherRun_sync_certificates(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset()
-	clientSet := kubemock.NewSimpleClientset()
+	clientSetHub := hubfake.NewSimpleClientset()
+	clientSet := kubefake.NewSimpleClientset()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 
 	edgeIngressInformer := hubInformer.Hub().V1alpha1().EdgeIngresses().Informer()
 
@@ -626,7 +626,7 @@ func Test_WatcherRun_sync_certificates(t *testing.T) {
 		OnGetEdgeIngresses().
 		TypedReturns(edgeIngresses, nil).Parent
 
-	traefikClientSet := traefikkubemock.NewSimpleClientset()
+	traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 	w, err := NewWatcher(client, clientSetHub, clientSet, traefikClientSet.TraefikV1alpha1(), hubInformer, WatcherConfig{
 		IngressClassName:        "traefik-hub",

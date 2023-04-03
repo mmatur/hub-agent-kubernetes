@@ -27,7 +27,7 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -35,8 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 )
 
@@ -73,15 +73,15 @@ type WatcherPortal struct {
 
 	platform PlatformClient
 
-	kubeClientSet clientset.Interface
-	kubeInformer  informers.SharedInformerFactory
+	kubeClientSet kclientset.Interface
+	kubeInformer  kinformers.SharedInformerFactory
 
 	hubClientSet hubclientset.Interface
-	hubInformer  hubinformer.SharedInformerFactory
+	hubInformer  hubinformers.SharedInformerFactory
 }
 
 // NewWatcherPortal returns a new WatcherPortal.
-func NewWatcherPortal(client PlatformClient, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, config *WatcherPortalConfig) *WatcherPortal {
+func NewWatcherPortal(client PlatformClient, kubeClientSet kclientset.Interface, kubeInformer kinformers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, config *WatcherPortalConfig) *WatcherPortal {
 	return &WatcherPortal{
 		config: config,
 

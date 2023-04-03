@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -36,11 +36,11 @@ type PolicyGetter interface {
 
 // PolGetter implementation the PolicyGetter interface.
 type PolGetter struct {
-	informer hubinformer.SharedInformerFactory
+	informer hubinformers.SharedInformerFactory
 }
 
 // NewPolGetter creates new PolGetter.
-func NewPolGetter(informer hubinformer.SharedInformerFactory) *PolGetter {
+func NewPolGetter(informer hubinformers.SharedInformerFactory) *PolGetter {
 	return &PolGetter{informer: informer}
 }
 

@@ -42,7 +42,7 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
@@ -55,8 +55,8 @@ import (
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/strings/slices"
@@ -256,7 +256,7 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
-	kubeClientSet, err := clientset.NewForConfig(config)
+	kubeClientSet, err := kclientset.NewForConfig(config)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create Kubernetes client set: %w", err)
 	}
@@ -279,8 +279,8 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 		return nil, nil, nil, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 
-	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
 	ingressUpdater := admission.NewIngressUpdater(kubeInformer, kubeClientSet, kubeVers.GitVersion)
 
@@ -348,8 +348,8 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 }
 
 func setupAPIManagementWatcher(ctx context.Context, platformClient *platform.Client,
-	kubeClientSet *clientset.Clientset, hubClientSet *hubclientset.Clientset, traefikClientSet v1alpha1.TraefikV1alpha1Interface,
-	kubeInformer informers.SharedInformerFactory, hubInformer hubinformer.SharedInformerFactory,
+	kubeClientSet *kclientset.Clientset, hubClientSet *hubclientset.Clientset, traefikClientSet v1alpha1.TraefikV1alpha1Interface,
+	kubeInformer kinformers.SharedInformerFactory, hubInformer hubinformers.SharedInformerFactory,
 	portalWatcherCfg *api.WatcherPortalConfig, gatewayWatcherCfg *api.WatcherGatewayConfig, cfgWatcher *platform.ConfigWatcher,
 ) error {
 	portalWatcher := api.NewWatcherPortal(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, portalWatcherCfg)
@@ -400,7 +400,7 @@ func setupAPIManagementWatcher(ctx context.Context, platformClient *platform.Cli
 	return nil
 }
 
-func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
+func createTraefikClientSet(clientSet *kclientset.Clientset, config *rest.Config) (v1alpha1.TraefikV1alpha1Interface, error) {
 	crd, err := hasMiddlewareCRD(clientSet.Discovery())
 	if err != nil {
 		return nil, fmt.Errorf("check presence of Traefik Middleware CRD: %w", err)
@@ -418,7 +418,7 @@ func createTraefikClientSet(clientSet *clientset.Clientset, config *rest.Config)
 	return traefikClientSet.TraefikV1alpha1(), nil
 }
 
-func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler, apiAvailable bool) error {
+func startHubInformer(ctx context.Context, hubInformer hubinformers.SharedInformerFactory, ingClassWatcher, acpEventHandler cache.ResourceEventHandler, apiAvailable bool) error {
 	if _, err := hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(ingClassWatcher); err != nil {
 		return fmt.Errorf("add ingressClass event handler: %w", err)
 	}
@@ -448,7 +448,7 @@ func startHubInformer(ctx context.Context, hubInformer hubinformer.SharedInforme
 	return nil
 }
 
-func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer informers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
+func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer kinformers.SharedInformerFactory, ingClassEventHandler cache.ResourceEventHandler) error {
 	if kubevers.SupportsNetV1IngressClasses(kubeVers) {
 		if _, err := kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(ingClassEventHandler); err != nil {
 			return fmt.Errorf("add v1 IngressClass event handler: %w", err)
@@ -477,7 +477,7 @@ func startKubeInformer(ctx context.Context, kubeVers string, kubeInformer inform
 	return nil
 }
 
-func initIngressClass(ctx context.Context, clientSet clientset.Interface, ingressClassName string) error {
+func initIngressClass(ctx context.Context, clientSet kclientset.Interface, ingressClassName string) error {
 	ic := &netv1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ingressClassName,

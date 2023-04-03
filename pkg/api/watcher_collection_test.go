@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -52,10 +52,10 @@ var collectionToDelete = &hubv1alpha1.APICollection{
 }
 
 func Test_WatcherCollectionRun(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{collectionToUpdate, collectionToDelete}...)
+	clientSetHub := hubfake.NewSimpleClientset([]runtime.Object{collectionToUpdate, collectionToDelete}...)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 	collectionInformer := hubInformer.Hub().V1alpha1().APICollections().Informer()
 
 	hubInformer.Start(ctx.Done())

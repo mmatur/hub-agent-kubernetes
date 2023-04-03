@@ -31,7 +31,7 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
@@ -40,8 +40,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 )
 
@@ -71,17 +71,17 @@ type WatcherGateway struct {
 
 	platform PlatformClient
 
-	kubeClientSet clientset.Interface
-	kubeInformer  informers.SharedInformerFactory
+	kubeClientSet kclientset.Interface
+	kubeInformer  kinformers.SharedInformerFactory
 
 	hubClientSet hubclientset.Interface
-	hubInformer  hubinformer.SharedInformerFactory
+	hubInformer  hubinformers.SharedInformerFactory
 
 	traefikClientSet v1alpha1.TraefikV1alpha1Interface
 }
 
 // NewWatcherGateway returns a new WatcherGateway.
-func NewWatcherGateway(client PlatformClient, kubeClientSet clientset.Interface, kubeInformer informers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherGatewayConfig) *WatcherGateway {
+func NewWatcherGateway(client PlatformClient, kubeClientSet kclientset.Interface, kubeInformer kinformers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherGatewayConfig) *WatcherGateway {
 	return &WatcherGateway{
 		config: config,
 

@@ -27,27 +27,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubemock "k8s.io/client-go/kubernetes/fake"
-	ts "k8s.io/client-go/testing"
+	kschema "k8s.io/apimachinery/pkg/runtime/schema"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 )
 
 func TestSetupOIDCSecret(t *testing.T) {
 	testCases := []struct {
 		desc        string
 		objects     []runtime.Object
-		actions     []ts.Action
+		actions     []ktesting.Action
 		expectedErr assert.ErrorAssertionFunc
 	}{
 		{
 			desc:        "should create secret",
 			expectedErr: assert.NoError,
-			actions: []ts.Action{
-				ts.CreateActionImpl{
-					ActionImpl: ts.ActionImpl{
+			actions: []ktesting.Action{
+				ktesting.CreateActionImpl{
+					ActionImpl: ktesting.ActionImpl{
 						Namespace: "default",
 						Verb:      "create",
-						Resource: schema.GroupVersionResource{
+						Resource: kschema.GroupVersionResource{
 							Version:  "v1",
 							Resource: "secrets",
 						},
@@ -84,12 +84,12 @@ func TestSetupOIDCSecret(t *testing.T) {
 					},
 				},
 			},
-			actions: []ts.Action{
-				ts.CreateActionImpl{
-					ActionImpl: ts.ActionImpl{
+			actions: []ktesting.Action{
+				ktesting.CreateActionImpl{
+					ActionImpl: ktesting.ActionImpl{
 						Namespace: "default",
 						Verb:      "create",
-						Resource: schema.GroupVersionResource{
+						Resource: kschema.GroupVersionResource{
 							Version:  "v1",
 							Resource: "secrets",
 						},
@@ -116,7 +116,7 @@ func TestSetupOIDCSecret(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			cliCtx := &cli.Context{Context: context.Background()}
-			clientSetHub := kubemock.NewSimpleClientset(test.objects...)
+			clientSetHub := kubefake.NewSimpleClientset(test.objects...)
 			err := setupOIDCSecret(cliCtx, clientSetHub, "my-token")
 			test.expectedErr(t, err)
 

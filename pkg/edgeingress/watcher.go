@@ -30,14 +30,14 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	clientset "k8s.io/client-go/kubernetes"
+	kclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 )
 
@@ -74,13 +74,13 @@ type Watcher struct {
 
 	client           PlatformClient
 	hubClientSet     hubclientset.Interface
-	hubInformer      hubinformer.SharedInformerFactory
-	clientSet        clientset.Interface
+	hubInformer      hubinformers.SharedInformerFactory
+	clientSet        kclientset.Interface
 	traefikClientSet v1alpha1.TraefikV1alpha1Interface
 }
 
 // NewWatcher returns a new Watcher.
-func NewWatcher(client PlatformClient, hubClientSet hubclientset.Interface, clientSet clientset.Interface, traefikClientSet v1alpha1.TraefikV1alpha1Interface, hubInformer hubinformer.SharedInformerFactory, config WatcherConfig) (*Watcher, error) {
+func NewWatcher(client PlatformClient, hubClientSet hubclientset.Interface, clientSet kclientset.Interface, traefikClientSet v1alpha1.TraefikV1alpha1Interface, hubInformer hubinformers.SharedInformerFactory, config WatcherConfig) (*Watcher, error) {
 	return &Watcher{
 		config: config,
 

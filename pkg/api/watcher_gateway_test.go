@@ -28,17 +28,17 @@ import (
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_WatcherGatewayRun(t *testing.T) {
@@ -201,14 +201,14 @@ func Test_WatcherGatewayRun(t *testing.T) {
 				traefikObjects = append(traefikObjects, clusterMiddleware.DeepCopy())
 			}
 
-			kubeClientSet := kubemock.NewSimpleClientset(kubeObjects...)
-			hubClientSet := hubkubemock.NewSimpleClientset(hubObjects...)
-			traefikClientSet := traefikkubemock.NewSimpleClientset(traefikObjects...)
+			kubeClientSet := kubefake.NewSimpleClientset(kubeObjects...)
+			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
+			traefikClientSet := traefikcrdfake.NewSimpleClientset(traefikObjects...)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
-			kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 0)
-			hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
+			kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 0)
+			hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 0)
 
 			hubInformer.Hub().V1alpha1().APIGateways().Informer()
 			hubInformer.Hub().V1alpha1().APIAccesses().Informer()
@@ -282,7 +282,7 @@ func Test_WatcherGatewayRun(t *testing.T) {
 	}
 }
 
-func assertGatewaysMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, want []hubv1alpha1.APIGateway) {
+func assertGatewaysMatches(t *testing.T, hubClientSet *hubfake.Clientset, want []hubv1alpha1.APIGateway) {
 	t.Helper()
 
 	slices.SortFunc(want, func(x, y hubv1alpha1.APIGateway) bool {
@@ -309,7 +309,7 @@ func assertGatewaysMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, wa
 	assert.Equal(t, want, gateways)
 }
 
-func assertSecretsMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []corev1.Secret) {
+func assertSecretsMatches(t *testing.T, kubeClientSet *kubefake.Clientset, namespaces []string, want []corev1.Secret) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -334,7 +334,7 @@ func assertSecretsMatches(t *testing.T, kubeClientSet *kubemock.Clientset, names
 	assert.Equal(t, want, secrets)
 }
 
-func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, namespaces []string, want []netv1.Ingress) {
+func assertIngressesMatches(t *testing.T, kubeClientSet *kubefake.Clientset, namespaces []string, want []netv1.Ingress) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -363,7 +363,7 @@ func assertIngressesMatches(t *testing.T, kubeClientSet *kubemock.Clientset, nam
 	assert.Equal(t, want, ingresses)
 }
 
-func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikkubemock.Clientset, namespaces []string, want []traefikv1alpha1.Middleware) {
+func assertMiddlewaresMatches(t *testing.T, traefikClientSet *traefikcrdfake.Clientset, namespaces []string, want []traefikv1alpha1.Middleware) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

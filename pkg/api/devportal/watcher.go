@@ -24,7 +24,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	hublistersv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,11 +56,11 @@ type UpdatableHandler interface {
 
 // Watcher watches APIPortals resources and builds configurations out of them.
 type Watcher struct {
-	portals     v1alpha1.APIPortalLister
-	gateways    v1alpha1.APIGatewayLister
-	apis        v1alpha1.APILister
-	collections v1alpha1.APICollectionLister
-	accesses    v1alpha1.APIAccessLister
+	portals     hublistersv1alpha1.APIPortalLister
+	gateways    hublistersv1alpha1.APIGatewayLister
+	apis        hublistersv1alpha1.APILister
+	collections hublistersv1alpha1.APICollectionLister
+	accesses    hublistersv1alpha1.APIAccessLister
 
 	refresh          chan struct{}
 	debounceDelay    time.Duration
@@ -72,11 +72,11 @@ type Watcher struct {
 // NewWatcher returns a new watcher to track API management resources. It calls the given UpdatableHandler when
 // a resource is modified.
 func NewWatcher(handler UpdatableHandler,
-	portals v1alpha1.APIPortalLister,
-	gateways v1alpha1.APIGatewayLister,
-	apis v1alpha1.APILister,
-	collections v1alpha1.APICollectionLister,
-	accesses v1alpha1.APIAccessLister,
+	portals hublistersv1alpha1.APIPortalLister,
+	gateways hublistersv1alpha1.APIGatewayLister,
+	apis hublistersv1alpha1.APILister,
+	collections hublistersv1alpha1.APICollectionLister,
+	accesses hublistersv1alpha1.APIAccessLister,
 ) *Watcher {
 	return &Watcher{
 		portals:     portals,

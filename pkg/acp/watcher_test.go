@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -57,10 +57,10 @@ var toDelete = &hubv1alpha1.AccessControlPolicy{
 }
 
 func Test_WatcherRun(t *testing.T) {
-	clientSetHub := hubkubemock.NewSimpleClientset([]runtime.Object{toUpdate, toDelete}...)
+	clientSetHub := hubfake.NewSimpleClientset([]runtime.Object{toUpdate, toDelete}...)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSetHub, 0)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSetHub, 0)
 	acpInformer := hubInformer.Hub().V1alpha1().AccessControlPolicies().Informer()
 
 	hubInformer.Start(ctx.Done())

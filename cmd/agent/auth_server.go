@@ -30,13 +30,13 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/auth"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 type authServerCmd struct {
@@ -84,14 +84,14 @@ func (c authServerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Hub client set: %w", err)
 	}
 
-	kubeClientSet, err := clientset.NewForConfig(config)
+	kubeClientSet, err := kclientset.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("create Kube client set: %w", err)
 	}
 
 	switcher := auth.NewHandlerSwitcher()
-	kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 	acpWatcher := auth.NewWatcher(
 		switcher,
 		hubInformer.Hub().V1alpha1().AccessControlPolicies().Lister(),

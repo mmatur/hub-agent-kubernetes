@@ -91,19 +91,39 @@ linters-settings:
       pkg: "k8s.io/apimachinery/pkg/types"
     - alias: kerror
       pkg: "k8s.io/apimachinery/pkg/api/errors"
-    - alias: clientset
+    - alias: kclientset
       pkg: "k8s.io/client-go/kubernetes"
-    - alias: kubemock
+    - alias: kinformers
+      pkg: "k8s.io/client-go/informers"
+    - alias: ktesting
+      pkg: "k8s.io/client-go/testing"
+    - alias: kubefake
       pkg: "k8s.io/client-go/kubernetes/fake"
+    - alias: kschema
+      pkg: "k8s.io/apimachinery/pkg/runtime/schema"
+    - alias: kscheme
+      pkg: "k8s.io/client-go/kubernetes/scheme"
+    - alias: kversion
+      pkg: "k8s.io/apimachinery/pkg/version"
+    - alias: discoveryfake
+      pkg: "k8s.io/client-go/discovery/fake"
+
+    # Kubernetes Gateway rewrites:
+    - alias: gateclientset
+      pkg: "sigs.k8s.io/gateway-api/pkg/client/clientset/gateway/versioned"
+    - alias: gateinformers
+      pkg: "sigs.k8s.io/gateway-api/pkg/client/informers/gateway/externalversions"
 
     # Traefik Kubernetes rewrites:
     - alias: traefikv1alpha1
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
     - alias: traefikclientset
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
-    - alias: traefikinformer
+    - alias: traefikinformers
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
-    - alias: traefikkubemock
+    - alias: traefikscheme
+      pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/scheme"
+    - alias: traefikcrdfake
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 
     # Hub Kubernetes rewrites:
@@ -111,14 +131,61 @@ linters-settings:
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
     - alias: hubclientset
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-    - alias: hubinformer
+    - alias: hubinformers
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
-    - alias: hubkubemock
+    - alias: hublistersv1alpha1
+      pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+    - alias: hubfake
       pkg: "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 
     # Misc:
     - alias: jwtreq
       pkg: "github.com/golang-jwt/jwt/v4/request"
+  tagalign:
+    align: false
+    sort: true
+    order:
+      - description
+      - json
+      - bson
+      - toml
+      - yaml
+      - yml
+      - label
+      - label-slice-as-struct
+      - file
+      - kv
+      - export
+  revive:
+    rules:
+      - name: struct-tag
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+        disabled: true
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+        disabled: true
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+        disabled: true
+      - name: unreachable-code
+      - name: redefines-builtin-id
 
 linters:
   enable-all: true
@@ -170,7 +237,6 @@ issues:
     - 'ST1000: at least one file in a package should have a package comment'
     - 'G204: Subprocess launched with variable'
     - 'G304: Potential file inclusion via variable'
-    - 'package-comments: should have a package comment'
   exclude-rules:
     - path: .*_test.go
       linters:
@@ -182,6 +248,10 @@ issues:
     - path: pkg/crd/api/.*
       linters:
         - tagliatelle
+    - path: '(.+)\.go'
+      text: 'struct-tag: unknown option ''inline'' in JSON tag'
+      linters:
+        - revive
     - path: pkg/crd/api/.*/v1alpha1/register.go
       linters:
         - gochecknoglobals

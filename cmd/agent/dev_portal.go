@@ -29,7 +29,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/api/devportal"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
@@ -82,7 +82,7 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Hub client set: %w", err)
 	}
 
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 
 	portalInformer := hubInformer.Hub().V1alpha1().APIPortals()
 	gatewayInformer := hubInformer.Hub().V1alpha1().APIGateways()

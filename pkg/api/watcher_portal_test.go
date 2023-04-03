@@ -29,16 +29,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/informers"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kinformers "k8s.io/client-go/informers"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_WatcherRun(t *testing.T) {
@@ -144,13 +144,13 @@ func Test_WatcherRun(t *testing.T) {
 				hubObjects = append(hubObjects, clusterEdgeIngress.DeepCopy())
 			}
 
-			kubeClientSet := kubemock.NewSimpleClientset(kubeObjects...)
-			hubClientSet := hubkubemock.NewSimpleClientset(hubObjects...)
+			kubeClientSet := kubefake.NewSimpleClientset(kubeObjects...)
+			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
-			kubeInformer := informers.NewSharedInformerFactory(kubeClientSet, 0)
-			hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 0)
+			kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 0)
+			hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 0)
 
 			hubInformer.Hub().V1alpha1().APIPortals().Informer()
 			kubeInformer.Networking().V1().Ingresses().Informer()
@@ -229,7 +229,7 @@ func Test_WatcherRun(t *testing.T) {
 	}
 }
 
-func assertPortalsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, want []hubv1alpha1.APIPortal) {
+func assertPortalsMatches(t *testing.T, hubClientSet *hubfake.Clientset, want []hubv1alpha1.APIPortal) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -256,7 +256,7 @@ func assertPortalsMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, wan
 	assert.Equal(t, want, portals)
 }
 
-func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubkubemock.Clientset, namespace string, want []hubv1alpha1.EdgeIngress) {
+func assertEdgeIngressesMatches(t *testing.T, hubClientSet *hubfake.Clientset, namespace string, want []hubv1alpha1.EdgeIngress) {
 	t.Helper()
 
 	sort.Slice(want, func(i, j int) bool {

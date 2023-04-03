@@ -23,14 +23,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	kubemock "k8s.io/client-go/kubernetes/fake"
-	kubetesting "k8s.io/client-go/testing"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 )
 
 func TestFetcher_GetServices(t *testing.T) {
@@ -86,9 +86,9 @@ func TestFetcher_GetServices(t *testing.T) {
 		},
 	}
 
-	kubeClient := kubemock.NewSimpleClientset(objects...)
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
+	kubeClient := kubefake.NewSimpleClientset(objects...)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
+	hubClient := hubfake.NewSimpleClientset()
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
@@ -156,9 +156,9 @@ func TestFetcher_GetServicesWithExternalIPs(t *testing.T) {
 		},
 	}
 
-	kubeClient := kubemock.NewSimpleClientset(objects...)
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
+	kubeClient := kubefake.NewSimpleClientset(objects...)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
+	hubClient := hubfake.NewSimpleClientset()
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
@@ -321,9 +321,9 @@ func TestFetcher_GetServicesWithOpenAPISpecs(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := kubemock.NewSimpleClientset(test.service)
-			traefikClient := traefikkubemock.NewSimpleClientset()
-			hubClient := hubkubemock.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset(test.service)
+			traefikClient := traefikcrdfake.NewSimpleClientset()
+			hubClient := hubfake.NewSimpleClientset()
 
 			f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 			require.NoError(t, err)
@@ -392,16 +392,16 @@ func TestFetcher_GetServiceLogs(t *testing.T) {
 		},
 	}
 
-	kubeClient := kubemock.NewSimpleClientset(objects...)
-	kubeClient.PrependReactor("get", "pods", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+	kubeClient := kubefake.NewSimpleClientset(objects...)
+	kubeClient.PrependReactor("get", "pods", func(action ktesting.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetSubresource() != "log" {
 			return false, nil, nil
 		}
 		return true, nil, nil
 	})
 
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
+	hubClient := hubfake.NewSimpleClientset()
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)
@@ -477,16 +477,16 @@ func TestFetcher_GetServiceLogsHandlesTooManyPods(t *testing.T) {
 		},
 	}
 
-	kubeClient := kubemock.NewSimpleClientset(objects...)
-	kubeClient.PrependReactor("get", "pods", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+	kubeClient := kubefake.NewSimpleClientset(objects...)
+	kubeClient.PrependReactor("get", "pods", func(action ktesting.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetSubresource() != "log" {
 			return false, nil, nil
 		}
 		return true, nil, nil
 	})
 
-	traefikClient := traefikkubemock.NewSimpleClientset()
-	hubClient := hubkubemock.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
+	hubClient := hubfake.NewSimpleClientset()
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 	require.NoError(t, err)

@@ -25,20 +25,20 @@ import (
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubemock "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // Mandatory to be able to parse traefik.containo.us/v1alpha1 resources.
 func init() {
-	if err := traefikv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+	if err := traefikv1alpha1.AddToScheme(kscheme.Scheme); err != nil {
 		panic(err)
 	}
 
-	if err := hubv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+	if err := hubv1alpha1.AddToScheme(kscheme.Scheme); err != nil {
 		panic(err)
 	}
 }
@@ -269,7 +269,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 
 			objects := loadK8sObjects(t, "fixtures/ingress-route/"+test.fixture)
 
-			kubeClient := kubemock.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset()
 			// Faking having Traefik CRDs installed on cluster.
 			kubeClient.Resources = append(kubeClient.Resources, &metav1.APIResourceList{
 				GroupVersion: traefikv1alpha1.SchemeGroupVersion.String(),
@@ -280,8 +280,8 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 				},
 			})
 
-			traefikClient := traefikkubemock.NewSimpleClientset(objects...)
-			hubClient := hubkubemock.NewSimpleClientset()
+			traefikClient := traefikcrdfake.NewSimpleClientset(objects...)
+			hubClient := hubfake.NewSimpleClientset()
 
 			f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
 			require.NoError(t, err)

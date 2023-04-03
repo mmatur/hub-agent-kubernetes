@@ -25,13 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	netv1 "k8s.io/api/networking/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
 )
 
@@ -49,8 +49,8 @@ func TestSetIngressACPCommand_Handle_ingressSuccess(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset(ingress)
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset(ingress)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	handler := NewSetIngressACPCommand(k8sClient, traefikClient)
 
@@ -87,8 +87,8 @@ func TestSetIngressACPCommand_Handle_ingressRouteSuccess(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset(ingressRoute)
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset(ingressRoute)
 
 	handler := NewSetIngressACPCommand(k8sClient, traefikClient)
 
@@ -115,8 +115,8 @@ func TestSetIngressACPCommand_Handle_ingressNotFound(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	createdAt := now.Add(-time.Hour)
 	data := []byte(`{"ingressId": "my-ingress@my-ns.ingress.networking.k8s.io", "acpName": "my-acp"}`)
@@ -134,8 +134,8 @@ func TestSetIngressACPCommand_Handle_ingressRouteNotFound(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	createdAt := now.Add(-time.Hour)
 	data := []byte(`{"ingressId": "my-ingress-route@my-ns.ingressroute.traefik.containo.us", "acpName": "my-acp"}`)
@@ -163,8 +163,8 @@ func TestSetIngressACPCommand_Handle_acpNotFound(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset(ingress)
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset(ingress)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	// Simulate an error triggered by the mutating webhook: ACP doesn't exist.
 	k8sClient.PrependReactor("patch", "ingresses", func(action ktesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -211,8 +211,8 @@ func TestSetIngressACPCommand_Handle_replace(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset(ingress)
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset(ingress)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	createdAt := now
 	data := []byte(`{"ingressId": "my-ingress@my-ns.ingress.networking.k8s.io", "acpName": "my-acp-2"}`)

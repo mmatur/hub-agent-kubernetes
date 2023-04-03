@@ -23,12 +23,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kschema "k8s.io/apimachinery/pkg/runtime/schema"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestFetcher_GetAPIs(t *testing.T) {
@@ -173,16 +173,16 @@ func TestFetcher_GetAPIGateways(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func setupClientSets(t *testing.T, hubObjects []runtime.Object) (*kubemock.Clientset, *traefikkubemock.Clientset, *hubkubemock.Clientset) {
+func setupClientSets(t *testing.T, hubObjects []runtime.Object) (*kubefake.Clientset, *traefikcrdfake.Clientset, *hubfake.Clientset) {
 	t.Helper()
 
-	kubeClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	kubeClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
-	hubClient := hubkubemock.NewSimpleClientset()
+	hubClient := hubfake.NewSimpleClientset()
 	for _, obj := range hubObjects {
 		if obj.GetObjectKind().GroupVersionKind().Kind == "APIGateway" {
-			err := hubClient.Tracker().Create(schema.GroupVersionResource{
+			err := hubClient.Tracker().Create(kschema.GroupVersionResource{
 				Group:    "hub.traefik.io",
 				Version:  "v1alpha1",
 				Resource: "apigateways",

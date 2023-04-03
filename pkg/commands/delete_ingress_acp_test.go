@@ -25,11 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestDeleteIngressACPCommand_Handle_IngressSuccess(t *testing.T) {
@@ -49,8 +49,8 @@ func TestDeleteIngressACPCommand_Handle_IngressSuccess(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset(ingress)
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset(ingress)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	handler := NewDeleteIngressACPCommand(k8sClient, traefikClient)
 
@@ -90,8 +90,8 @@ func TestDeleteIngressACPCommand_Handle_IngressRouteSuccess(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset(ingressRoute)
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset(ingressRoute)
 
 	handler := NewDeleteIngressACPCommand(k8sClient, traefikClient)
 
@@ -119,8 +119,8 @@ func TestDeleteIngressACPCommand_Handle_ingressNotFound(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	handler := NewDeleteIngressACPCommand(k8sClient, traefikClient)
 
@@ -139,8 +139,8 @@ func TestDeleteIngressACPCommand_Handle_ingressRouteNotFound(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
-	k8sClient := kubemock.NewSimpleClientset()
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset()
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	handler := NewDeleteIngressACPCommand(k8sClient, traefikClient)
 
@@ -170,8 +170,8 @@ func TestDeleteIngressACPCommand_Handle_nothingDoDelete(t *testing.T) {
 		},
 	}
 
-	k8sClient := kubemock.NewSimpleClientset(ingress)
-	traefikClient := traefikkubemock.NewSimpleClientset()
+	k8sClient := kubefake.NewSimpleClientset(ingress)
+	traefikClient := traefikcrdfake.NewSimpleClientset()
 
 	handler := NewDeleteIngressACPCommand(k8sClient, traefikClient)
 

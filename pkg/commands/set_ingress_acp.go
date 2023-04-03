@@ -30,7 +30,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -40,13 +40,13 @@ const (
 
 // SetIngressACPCommand sets the given ACP on a specific Ingress.
 type SetIngressACPCommand struct {
-	k8sClientSet     clientset.Interface
+	k8sClientSet     kclientset.Interface
 	traefikClientSet traefikclientset.Interface
 }
 
 // NewSetIngressACPCommand creates a new SetIngressACPCommand.
 func NewSetIngressACPCommand(
-	k8sClientSet clientset.Interface,
+	k8sClientSet kclientset.Interface,
 	traefikClientSet traefikclientset.Interface,
 ) *SetIngressACPCommand {
 	return &SetIngressACPCommand{

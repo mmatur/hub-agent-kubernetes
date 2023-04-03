@@ -29,17 +29,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
-	listers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hublistersv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	kschema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestWatcher_Run(t *testing.T) {
-	clientSet := hubkubemock.NewSimpleClientset()
+	clientSet := hubfake.NewSimpleClientset()
 
 	internalObjects := loadK8sObjects(t, clientSet, "./testdata/manifests/internal-portal.yaml")
 	externalObjects := loadK8sObjects(t, clientSet, "./testdata/manifests/external-portal.yaml")
@@ -103,7 +103,7 @@ func TestWatcher_Run(t *testing.T) {
 }
 
 func TestWatcher_OnAdd(t *testing.T) {
-	clientSet := hubkubemock.NewSimpleClientset()
+	clientSet := hubfake.NewSimpleClientset()
 	portals, gateways, apis, collections, accesses := setupInformers(t, clientSet)
 
 	tests := []struct {
@@ -151,7 +151,7 @@ func TestWatcher_OnAdd(t *testing.T) {
 }
 
 func TestWatcher_OnDelete(t *testing.T) {
-	clientSet := hubkubemock.NewSimpleClientset()
+	clientSet := hubfake.NewSimpleClientset()
 	portals, gateways, apis, collections, accesses := setupInformers(t, clientSet)
 
 	tests := []struct {
@@ -199,7 +199,7 @@ func TestWatcher_OnDelete(t *testing.T) {
 }
 
 func TestWatcher_OnUpdate(t *testing.T) {
-	clientSet := hubkubemock.NewSimpleClientset()
+	clientSet := hubfake.NewSimpleClientset()
 	portals, gateways, apis, collections, accesses := setupInformers(t, clientSet)
 
 	tests := []struct {
@@ -324,7 +324,7 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}
 }
 
-func loadK8sObjects(t *testing.T, clientSet *hubkubemock.Clientset, path string) *k8sObjects {
+func loadK8sObjects(t *testing.T, clientSet *hubfake.Clientset, path string) *k8sObjects {
 	t.Helper()
 
 	objects := newK8sObjects()
@@ -350,7 +350,7 @@ func loadK8sObjects(t *testing.T, clientSet *hubkubemock.Clientset, path string)
 		// Therefore, preventing any ClientSet APIs and Listers from working. To alleviate the issue, such objects
 		// must be manually created with the right GroupVersionResource.
 		if object.GetObjectKind().GroupVersionKind().Kind == "APIGateway" {
-			err = clientSet.Tracker().Create(schema.GroupVersionResource{
+			err = clientSet.Tracker().Create(kschema.GroupVersionResource{
 				Group:    "hub.traefik.io",
 				Version:  "v1alpha1",
 				Resource: "apigateways",
@@ -414,10 +414,10 @@ func (o *k8sObjects) Add(t *testing.T, object runtime.Object) {
 	}
 }
 
-func setupInformers(t *testing.T, clientSet *hubkubemock.Clientset) (listers.APIPortalLister, listers.APIGatewayLister, listers.APILister, listers.APICollectionLister, listers.APIAccessLister) {
+func setupInformers(t *testing.T, clientSet *hubfake.Clientset) (hublistersv1alpha1.APIPortalLister, hublistersv1alpha1.APIGatewayLister, hublistersv1alpha1.APILister, hublistersv1alpha1.APICollectionLister, hublistersv1alpha1.APIAccessLister) {
 	t.Helper()
 
-	hubInformer := hubinformer.NewSharedInformerFactory(clientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(clientSet, 5*time.Minute)
 
 	portals := hubInformer.Hub().V1alpha1().APIPortals().Lister()
 	gateways := hubInformer.Hub().V1alpha1().APIGateways().Lister()
@@ -436,11 +436,11 @@ func setupInformers(t *testing.T, clientSet *hubkubemock.Clientset) (listers.API
 
 func setupWatcher(t *testing.T,
 	handler UpdatableHandler,
-	portals listers.APIPortalLister,
-	gateways listers.APIGatewayLister,
-	apis listers.APILister,
-	collections listers.APICollectionLister,
-	accesses listers.APIAccessLister,
+	portals hublistersv1alpha1.APIPortalLister,
+	gateways hublistersv1alpha1.APIGatewayLister,
+	apis hublistersv1alpha1.APILister,
+	collections hublistersv1alpha1.APICollectionLister,
+	accesses hublistersv1alpha1.APIAccessLister,
 ) *Watcher {
 	t.Helper()
 

@@ -40,7 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -105,7 +105,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
 	}
 
-	kubeClient, err := clientset.NewForConfig(kubeCfg)
+	kubeClient, err := kclientset.NewForConfig(kubeCfg)
 	if err != nil {
 		return fmt.Errorf("create Kubernetes client set: %w", err)
 	}
@@ -221,7 +221,7 @@ func (c controllerCmd) run(cliCtx *cli.Context) error {
 	return err
 }
 
-func setupOIDCSecret(cliCtx *cli.Context, client clientset.Interface, token string) error {
+func setupOIDCSecret(cliCtx *cli.Context, client kclientset.Interface, token string) error {
 	ctx, cancel := context.WithTimeout(cliCtx.Context, time.Second*5)
 	defer cancel()
 
@@ -251,7 +251,7 @@ func setupOIDCSecret(cliCtx *cli.Context, client clientset.Interface, token stri
 	return nil
 }
 
-func setup(ctx context.Context, c *platform.Client, kubeClient clientset.Interface) (platform.Config, error) {
+func setup(ctx context.Context, c *platform.Client, kubeClient kclientset.Interface) (platform.Config, error) {
 	ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, metav1.NamespaceSystem, metav1.GetOptions{})
 	if err != nil {
 		return platform.Config{}, fmt.Errorf("get namespace: %w", err)

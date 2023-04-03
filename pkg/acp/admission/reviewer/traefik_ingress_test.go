@@ -31,7 +31,7 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -428,7 +428,7 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			traefikClientSet := traefikkubemock.NewSimpleClientset()
+			traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 			policies := newPolicyGetterMock(t)
 			if test.config == nil {
@@ -545,7 +545,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				},
 			}
 
-			traefikClientSet := traefikkubemock.NewSimpleClientset(&middleware)
+			traefikClientSet := traefikcrdfake.NewSimpleClientset(&middleware)
 
 			policies := newPolicyGetterMock(t)
 			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()

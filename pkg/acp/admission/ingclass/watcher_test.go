@@ -28,19 +28,19 @@ import (
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
-func setupEnv(clientSet clientset.Interface, hubClientSet hubclientset.Interface, watcher *Watcher) error {
-	kubeInformer := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
+func setupEnv(clientSet kclientset.Interface, hubClientSet hubclientset.Interface, watcher *Watcher) error {
+	kubeInformer := kinformers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 	if _, err := kubeInformer.Networking().V1().IngressClasses().Informer().AddEventHandler(watcher); err != nil {
 		return fmt.Errorf("failed to add v1 ingress class event handler: %w", err)
 	}
@@ -59,7 +59,7 @@ func setupEnv(clientSet clientset.Interface, hubClientSet hubclientset.Interface
 		}
 	}
 
-	hubInformer := hubinformer.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
+	hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 5*time.Minute)
 	if _, err := hubInformer.Hub().V1alpha1().IngressClasses().Informer().AddEventHandler(watcher); err != nil {
 		return fmt.Errorf("failed to add hub v1alpha1 ingress class event handler: %w", err)
 	}
@@ -96,8 +96,8 @@ func TestWatcher_GetController(t *testing.T) {
 			Controller: ControllerTypeTraefik,
 		},
 	}
-	clientSet := kubemock.NewSimpleClientset(&ing, &legacyIng)
-	hubClientSet := hubkubemock.NewSimpleClientset(&customIng)
+	clientSet := kubefake.NewSimpleClientset(&ing, &legacyIng)
+	hubClientSet := hubfake.NewSimpleClientset(&customIng)
 	watcher := NewWatcher()
 
 	err := setupEnv(clientSet, hubClientSet, watcher)
@@ -208,8 +208,8 @@ func TestWatcher_GetDefaultController(t *testing.T) {
 				})
 			}
 
-			clientSet := kubemock.NewSimpleClientset(resources...)
-			hubClientSet := hubkubemock.NewSimpleClientset(customResources...)
+			clientSet := kubefake.NewSimpleClientset(resources...)
+			hubClientSet := hubfake.NewSimpleClientset(customResources...)
 			watcher := NewWatcher()
 			err := setupEnv(clientSet, hubClientSet, watcher)
 			require.NoError(t, err)

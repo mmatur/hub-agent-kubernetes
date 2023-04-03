@@ -26,7 +26,7 @@ import (
 	"github.com/rs/zerolog/log"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
-	clientset "k8s.io/client-go/kubernetes"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 // AnnotationLastPatchRequestedAt is specifies the date at which an update
@@ -52,7 +52,7 @@ type Watcher struct {
 }
 
 // NewWatcher creates a Watcher.
-func NewWatcher(interval time.Duration, store Store, k8sClientSet clientset.Interface, traefikClientSet traefikclientset.Interface) *Watcher {
+func NewWatcher(interval time.Duration, store Store, k8sClientSet kclientset.Interface, traefikClientSet traefikclientset.Interface) *Watcher {
 	return &Watcher{
 		interval: interval,
 		store:    store,

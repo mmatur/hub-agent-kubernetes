@@ -27,28 +27,28 @@ import (
 	"github.com/rs/zerolog/log"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
-	traefikinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
+	traefikinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	kinformers "k8s.io/client-go/informers"
+	kclientset "k8s.io/client-go/kubernetes"
 )
 
 // Fetcher fetches Kubernetes resources and converts them into a filtered and simplified state.
 type Fetcher struct {
 	serverVersion string
 
-	k8s       informers.SharedInformerFactory
-	hub       hubinformer.SharedInformerFactory
-	traefik   traefikinformer.SharedInformerFactory
-	clientSet clientset.Interface
+	k8s       kinformers.SharedInformerFactory
+	hub       hubinformers.SharedInformerFactory
+	traefik   traefikinformers.SharedInformerFactory
+	clientSet kclientset.Interface
 }
 
 // NewFetcher creates a new Fetcher.
-func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface) (*Fetcher, error) {
+func NewFetcher(ctx context.Context, clientSet kclientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface) (*Fetcher, error) {
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
@@ -66,8 +66,8 @@ func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClien
 	return watchAll(ctx, clientSet, traefikClientSet, hubClientSet, serverVersion.GitVersion)
 }
 
-func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface, serverVersion string) (*Fetcher, error) {
-	kubernetesFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
+func watchAll(ctx context.Context, clientSet kclientset.Interface, traefikClientSet traefikclientset.Interface, hubClientSet hubclientset.Interface, serverVersion string) (*Fetcher, error) {
+	kubernetesFactory := kinformers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 
 	kubernetesFactory.Core().V1().Pods().Informer()
 	kubernetesFactory.Core().V1().Services().Informer()
@@ -85,7 +85,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 		kubernetesFactory.Networking().V1beta1().Ingresses().Informer()
 	}
 
-	traefikFactory := traefikinformer.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)
+	traefikFactory := traefikinformers.NewSharedInformerFactoryWithOptions(traefikClientSet, 5*time.Minute)
 
 	hasTraefikCRDs, err := hasTraefikCRDs(clientSet.Discovery())
 	if err != nil {
@@ -103,7 +103,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 		log.Info().Msg(msg)
 	}
 
-	hubFactory := hubinformer.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
+	hubFactory := hubinformers.NewSharedInformerFactoryWithOptions(hubClientSet, 5*time.Minute)
 	hubFactory.Hub().V1alpha1().AccessControlPolicies().Informer()
 	hubFactory.Hub().V1alpha1().EdgeIngresses().Informer()
 	hubFactory.Hub().V1alpha1().APIs().Informer()

@@ -25,7 +25,7 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
-	hubinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -37,11 +37,11 @@ type WatcherCollection struct {
 	platform PlatformClient
 
 	hubClientSet hubclientset.Interface
-	hubInformer  hubinformer.SharedInformerFactory
+	hubInformer  hubinformers.SharedInformerFactory
 }
 
 // NewWatcherCollection returns a new WatcherCollection.
-func NewWatcherCollection(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformer.SharedInformerFactory, collectionSyncInterval time.Duration) *WatcherCollection {
+func NewWatcherCollection(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, collectionSyncInterval time.Duration) *WatcherCollection {
 	return &WatcherCollection{
 		collectionSyncInterval: collectionSyncInterval,
 		platform:               client,

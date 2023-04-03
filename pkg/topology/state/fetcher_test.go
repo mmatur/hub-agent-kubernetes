@@ -23,15 +23,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	hubkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
+	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/version"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	kubemock "k8s.io/client-go/kubernetes/fake"
+	kversion "k8s.io/apimachinery/pkg/version"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNewFetcher_handlesUnsupportedVersions(t *testing.T) {
@@ -66,14 +66,14 @@ func TestNewFetcher_handlesUnsupportedVersions(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			kubeClient := kubemock.NewSimpleClientset()
-			traefikClient := traefikkubemock.NewSimpleClientset()
-			hubClient := hubkubemock.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset()
+			traefikClient := traefikcrdfake.NewSimpleClientset()
+			hubClient := hubfake.NewSimpleClientset()
 
-			fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
+			fakeDiscovery, ok := kubeClient.Discovery().(*discoveryfake.FakeDiscovery)
 			require.True(t, ok, "couldn't convert Discovery() to *FakeDiscovery")
 
-			fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: test.serverVersion}
+			fakeDiscovery.FakedServerVersion = &kversion.Info{GitVersion: test.serverVersion}
 
 			_, err := NewFetcher(context.Background(), kubeClient, traefikClient, hubClient)
 			test.wantErr(t, err)
@@ -184,14 +184,14 @@ func TestNewFetcher_handlesAllIngressAPIVersions(t *testing.T) {
 				},
 			}
 
-			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
-			traefikClient := traefikkubemock.NewSimpleClientset()
-			hubClient := hubkubemock.NewSimpleClientset()
+			kubeClient := kubefake.NewSimpleClientset(k8sObjects...)
+			traefikClient := traefikcrdfake.NewSimpleClientset()
+			hubClient := hubfake.NewSimpleClientset()
 
-			fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
+			fakeDiscovery, ok := kubeClient.Discovery().(*discoveryfake.FakeDiscovery)
 			require.True(t, ok, "couldn't convert Discovery() to *FakeDiscovery")
 
-			fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: test.serverVersion}
+			fakeDiscovery.FakedServerVersion = &kversion.Info{GitVersion: test.serverVersion}
 
 			f, err := NewFetcher(context.Background(), kubeClient, traefikClient, hubClient)
 			require.NoError(t, err)
