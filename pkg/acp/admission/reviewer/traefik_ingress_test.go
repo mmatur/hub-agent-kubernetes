@@ -21,15 +21,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/apikey"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	admv1 "k8s.io/api/admission/v1"
@@ -325,19 +328,19 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				},
 			}},
 			oldIngAnno: map[string]string{
-				AnnotationHubAuth:   "my-old-policy@test",
+				AnnotationHubAuth:   "my-old-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "test-zz-my-old-policy-test@kubernetescrd",
 			},
 			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader"},
 		},
@@ -349,16 +352,41 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
+		},
+		{
+			desc: "add APIKey authentication",
+			config: &acp.Config{
+				APIKey: &apikey.Config{
+					KeySource: token.Source{},
+					ForwardHeaders: map[string]string{
+						"fwdHeader": "claim",
+					},
+				},
+			},
+			oldIngAnno: map[string]string{},
+			ingAnno: map[string]string{
+				AnnotationHubAuth:      "my-policy",
+				AnnotationHubAuthGroup: "dev",
+				"custom-annotation":    "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
+			},
+			wantPatch: map[string]string{
+				AnnotationHubAuth:      "my-policy",
+				AnnotationHubAuthGroup: "dev",
+				"custom-annotation":    "foobar",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-378875130@kubernetescrd",
+			},
+			wantAuthResponseHeaders: []string{"fwdHeader"},
 		},
 		{
 			desc: "add OIDC authentication",
@@ -369,14 +397,14 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			}},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader", "Authorization", "Cookie"},
 		},
@@ -394,14 +422,14 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			},
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"fwdHeader", "Authorization", "Cookie"},
 		},
@@ -410,14 +438,14 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 			config:     nil,
 			oldIngAnno: map[string]string{},
 			ingAnno: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
 				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd",
 			},
 			wantPatch: map[string]string{
-				AnnotationHubAuth:   "my-policy@test",
+				AnnotationHubAuth:   "my-policy",
 				"custom-annotation": "foobar",
-				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy-test@kubernetescrd",
+				"traefik.ingress.kubernetes.io/router.middlewares": "custom-middleware@kubernetescrd,test-zz-my-policy@kubernetescrd",
 			},
 			wantAuthResponseHeaders: []string{"User", "Authorization"},
 		},
@@ -432,12 +460,12 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 
 			policies := newPolicyGetterMock(t)
 			if test.config == nil {
-				policies.OnGetConfig("my-policy@test").TypedReturns(nil, ErrPolicyNotFound).Once()
+				policies.OnGetConfig("my-policy").TypedReturns(nil, ErrPolicyNotFound).Once()
 			} else {
-				policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+				policies.OnGetConfig("my-policy").TypedReturns(test.config, nil).Once()
 			}
 
-			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
+			fwdAuthMdlwrs := NewFwdAuthMiddlewares("auth.server.svc", policies, traefikClientSet.TraefikV1alpha1())
 
 			rev := NewTraefikIngress(newIngressClassesMock(t), fwdAuthMdlwrs)
 
@@ -492,12 +520,27 @@ func TestTraefikIngress_ReviewAddsAuthentication(t *testing.T) {
 				return
 			}
 
+			grps := test.ingAnno[AnnotationHubAuthGroup]
+			var suffix string
+			if grps != "" {
+				var h uint32
+				h, err = hash(grps)
+				require.NoError(t, err)
+
+				suffix = fmt.Sprintf("-%d", h)
+			}
+
 			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").
-				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+				Get(context.Background(), "zz-my-policy"+suffix, metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 
 			assert.Equal(t, test.wantAuthResponseHeaders, m.Spec.ForwardAuth.AuthResponseHeaders)
+
+			if grps != "" {
+				suffix = "?groups=" + grps
+			}
+			assert.Equal(t, "auth.server.svc/my-policy"+suffix, m.Spec.ForwardAuth.Address)
 		})
 	}
 }
@@ -535,7 +578,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 
 			middleware := traefikv1alpha1.Middleware{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "zz-my-policy-test",
+					Name:      "zz-my-policy",
 					Namespace: "test",
 				},
 				Spec: traefikv1alpha1.MiddlewareSpec{
@@ -548,7 +591,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			traefikClientSet := traefikcrdfake.NewSimpleClientset(&middleware)
 
 			policies := newPolicyGetterMock(t)
-			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+			policies.OnGetConfig("my-policy").TypedReturns(test.config, nil).Once()
 
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 			rev := NewTraefikIngress(newIngressClassesMock(t), fwdAuthMdlwrs)
@@ -559,7 +602,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				Metadata: metav1.ObjectMeta{
 					Name:        "name",
 					Namespace:   "test",
-					Annotations: map[string]string{AnnotationHubAuth: "my-policy@test"},
+					Annotations: map[string]string{AnnotationHubAuth: "my-policy"},
 				},
 			}
 			b, err := json.Marshal(ing)
@@ -572,7 +615,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			}
 
 			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").
-				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+				Get(context.Background(), "zz-my-policy", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 			assert.Equal(t, []string{"fwdHeader"}, m.Spec.ForwardAuth.AuthResponseHeaders)
@@ -582,7 +625,7 @@ func TestTraefikIngress_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			assert.NotNil(t, p)
 
 			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").
-				Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+				Get(context.Background(), "zz-my-policy", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 

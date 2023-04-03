@@ -27,9 +27,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/admission/ingclass"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/apikey"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/basicauth"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/jwt"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/oidc"
+	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
 	admv1 "k8s.io/api/admission/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -394,6 +396,29 @@ func TestNginxIngress_Review(t *testing.T) {
 				"hub.traefik.io/access-control-policy":              "my-policy",
 				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy",
 				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_User; proxy_set_header User $value_0;\nauth_request_set $value_1 $upstream_http_Authorization; proxy_set_header Authorization $value_1;\n##hub-snippet-end",
+			},
+		},
+		{
+			desc: "adds APIKey authentication with username and strip authorization",
+			config: &acp.Config{
+				APIKey: &apikey.Config{
+					KeySource: token.Source{},
+					ForwardHeaders: map[string]string{
+						"fwdHeader": "claim",
+					},
+				},
+			},
+			ingAnnotations: map[string]string{
+				"custom-annotation":                    "foobar",
+				"hub.traefik.io/access-control-policy": "my-policy",
+				AnnotationHubAuthGroup:                 "dev",
+			},
+			wantPatch: map[string]string{
+				"custom-annotation":                                 "foobar",
+				"hub.traefik.io/access-control-policy":              "my-policy",
+				"nginx.ingress.kubernetes.io/auth-url":              "http://hub-agent.default.svc.cluster.local/my-policy?groups=dev",
+				AnnotationHubAuthGroup:                              "dev",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "##hub-snippet-start\nauth_request_set $value_0 $upstream_http_fwdHeader; proxy_set_header fwdHeader $value_0;\n##hub-snippet-end",
 			},
 		},
 		{

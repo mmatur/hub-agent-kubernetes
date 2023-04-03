@@ -27,7 +27,10 @@ import (
 )
 
 // AnnotationHubAuth is the annotation to add to an Ingress resource in order to enable Hub authentication.
-const AnnotationHubAuth = "hub.traefik.io/access-control-policy"
+const (
+	AnnotationHubAuth      = "hub.traefik.io/access-control-policy"
+	AnnotationHubAuthGroup = "hub.traefik.io/access-control-policy-groups"
+)
 
 // Ingress controller default annotations.
 const (

@@ -41,6 +41,7 @@ type APIAccess struct {
 
 // APIAccessSpec configures an APIAccess.
 type APIAccessSpec struct {
+	// +optional
 	Groups                []string              `json:"groups"`
 	APISelector           *metav1.LabelSelector `json:"apiSelector,omitempty"`
 	APICollectionSelector *metav1.LabelSelector `json:"apiCollectionSelector,omitempty"`

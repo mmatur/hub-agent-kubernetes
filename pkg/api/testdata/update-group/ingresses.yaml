@@ -2,12 +2,12 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: new-gateway-3695162296-4249197200-hub
+  name: gateway-713459761-hub
   namespace: default
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: new-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -15,7 +15,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-713459761-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -46,12 +46,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: new-gateway-3695162296-4249197200
+  name: gateway-713459761
   namespace: default
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: new-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -59,7 +59,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-713459761-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -97,93 +97,122 @@ spec:
                 name: petstore-svc
                 port:
                   number: 8080
+    - host: api.new.example.com
+      http:
+        paths:
+          - path: /petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
+          - path: /stores/petstore
+            pathType: Prefix
+            backend:
+              service:
+                name: petstore-svc
+                port:
+                  number: 8080
   tls:
-    - secretName: hub-certificate-custom-domains-3695162296
+    - secretName: hub-certificate-custom-domains-713459761
       hosts:
         - api.hello.example.com
         - api.welcome.example.com
+        - api.new.example.com
 
 ---
-# Ingress for custom domains in the default namespace.
+# Ingress for hub domain in the books namespace.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: new-gateway-3695162296-3477267184
-  namespace: default
+  name: gateway-713459761-hub
+  namespace: books
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: new-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
     hub.traefik.io/access-control-policy: "hub-api-management"
-    hub.traefik.io/access-control-policy-groups: "supply-chain"
-    traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
-spec:
-  ingressClassName: ingress-class
-  rules:
-    - host: api.hello.example.com
-      http:
-        paths:
-          - path: /deliver
-            pathType: Prefix
-            backend:
-              service:
-                name: supply-chain-svc
-                port:
-                  number: 8080
-    - host: api.welcome.example.com
-      http:
-        paths:
-          - path: /deliver
-            pathType: Prefix
-            backend:
-              service:
-                name: supply-chain-svc
-                port:
-                  number: 8080
-  tls:
-    - secretName: hub-certificate-custom-domains-3695162296
-      hosts:
-        - api.hello.example.com
-        - api.welcome.example.com
-
----
-# Ingress for custom domains in the default namespace.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: new-gateway-3695162296-3477267184-hub
-  namespace: default
-  ownerReferences:
-    - apiVersion: hub.traefik.io/v1alpha1
-      kind: APIGateway
-      name: new-gateway
-  labels:
-    app.kubernetes.io/managed-by: traefik-hub
-  annotations:
-    hub.traefik.io/access-control-policy: "hub-api-management"
-    hub.traefik.io/access-control-policy-groups: "supply-chain"
+    hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-new-gateway-3695162296-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-713459761-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
     - host: brave-lion-123.hub-traefik.io
       http:
         paths:
-          - path: /deliver
+          - path: /stores/bookstore
             pathType: Prefix
             backend:
               service:
-                name: supply-chain-svc
+                name: bookstore-svc
                 port:
-                  number: 8080
+                  number: 443
   tls:
     - secretName: hub-certificate
       hosts:
         - brave-lion-123.hub-traefik.io
+
+---
+# Ingress for custom domains in the books namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-713459761
+  namespace: books
+  ownerReferences:
+    - apiVersion: hub.traefik.io/v1alpha1
+      kind: APIGateway
+      name: gateway
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+  annotations:
+    hub.traefik.io/access-control-policy: "hub-api-management"
+    hub.traefik.io/access-control-policy-groups: "suppliers"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-713459761-stripprefix@kubernetescrd"
+spec:
+  ingressClassName: ingress-class
+  rules:
+    - host: api.hello.example.com
+      http:
+        paths:
+          - path: /stores/bookstore
+            pathType: Prefix
+            backend:
+              service:
+                name: bookstore-svc
+                port:
+                  number: 443
+    - host: api.welcome.example.com
+      http:
+        paths:
+          - path: /stores/bookstore
+            pathType: Prefix
+            backend:
+              service:
+                name: bookstore-svc
+                port:
+                  number: 443
+    - host: api.new.example.com
+      http:
+        paths:
+          - path: /stores/bookstore
+            pathType: Prefix
+            backend:
+              service:
+                name: bookstore-svc
+                port:
+                  number: 443
+  tls:
+    - secretName: hub-certificate-custom-domains-713459761
+      hosts:
+        - api.hello.example.com
+        - api.welcome.example.com
+        - api.new.example.com

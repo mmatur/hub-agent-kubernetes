@@ -136,9 +136,11 @@ func (r NginxIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (map
 		polCfg, err = r.policies.GetConfig(polName)
 		switch {
 		case errors.Is(err, ErrPolicyNotFound):
-			nginxAnno, err = genNginxAnnotations(polName, nil, r.agentAddress)
+			nginxAnno, err = genNginxAnnotations(polName, nil, r.agentAddress, "")
 		case err == nil:
-			nginxAnno, err = genNginxAnnotations(polName, polCfg, r.agentAddress)
+			grps := ing.Metadata.Annotations[AnnotationHubAuthGroup]
+
+			nginxAnno, err = genNginxAnnotations(polName, polCfg, r.agentAddress, grps)
 		}
 
 		if err != nil {

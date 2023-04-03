@@ -165,7 +165,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 					Name:      "name",
 					Namespace: "test",
 					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-old-policy@test",
+						"hub.traefik.io/access-control-policy": "my-old-policy",
 						"custom-annotation":                    "foobar",
 					},
 				},
@@ -178,7 +178,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 									Namespace: "test",
 								},
 								{
-									Name:      "zz-my-old-policy-test",
+									Name:      "zz-my-old-policy",
 									Namespace: "test",
 								},
 							},
@@ -191,7 +191,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 					Name:      "name",
 					Namespace: "test",
 					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-policy@test",
+						"hub.traefik.io/access-control-policy": "my-policy",
 						"custom-annotation":                    "foobar",
 					},
 				},
@@ -212,7 +212,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 									Namespace: "test",
 								},
 								{
-									Name:      "zz-my-old-policy-test",
+									Name:      "zz-my-old-policy",
 									Namespace: "test",
 								},
 							},
@@ -236,7 +236,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 							Namespace: "test",
 						},
 						{
-							Name:      "zz-my-policy-test",
+							Name:      "zz-my-policy",
 							Namespace: "test",
 						},
 					},
@@ -255,7 +255,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 					Name:      "name",
 					Namespace: "test",
 					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-old-policy@test",
+						"hub.traefik.io/access-control-policy": "my-old-policy",
 						"custom-annotation":                    "foobar",
 					},
 				},
@@ -268,7 +268,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 					Name:      "name",
 					Namespace: "test",
 					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-policy@test",
+						"hub.traefik.io/access-control-policy": "my-policy",
 						"custom-annotation":                    "foobar",
 					},
 				},
@@ -280,7 +280,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 				{
 					Middlewares: []traefikv1alpha1.MiddlewareRef{
 						{
-							Name:      "zz-my-policy-test",
+							Name:      "zz-my-policy",
 							Namespace: "test",
 						},
 					},
@@ -298,7 +298,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 			traefikClientSet := traefikcrdfake.NewSimpleClientset()
 
 			policies := newPolicyGetterMock(t)
-			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+			policies.OnGetConfig("my-policy").TypedReturns(test.config, nil).Once()
 
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 			rev := NewTraefikIngressRoute(fwdAuthMdlwrs)
@@ -341,7 +341,7 @@ func TestTraefikIngressRoute_ReviewAddsAuthentication(t *testing.T) {
 				}
 			}
 
-			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 
@@ -383,7 +383,7 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 
 			middleware := traefikv1alpha1.Middleware{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "zz-my-policy-test",
+					Name:      "zz-my-policy",
 					Namespace: "test",
 				},
 				Spec: traefikv1alpha1.MiddlewareSpec{
@@ -395,7 +395,7 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			traefikClientSet := traefikcrdfake.NewSimpleClientset(&middleware)
 
 			policies := newPolicyGetterMock(t)
-			policies.OnGetConfig("my-policy@test").TypedReturns(test.config, nil).Once()
+			policies.OnGetConfig("my-policy").TypedReturns(test.config, nil).Once()
 
 			fwdAuthMdlwrs := NewFwdAuthMiddlewares("", policies, traefikClientSet.TraefikV1alpha1())
 			rev := NewTraefikIngressRoute(fwdAuthMdlwrs)
@@ -405,7 +405,7 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 					Name:      "name",
 					Namespace: "test",
 					Annotations: map[string]string{
-						"hub.traefik.io/access-control-policy": "my-policy@test",
+						"hub.traefik.io/access-control-policy": "my-policy",
 						"custom-annotation":                    "foobar",
 					},
 				},
@@ -436,7 +436,7 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 				},
 			}
 
-			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err := traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 			assert.Equal(t, []string{"fwdHeader"}, m.Spec.ForwardAuth.AuthResponseHeaders)
@@ -445,7 +445,7 @@ func TestTraefikIngressRoute_ReviewUpdatesExistingMiddleware(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, p)
 
-			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy-test", metav1.GetOptions{})
+			m, err = traefikClientSet.TraefikV1alpha1().Middlewares("test").Get(context.Background(), "zz-my-policy", metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.NotNil(t, m)
 

@@ -78,7 +78,9 @@ func (r TraefikIngressRoute) Review(ctx context.Context, ar admv1.AdmissionRevie
 
 	var mdlwrName string
 	if polName != "" {
-		mdlwrName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ingRoute.Namespace)
+		grps := ingRoute.Annotations[AnnotationHubAuthGroup]
+
+		mdlwrName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ingRoute.Namespace, grps)
 		if err != nil {
 			return nil, err
 		}

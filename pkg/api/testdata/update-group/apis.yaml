@@ -16,21 +16,21 @@ spec:
     name: petstore-svc
     port:
       number: 8080
+
 ---
 apiVersion: hub.traefik.io/v1alpha1
 kind: API
 metadata:
-  name: my-supply-chain
-  namespace: default
+  name: my-bookstore-api
+  namespace: books
   labels:
-    area: supply-chain
+    area: products
+    product: books
 spec:
-  pathPrefix: "/deliver"
+  pathPrefix: "/bookstore"
   service:
     openApiSpec:
-      path: /api/v3/openapi.json
-      port:
-        number: 8080
-    name: supply-chain-svc
+      url: https://example.com/api/v3/openapi.json
+    name: bookstore-svc
     port:
-      number: 8080
+      number: 443

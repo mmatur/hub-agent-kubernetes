@@ -292,6 +292,97 @@ func TestServeHTTP(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_handleGroups(t *testing.T) {
+	tests := []struct {
+		desc       string
+		metadata   map[string]string
+		query      string
+		wantStatus int
+	}{
+		{
+			desc:  "matching group",
+			query: "?groups=admin",
+			metadata: map[string]string{
+				"groups": "admin",
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			desc:  "not matching groups",
+			query: "?groups=admin",
+			metadata: map[string]string{
+				"groups": "not-admin",
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			desc:  "user group match one of the required groups",
+			query: "?groups=admin,dev",
+			metadata: map[string]string{
+				"groups": "dev",
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			desc:  "one of user groups match the required group",
+			query: "?groups=admin",
+			metadata: map[string]string{
+				"groups": "admin,dev",
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			desc:  "query escaped groups",
+			query: "?groups=dev%20",
+			metadata: map[string]string{
+				"groups": "dev ",
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			desc:       "no groups metadata",
+			query:      "?groups=admin",
+			metadata:   map[string]string{},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			desc: "no required groups",
+			metadata: map[string]string{
+				"groups": "dev",
+			},
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := Config{
+				KeySource: token.Source{Header: "Api-Key"},
+				Keys: []Key{{
+					ID:       "id-1",
+					Value:    "17fa993d5eecbd361f30baf0b9b2329ad053bb6d5fec2228eca55e9b4914fface3af69bcc9a6b5f7ff093aa9a0d00811d0b2a3ee67eac60c57e79d2fd99bbde0",
+					Metadata: test.metadata,
+				}},
+			}
+
+			apiKey, err := NewHandler(&cfg, "api-key")
+			require.NoError(t, err)
+
+			rr := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/"+test.query, http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Api-Key", validAPIKey)
+
+			apiKey.ServeHTTP(rr, req)
+
+			assert.Equal(t, test.wantStatus, rr.Code)
+		})
+	}
+}
+
 func TestServeHTTPForwardsHeader(t *testing.T) {
 	tests := []struct {
 		desc       string

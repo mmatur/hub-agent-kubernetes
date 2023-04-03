@@ -21,6 +21,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
+	"net/url"
 	"reflect"
 
 	"github.com/rs/zerolog/log"
@@ -53,7 +55,7 @@ func NewFwdAuthMiddlewares(agentAddr string, policies PolicyGetter, traefikClien
 // allows to untie ACP creation from ACP reference and remove ordering constraints while still not exposing publicly
 // a protected resource.
 // NOTE: forward auth middlewares deletion is to be done elsewhere, when ACPs are deleted.
-func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string) (string, error) {
+func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace, groups string) (string, error) {
 	name := middlewareName(polName)
 
 	logger := log.Ctx(ctx).With().
@@ -73,34 +75,49 @@ func (m FwdAuthMiddlewares) Setup(ctx context.Context, polName, namespace string
 		return "", err
 	}
 
-	if err = m.setupMiddleware(ctx, name, namespace, polName, acpCfg); err != nil {
+	name, err = m.setupMiddleware(ctx, name, namespace, polName, groups, acpCfg)
+	if err != nil {
 		return "", fmt.Errorf("setup ForwardAuth middleware: %w", err)
 	}
 
 	return name, nil
 }
 
-func (m *FwdAuthMiddlewares) setupMiddleware(ctx context.Context, name, namespace, canonicalPolName string, cfg *acp.Config) error {
+func (m *FwdAuthMiddlewares) setupMiddleware(ctx context.Context, name, namespace, canonicalPolName, groups string, cfg *acp.Config) (string, error) {
 	logger := log.Ctx(ctx)
+
+	if groups != "" {
+		h, err := hash(groups)
+		if err != nil {
+			return "", fmt.Errorf("unable to hash groups: %w", err)
+		}
+
+		name = name + "-" + fmt.Sprintf("%d", h)
+	}
 
 	currentMiddleware, err := m.findMiddleware(ctx, name, namespace)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if currentMiddleware == nil {
 		logger.Debug().Msg("No ForwardAuth middleware found, creating a new one")
-		return m.createMiddleware(ctx, name, namespace, canonicalPolName, cfg)
+		if err = m.createMiddleware(ctx, name, namespace, canonicalPolName, groups, cfg); err != nil {
+			return "", err
+		}
+
+		return name, nil
 	}
 
-	newSpec, err := m.newMiddlewareSpec(canonicalPolName, cfg)
+	newSpec, err := m.newMiddlewareSpec(canonicalPolName, groups, cfg)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if reflect.DeepEqual(currentMiddleware.Spec, newSpec) {
 		logger.Debug().Msg("Existing ForwardAuth middleware is up do date")
-		return nil
+
+		return name, nil
 	}
 
 	logger.Debug().Msg("Existing ForwardAuth middleware is outdated, updating it")
@@ -109,10 +126,10 @@ func (m *FwdAuthMiddlewares) setupMiddleware(ctx context.Context, name, namespac
 
 	_, err = m.traefikClientSet.Middlewares(namespace).Update(ctx, currentMiddleware, metav1.UpdateOptions{FieldManager: "hub-auth"})
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return name, nil
 }
 
 func (m *FwdAuthMiddlewares) findMiddleware(ctx context.Context, name, namespace string) (*traefikv1alpha1.Middleware, error) {
@@ -121,28 +138,34 @@ func (m *FwdAuthMiddlewares) findMiddleware(ctx context.Context, name, namespace
 		if kerror.IsNotFound(err) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
 
 	return mdlwr, nil
 }
 
-func (m *FwdAuthMiddlewares) newMiddlewareSpec(canonicalPolName string, cfg *acp.Config) (traefikv1alpha1.MiddlewareSpec, error) {
+func (m *FwdAuthMiddlewares) newMiddlewareSpec(canonicalPolName, groups string, cfg *acp.Config) (traefikv1alpha1.MiddlewareSpec, error) {
 	authResponseHeaders, err := headerToForward(cfg)
 	if err != nil {
 		return traefikv1alpha1.MiddlewareSpec{}, err
 	}
 
+	address := m.agentAddress + "/" + canonicalPolName
+	if cfg.APIKey != nil && groups != "" {
+		address += "?groups=" + url.QueryEscape(groups)
+	}
+
 	return traefikv1alpha1.MiddlewareSpec{
 		ForwardAuth: &traefikv1alpha1.ForwardAuth{
-			Address:             m.agentAddress + "/" + canonicalPolName,
+			Address:             address,
 			AuthResponseHeaders: authResponseHeaders,
 		},
 	}, nil
 }
 
-func (m *FwdAuthMiddlewares) createMiddleware(ctx context.Context, name, namespace, canonicalPolName string, cfg *acp.Config) error {
-	spec, err := m.newMiddlewareSpec(canonicalPolName, cfg)
+func (m *FwdAuthMiddlewares) createMiddleware(ctx context.Context, name, namespace, canonicalPolName, groups string, cfg *acp.Config) error {
+	spec, err := m.newMiddlewareSpec(canonicalPolName, groups, cfg)
 	if err != nil {
 		return fmt.Errorf("new middleware spec: %w", err)
 	}
@@ -161,4 +184,14 @@ func (m *FwdAuthMiddlewares) createMiddleware(ctx context.Context, name, namespa
 	}
 
 	return nil
+}
+
+func hash(name string) (uint32, error) {
+	h := fnv.New32()
+
+	if _, err := h.Write([]byte(name)); err != nil {
+		return 0, fmt.Errorf("generate hash: %w", err)
+	}
+
+	return h.Sum32(), nil
 }

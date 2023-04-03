@@ -76,7 +76,7 @@ func Test_WatcherGatewayRun(t *testing.T) {
 				{
 					Name:      "new-gateway",
 					Labels:    map[string]string{"area": "stores"},
-					Accesses:  []string{"products"},
+					Accesses:  []string{"products", "supply-chain"},
 					Version:   "version-1",
 					HubDomain: "brave-lion-123.hub-traefik.io",
 					CustomDomains: []CustomDomain{
@@ -120,7 +120,31 @@ func Test_WatcherGatewayRun(t *testing.T) {
 			wantMiddlewares:    "testdata/update-gateway/want.middlewares.yaml",
 		},
 		{
-			desc: "delete related ingresses  when an API is removed from a gateway on the platform",
+			desc: "update change group",
+			platformGateways: []Gateway{{
+				Name:      "modified-gateway",
+				Labels:    map[string]string{"area": "products", "role": "dev"},
+				Accesses:  []string{"products"},
+				Version:   "version-2",
+				HubDomain: "brave-lion-123.hub-traefik.io",
+				CustomDomains: []CustomDomain{
+					{Name: "api.hello.example.com", Verified: true},
+					{Name: "api.welcome.example.com", Verified: true},
+					{Name: "api.new.example.com", Verified: true},
+				},
+			}},
+			clusterGateways:    "testdata/update-group/gateways.yaml",
+			clusterIngresses:   "testdata/update-group/ingresses.yaml",
+			clusterAccesses:    "testdata/update-group/accesses.yaml",
+			clusterCollections: "testdata/update-group/collections.yaml",
+			clusterAPIs:        "testdata/update-group/apis.yaml",
+			wantGateways:       "testdata/update-group/want.gateways.yaml",
+			wantIngresses:      "testdata/update-group/want.ingresses.yaml",
+			wantSecrets:        "testdata/update-group/want.secrets.yaml",
+			wantMiddlewares:    "testdata/update-group/want.middlewares.yaml",
+		},
+		{
+			desc: "delete related ingresses when an API is removed from a gateway on the platform",
 			platformGateways: []Gateway{
 				{
 					Name:      "modified-gateway",

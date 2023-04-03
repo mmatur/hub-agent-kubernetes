@@ -133,8 +133,10 @@ func (r TraefikIngress) Review(ctx context.Context, ar admv1.AdmissionReview) (m
 	}
 
 	if polName != "" {
+		grps := ing.Metadata.Annotations[AnnotationHubAuthGroup]
+
 		var middlewareName string
-		middlewareName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ing.Metadata.Namespace)
+		middlewareName, err = r.fwdAuthMiddlewares.Setup(ctx, polName, ing.Metadata.Namespace, grps)
 		if err != nil {
 			return nil, err
 		}

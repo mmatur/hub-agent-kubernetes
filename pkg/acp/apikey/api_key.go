@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/acp/token"
@@ -117,6 +119,43 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	queryParam := req.URL.Query()
+	if queryParam.Get("groups") != "" {
+		groups, err := url.QueryUnescape(queryParam.Get("groups"))
+		if err != nil {
+			log.Error().Err(err).Msg("Error while unescaping groups")
+
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		userGroupsRaw, ok := k.Metadata["groups"]
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		userGroups := strings.Split(userGroupsRaw, ",")
+
+		var found bool
+		for _, group := range strings.Split(groups, ",") {
+			if search(group, userGroups) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Debug().
+				Str("groups", groups).
+				Strs("user_groups", userGroups).
+				Msg("User is not in the required groups")
+
+			rw.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
 	for name, meta := range h.fwdHeaders {
 		if v, exists := k.Metadata[meta]; exists {
 			rw.Header().Add(name, v)
@@ -124,4 +163,14 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.WriteHeader(http.StatusOK)
+}
+
+func search(needle string, stack []string) bool {
+	for _, s := range stack {
+		if s == needle {
+			return true
+		}
+	}
+
+	return false
 }

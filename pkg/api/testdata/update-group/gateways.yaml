@@ -1,13 +1,10 @@
 apiVersion: hub.traefik.io/v1alpha1
 kind: APIGateway
 metadata:
-  name: new-gateway
+  name: gateway
   labels:
-    area: stores
+    area: users
 spec:
-  apiAccesses:
-    - products
-    - supply-chain
   customDomains:
     - "api.hello.example.com"
     - "api.welcome.example.com"
@@ -19,4 +16,4 @@ status:
     - api.hello.example.com
     - api.welcome.example.com
   urls: "https://api.hello.example.com,https://api.welcome.example.com,https://brave-lion-123.hub-traefik.io"
-  hash: "FJWzP5UcdSqx4zETjJ4PEA=="
+  hash: "8SctbQ7WDd1U8DK9U5okdzu0Pcg="

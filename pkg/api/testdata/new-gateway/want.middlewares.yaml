@@ -9,3 +9,4 @@ spec:
     prefixes:
       - /stores/petstore
       - /petstore
+      - /deliver

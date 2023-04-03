@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761-hub
+  name: modified-gateway-713459761-4249197200-hub
   namespace: books
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
@@ -11,6 +11,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
+    hub.traefik.io/access-control-policy: "hub-api-management"
+    hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
     traefik.ingress.kubernetes.io/router.middlewares: "books-modified-gateway-713459761-stripprefix@kubernetescrd"
@@ -37,7 +39,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761
+  name: modified-gateway-713459761-4249197200
   namespace: books
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
@@ -46,6 +48,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
+    hub.traefik.io/access-control-policy: "hub-api-management"
+    hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
     traefik.ingress.kubernetes.io/router.middlewares: "books-modified-gateway-713459761-stripprefix@kubernetescrd"

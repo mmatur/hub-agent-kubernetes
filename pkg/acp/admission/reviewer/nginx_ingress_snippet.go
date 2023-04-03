@@ -37,7 +37,7 @@ const (
 	serverSnippet        = "nginx.ingress.kubernetes.io/server-snippet"
 )
 
-func genNginxAnnotations(polName string, polCfg *acp.Config, agentAddr string) (map[string]string, error) {
+func genNginxAnnotations(polName string, polCfg *acp.Config, agentAddr, groups string) (map[string]string, error) {
 	// If there's no policy given, force a 404 response. It allows to untie ACP creation from ACP reference and
 	// remove ordering constraints while still not exposing publicly a protected resource.
 	if polCfg == nil {
@@ -54,8 +54,13 @@ func genNginxAnnotations(polName string, polCfg *acp.Config, agentAddr string) (
 	locSnip := generateLocationSnippet(headerToFwd)
 
 	if polCfg.OIDC == nil {
+		address := fmt.Sprintf("%s/%s", agentAddr, polName)
+		if groups != "" {
+			address += "?groups=" + url.QueryEscape(groups)
+		}
+
 		return map[string]string{
-			authURL:              fmt.Sprintf("%s/%s", agentAddr, polName),
+			authURL:              address,
 			configurationSnippet: wrapHubSnippet(locSnip),
 		}, nil
 	}

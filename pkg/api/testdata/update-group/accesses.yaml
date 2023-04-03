@@ -15,17 +15,3 @@ spec:
         values:
           - pets
           - toys
----
-apiVersion: hub.traefik.io/v1alpha1
-kind: APIAccess
-metadata:
-  name: supply-chain
-spec:
-  groups:
-    - supply-chain
-  apiSelector:
-    matchExpressions:
-      - key: area
-        operator: In
-        values:
-          - supply-chain
