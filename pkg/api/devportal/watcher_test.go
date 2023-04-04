@@ -54,14 +54,15 @@ func TestWatcher_Run(t *testing.T) {
 				Collections: map[string]collection{
 					"products": {
 						APICollection: externalObjects.APICollections["products"],
-						APIs: map[string]hubv1alpha1.API{
-							"books@products-ns": externalObjects.APIs["books@products-ns"],
-							"toys@products-ns":  externalObjects.APIs["toys@products-ns"],
+						APIs: map[string]api{
+							"books@products-ns": {API: externalObjects.APIs["books@products-ns"], authorizedGroups: []string{"supplier"}},
+							"toys@products-ns":  {API: externalObjects.APIs["toys@products-ns"], authorizedGroups: []string{"supplier"}},
 						},
+						authorizedGroups: []string{"supplier"},
 					},
 				},
-				APIs: map[string]hubv1alpha1.API{
-					"search@default": externalObjects.APIs["search@default"],
+				APIs: map[string]api{
+					"search@default": {API: externalObjects.APIs["search@default"], authorizedGroups: []string{"consumer"}},
 				},
 			},
 		},
@@ -70,8 +71,8 @@ func TestWatcher_Run(t *testing.T) {
 			Gateway: gateway{
 				APIGateway:  internalObjects.APIGateways["internal-gateway"],
 				Collections: map[string]collection{},
-				APIs: map[string]hubv1alpha1.API{
-					"accounting-reports@accounting-ns": internalObjects.APIs["accounting-reports@accounting-ns"],
+				APIs: map[string]api{
+					"accounting-reports@accounting-ns": {API: internalObjects.APIs["accounting-reports@accounting-ns"], authorizedGroups: []string{"accounting-team"}},
 				},
 			},
 		},

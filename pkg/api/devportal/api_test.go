@@ -54,112 +54,150 @@ var testPortal = portal{
 						PathPrefix: "/products",
 					},
 				},
-				APIs: map[string]hubv1alpha1.API{
+				APIs: map[string]api{
 					"books@products-ns": {
-						ObjectMeta: metav1.ObjectMeta{Name: "books", Namespace: "products-ns"},
-						Spec: hubv1alpha1.APISpec{
-							PathPrefix: "/books",
-							Service: hubv1alpha1.APIService{
-								Name: "books-svc",
-								Port: hubv1alpha1.APIServiceBackendPort{Number: 80},
-								OpenAPISpec: hubv1alpha1.OpenAPISpec{
-									URL: "http://my-oas-registry.example.com/artifacts/12345",
-								},
-							},
-						},
-					},
-					"groceries@products-ns": {
-						ObjectMeta: metav1.ObjectMeta{Name: "groceries", Namespace: "products-ns"},
-						Spec: hubv1alpha1.APISpec{
-							PathPrefix: "/groceries",
-							Service: hubv1alpha1.APIService{
-								Name:        "groceries-svc",
-								Port:        hubv1alpha1.APIServiceBackendPort{Number: 8080},
-								OpenAPISpec: hubv1alpha1.OpenAPISpec{Path: "/spec.json"},
-							},
-						},
-					},
-					"furnitures@products-ns": {
-						ObjectMeta: metav1.ObjectMeta{Name: "furnitures", Namespace: "products-ns"},
-						Spec: hubv1alpha1.APISpec{
-							PathPrefix: "/furnitures",
-							Service: hubv1alpha1.APIService{
-								Name: "furnitures-svc",
-								Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
-								OpenAPISpec: hubv1alpha1.OpenAPISpec{
-									Path: "/spec.json",
-									Port: &hubv1alpha1.APIServiceBackendPort{
-										Number: 9000,
+						API: hubv1alpha1.API{
+							ObjectMeta: metav1.ObjectMeta{Name: "books", Namespace: "products-ns"},
+							Spec: hubv1alpha1.APISpec{
+								PathPrefix: "/books",
+								Service: hubv1alpha1.APIService{
+									Name: "books-svc",
+									Port: hubv1alpha1.APIServiceBackendPort{Number: 80},
+									OpenAPISpec: hubv1alpha1.OpenAPISpec{
+										URL: "http://my-oas-registry.example.com/artifacts/12345",
 									},
 								},
 							},
 						},
+						authorizedGroups: []string{"supplier"},
+					},
+					"groceries@products-ns": {
+						API: hubv1alpha1.API{
+							ObjectMeta: metav1.ObjectMeta{Name: "groceries", Namespace: "products-ns"},
+							Spec: hubv1alpha1.APISpec{
+								PathPrefix: "/groceries",
+								Service: hubv1alpha1.APIService{
+									Name:        "groceries-svc",
+									Port:        hubv1alpha1.APIServiceBackendPort{Number: 8080},
+									OpenAPISpec: hubv1alpha1.OpenAPISpec{Path: "/spec.json"},
+								},
+							},
+						},
+						authorizedGroups: []string{"supplier"},
+					},
+					"furnitures@products-ns": {
+						API: hubv1alpha1.API{
+							ObjectMeta: metav1.ObjectMeta{Name: "furnitures", Namespace: "products-ns"},
+							Spec: hubv1alpha1.APISpec{
+								PathPrefix: "/furnitures",
+								Service: hubv1alpha1.APIService{
+									Name: "furnitures-svc",
+									Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+									OpenAPISpec: hubv1alpha1.OpenAPISpec{
+										Path: "/spec.json",
+										Port: &hubv1alpha1.APIServiceBackendPort{
+											Number: 9000,
+										},
+									},
+								},
+							},
+						},
+						authorizedGroups: []string{"supplier"},
 					},
 					"toys@products-ns": {
-						ObjectMeta: metav1.ObjectMeta{Name: "toys", Namespace: "products-ns"},
-						Spec: hubv1alpha1.APISpec{
-							PathPrefix: "/toys",
-							Service: hubv1alpha1.APIService{
-								Name: "toys-svc",
-								Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+						API: hubv1alpha1.API{
+							ObjectMeta: metav1.ObjectMeta{Name: "toys", Namespace: "products-ns"},
+							Spec: hubv1alpha1.APISpec{
+								PathPrefix: "/toys",
+								Service: hubv1alpha1.APIService{
+									Name: "toys-svc",
+									Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+								},
 							},
 						},
+						authorizedGroups: []string{"supplier"},
 					},
 				},
+				authorizedGroups: []string{"supplier"},
 			},
 		},
-		APIs: map[string]hubv1alpha1.API{
+		APIs: map[string]api{
 			"managers@people-ns": {
-				ObjectMeta: metav1.ObjectMeta{Name: "managers", Namespace: "people-ns"},
-				Spec: hubv1alpha1.APISpec{
-					PathPrefix: "/managers",
-					Service: hubv1alpha1.APIService{
-						Name: "managers-svc",
-						Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
-						OpenAPISpec: hubv1alpha1.OpenAPISpec{
-							URL: "http://my-oas-registry.example.com/artifacts/456",
-						},
-					},
-				},
-			},
-			"notifications@default": {
-				ObjectMeta: metav1.ObjectMeta{Name: "notifications", Namespace: "default"},
-				Spec: hubv1alpha1.APISpec{
-					PathPrefix: "/notifications",
-					Service: hubv1alpha1.APIService{
-						Name: "notifications-svc",
-						Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
-						OpenAPISpec: hubv1alpha1.OpenAPISpec{
-							Path: "/spec.json",
-						},
-					},
-				},
-			},
-			"metrics@default": {
-				ObjectMeta: metav1.ObjectMeta{Name: "metrics", Namespace: "default"},
-				Spec: hubv1alpha1.APISpec{
-					PathPrefix: "/metrics",
-					Service: hubv1alpha1.APIService{
-						Name: "metrics-svc",
-						Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
-						OpenAPISpec: hubv1alpha1.OpenAPISpec{
-							Path: "/spec.json",
-							Port: &hubv1alpha1.APIServiceBackendPort{
-								Number: 9000,
+				API: hubv1alpha1.API{
+					ObjectMeta: metav1.ObjectMeta{Name: "managers", Namespace: "people-ns"},
+					Spec: hubv1alpha1.APISpec{
+						PathPrefix: "/managers",
+						Service: hubv1alpha1.APIService{
+							Name: "managers-svc",
+							Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+							OpenAPISpec: hubv1alpha1.OpenAPISpec{
+								URL: "http://my-oas-registry.example.com/artifacts/456",
 							},
 						},
 					},
 				},
+				authorizedGroups: []string{"supplier"},
 			},
-			"health@default": {
-				ObjectMeta: metav1.ObjectMeta{Name: "health", Namespace: "default"},
-				Spec: hubv1alpha1.APISpec{
-					PathPrefix: "/health",
-					Service: hubv1alpha1.APIService{
-						Name: "health-svc",
-						Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+			"notifications@default": {
+				API: hubv1alpha1.API{
+					ObjectMeta: metav1.ObjectMeta{Name: "notifications", Namespace: "default"},
+					Spec: hubv1alpha1.APISpec{
+						PathPrefix: "/notifications",
+						Service: hubv1alpha1.APIService{
+							Name: "notifications-svc",
+							Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+							OpenAPISpec: hubv1alpha1.OpenAPISpec{
+								Path: "/spec.json",
+							},
+						},
 					},
 				},
+				authorizedGroups: []string{"supplier"},
+			},
+			"metrics@default": {
+				API: hubv1alpha1.API{
+					ObjectMeta: metav1.ObjectMeta{Name: "metrics", Namespace: "default"},
+					Spec: hubv1alpha1.APISpec{
+						PathPrefix: "/metrics",
+						Service: hubv1alpha1.APIService{
+							Name: "metrics-svc",
+							Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+							OpenAPISpec: hubv1alpha1.OpenAPISpec{
+								Path: "/spec.json",
+								Port: &hubv1alpha1.APIServiceBackendPort{
+									Number: 9000,
+								},
+							},
+						},
+					},
+				},
+				authorizedGroups: []string{"supplier"},
+			},
+			"health@default": {
+				API: hubv1alpha1.API{
+					ObjectMeta: metav1.ObjectMeta{Name: "health", Namespace: "default"},
+					Spec: hubv1alpha1.APISpec{
+						PathPrefix: "/health",
+						Service: hubv1alpha1.APIService{
+							Name: "health-svc",
+							Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+						},
+					},
+				},
+				authorizedGroups: []string{"supplier"},
+			},
+			"api@default": {
+				API: hubv1alpha1.API{
+					ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "default"},
+					Spec: hubv1alpha1.APISpec{
+						PathPrefix: "/api",
+						Service: hubv1alpha1.APIService{
+							Name: "api-svc",
+							Port: hubv1alpha1.APIServiceBackendPort{Number: 8080},
+						},
+					},
+				},
+				authorizedGroups: []string{"developer"},
 			},
 		},
 	},
@@ -173,6 +211,8 @@ func TestPortalAPI_Router_listAPIs(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/apis", http.NoBody)
 	require.NoError(t, err)
+
+	req.Header.Add("Hub-Groups", "supplier")
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -233,30 +273,35 @@ func TestPortalAPI_Router_getCollectionAPISpec(t *testing.T) {
 		collection string
 		api        string
 		wantURL    string
+		statusCode int
 	}{
 		{
 			desc:       "OpenAPI spec defined using an external URL",
 			collection: "products",
 			api:        "books@products-ns",
 			wantURL:    "http://my-oas-registry.example.com/artifacts/12345",
+			statusCode: http.StatusOK,
 		},
 		{
 			desc:       "OpenAPI spec defined with a path on the service",
 			collection: "products",
 			api:        "groceries@products-ns",
 			wantURL:    "http://groceries-svc.products-ns:8080/spec.json",
+			statusCode: http.StatusOK,
 		},
 		{
 			desc:       "OpenAPI spec defined with a path on the service and a specific port",
 			collection: "products",
 			api:        "furnitures@products-ns",
 			wantURL:    "http://furnitures-svc.products-ns:9000/spec.json",
+			statusCode: http.StatusOK,
 		},
 		{
 			desc:       "No OpenAPI spec defined",
 			collection: "products",
 			api:        "toys@products-ns",
 			wantURL:    "http://toys-svc.products-ns:8080/",
+			statusCode: http.StatusOK,
 		},
 	}
 
@@ -288,10 +333,15 @@ func TestPortalAPI_Router_getCollectionAPISpec(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, uri, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Groups", "supplier")
+
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 
-			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, test.statusCode, resp.StatusCode)
+			if test.statusCode != http.StatusOK {
+				return
+			}
 
 			got, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
@@ -328,19 +378,22 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 					},
 					Collections: map[string]collection{
 						"my-collection": {
-							APIs: map[string]hubv1alpha1.API{
+							APIs: map[string]api{
 								"my-api@my-ns": {
-									ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
-									Spec: hubv1alpha1.APISpec{
-										PathPrefix: "/api-prefix",
-										Service: hubv1alpha1.APIService{
-											Name:        "svc",
-											Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
-											OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+									API: hubv1alpha1.API{
+										ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
+										Spec: hubv1alpha1.APISpec{
+											PathPrefix: "/api-prefix",
+											Service: hubv1alpha1.APIService{
+												Name:        "svc",
+												Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
+												OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+											},
 										},
 									},
 								},
 							},
+							authorizedGroups: []string{"supplier"},
 						},
 					},
 				},
@@ -365,19 +418,23 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 								ObjectMeta: metav1.ObjectMeta{Name: "my-collection"},
 								Spec:       hubv1alpha1.APICollectionSpec{PathPrefix: "/collection-prefix"},
 							},
-							APIs: map[string]hubv1alpha1.API{
+							APIs: map[string]api{
 								"my-api@my-ns": {
-									ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
-									Spec: hubv1alpha1.APISpec{
-										PathPrefix: "/api-prefix",
-										Service: hubv1alpha1.APIService{
-											Name:        "svc",
-											Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
-											OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+									API: hubv1alpha1.API{
+										ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
+										Spec: hubv1alpha1.APISpec{
+											PathPrefix: "/api-prefix",
+											Service: hubv1alpha1.APIService{
+												Name:        "svc",
+												Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
+												OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+											},
 										},
 									},
+									authorizedGroups: []string{"supplier"},
 								},
 							},
+							authorizedGroups: []string{"supplier"},
 						},
 					},
 				},
@@ -405,19 +462,23 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 							APICollection: hubv1alpha1.APICollection{
 								ObjectMeta: metav1.ObjectMeta{Name: "my-collection"},
 							},
-							APIs: map[string]hubv1alpha1.API{
+							APIs: map[string]api{
 								"my-api@my-ns": {
-									ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
-									Spec: hubv1alpha1.APISpec{
-										PathPrefix: "/api-prefix",
-										Service: hubv1alpha1.APIService{
-											Name:        "svc",
-											Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
-											OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+									API: hubv1alpha1.API{
+										ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
+										Spec: hubv1alpha1.APISpec{
+											PathPrefix: "/api-prefix",
+											Service: hubv1alpha1.APIService{
+												Name:        "svc",
+												Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
+												OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+											},
 										},
 									},
+									authorizedGroups: []string{"supplier"},
 								},
 							},
+							authorizedGroups: []string{"supplier"},
 						},
 					},
 				},
@@ -440,6 +501,8 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 			req, err := http.NewRequest(http.MethodGet, apiSrv.URL+test.path, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Groups", "supplier")
+
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 
@@ -458,29 +521,40 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 
 func TestPortalAPI_Router_getAPISpec(t *testing.T) {
 	tests := []struct {
-		desc    string
-		api     string
-		wantURL string
+		desc       string
+		api        string
+		wantURL    string
+		statusCode int
 	}{
 		{
-			desc:    "OpenAPI spec defined using an external URL",
-			api:     "managers@people-ns",
-			wantURL: "http://my-oas-registry.example.com/artifacts/456",
+			desc:       "OpenAPI spec defined using an external URL",
+			api:        "managers@people-ns",
+			wantURL:    "http://my-oas-registry.example.com/artifacts/456",
+			statusCode: http.StatusOK,
 		},
 		{
-			desc:    "OpenAPI spec defined with a path on the service",
-			api:     "notifications@default",
-			wantURL: "http://notifications-svc.default:8080/spec.json",
+			desc:       "OpenAPI spec defined with a path on the service",
+			api:        "notifications@default",
+			wantURL:    "http://notifications-svc.default:8080/spec.json",
+			statusCode: http.StatusOK,
 		},
 		{
-			desc:    "OpenAPI spec defined with a path on the service and a specific port",
-			api:     "metrics@default",
-			wantURL: "http://metrics-svc.default:9000/spec.json",
+			desc:       "OpenAPI spec defined with a path on the service and a specific port",
+			api:        "metrics@default",
+			wantURL:    "http://metrics-svc.default:9000/spec.json",
+			statusCode: http.StatusOK,
 		},
 		{
-			desc:    "No OpenAPI spec defined",
-			api:     "health@default",
-			wantURL: "http://health-svc.default:8080/",
+			desc:       "No OpenAPI spec defined",
+			api:        "health@default",
+			wantURL:    "http://health-svc.default:8080/",
+			statusCode: http.StatusOK,
+		},
+		{
+			desc:       "Missing required group",
+			api:        "api@default",
+			wantURL:    "http://api-svc.default:8080/",
+			statusCode: http.StatusNotFound,
 		},
 	}
 
@@ -510,10 +584,15 @@ func TestPortalAPI_Router_getAPISpec(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, apiSrv.URL+"/apis/"+test.api, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Groups", "supplier")
+
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 
-			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, test.statusCode, resp.StatusCode)
+			if test.statusCode != http.StatusOK {
+				return
+			}
 
 			got, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
@@ -541,17 +620,20 @@ func TestPortalAPI_Router_getAPISpec_overrideServerAndAuth(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "my-gateway"},
 				Status:     hubv1alpha1.APIGatewayStatus{HubDomain: "majestic-beaver-123.hub-traefik.io"},
 			},
-			APIs: map[string]hubv1alpha1.API{
+			APIs: map[string]api{
 				"my-api@my-ns": {
-					ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
-					Spec: hubv1alpha1.APISpec{
-						PathPrefix: "/api-prefix",
-						Service: hubv1alpha1.APIService{
-							Name:        "svc",
-							Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
-							OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+					API: hubv1alpha1.API{
+						ObjectMeta: metav1.ObjectMeta{Name: "my-api", Namespace: "my-ns"},
+						Spec: hubv1alpha1.APISpec{
+							PathPrefix: "/api-prefix",
+							Service: hubv1alpha1.APIService{
+								Name:        "svc",
+								Port:        hubv1alpha1.APIServiceBackendPort{Number: 80},
+								OpenAPISpec: hubv1alpha1.OpenAPISpec{URL: svcSrv.URL},
+							},
 						},
 					},
+					authorizedGroups: []string{"supplier"},
 				},
 			},
 		},
@@ -566,6 +648,8 @@ func TestPortalAPI_Router_getAPISpec_overrideServerAndAuth(t *testing.T) {
 	uri := fmt.Sprintf("%s/apis/my-api@my-ns", apiSrv.URL)
 	req, err := http.NewRequest(http.MethodGet, uri, http.NoBody)
 	require.NoError(t, err)
+
+	req.Header.Add("Hub-Groups", "supplier")
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)

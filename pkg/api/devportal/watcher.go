@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hublistersv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	"golang.org/x/exp/slices"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,13 +41,41 @@ type gateway struct {
 	hubv1alpha1.APIGateway
 
 	Collections map[string]collection
-	APIs        map[string]hubv1alpha1.API
+	APIs        map[string]api
 }
 
 type collection struct {
 	hubv1alpha1.APICollection
 
-	APIs map[string]hubv1alpha1.API
+	APIs map[string]api
+
+	authorizedGroups []string
+}
+
+func (c *collection) authorizes(userGroups []string) bool {
+	for _, group := range c.authorizedGroups {
+		if slices.Contains(userGroups, group) {
+			return true
+		}
+	}
+
+	return false
+}
+
+type api struct {
+	hubv1alpha1.API
+
+	authorizedGroups []string
+}
+
+func (a *api) authorizes(userGroups []string) bool {
+	for _, group := range a.authorizedGroups {
+		if slices.Contains(userGroups, group) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // UpdatableHandler is an updatable HTTP handler for serving dev portals.
@@ -279,7 +308,7 @@ func (w *Watcher) getPortals() ([]portal, error) {
 		g := gateway{
 			APIGateway:  *apiGateway,
 			Collections: make(map[string]collection),
-			APIs:        make(map[string]hubv1alpha1.API),
+			APIs:        make(map[string]api),
 		}
 
 		for _, apiAccessName := range apiGateway.Spec.APIAccesses {
@@ -293,22 +322,22 @@ func (w *Watcher) getPortals() ([]portal, error) {
 				continue
 			}
 
-			accessAPIs, err := w.findAPIs(apiAccess.Spec.APISelector)
+			apis, err := w.findAPIs(apiAccess.Spec.APISelector, apiAccess.Spec.Groups)
 			if err != nil {
 				return nil, fmt.Errorf("find APIAccess %q APIs: %w", apiAccessName, err)
 			}
 
-			for k := range accessAPIs {
-				g.APIs[k] = accessAPIs[k]
+			for k := range apis {
+				g.APIs[k] = apis[k]
 			}
 
-			collectionAPIs, err := w.findCollections(apiAccess.Spec.APICollectionSelector)
+			apiCollections, err := w.findCollections(apiAccess.Spec.APICollectionSelector, apiAccess.Spec.Groups)
 			if err != nil {
 				return nil, fmt.Errorf("find APIAccess %q APICollections: %w", apiAccessName, err)
 			}
 
-			for k := range collectionAPIs {
-				g.Collections[k] = collectionAPIs[k]
+			for k := range apiCollections {
+				g.Collections[k] = apiCollections[k]
 			}
 		}
 
@@ -321,7 +350,7 @@ func (w *Watcher) getPortals() ([]portal, error) {
 	return portals, nil
 }
 
-func (w *Watcher) findAPIs(labelSelector *metav1.LabelSelector) (map[string]hubv1alpha1.API, error) {
+func (w *Watcher) findAPIs(labelSelector *metav1.LabelSelector, authorizedGroups []string) (map[string]api, error) {
 	if labelSelector == nil {
 		return nil, nil
 	}
@@ -339,20 +368,23 @@ func (w *Watcher) findAPIs(labelSelector *metav1.LabelSelector) (map[string]hubv
 		return nil, fmt.Errorf("list APIs using selector %q: %w", labelSelector.String(), err)
 	}
 
-	foundAPIs := make(map[string]hubv1alpha1.API)
+	foundAPIs := make(map[string]api)
 	for _, a := range apis {
 		namespace := a.Namespace
 		if namespace == "" {
 			namespace = "default"
 		}
 
-		foundAPIs[a.Name+"@"+namespace] = *a
+		foundAPIs[a.Name+"@"+namespace] = api{
+			API:              *a,
+			authorizedGroups: authorizedGroups,
+		}
 	}
 
 	return foundAPIs, nil
 }
 
-func (w *Watcher) findCollections(labelSelector *metav1.LabelSelector) (map[string]collection, error) {
+func (w *Watcher) findCollections(labelSelector *metav1.LabelSelector, authorizedGroups []string) (map[string]collection, error) {
 	if labelSelector == nil {
 		return nil, nil
 	}
@@ -372,14 +404,15 @@ func (w *Watcher) findCollections(labelSelector *metav1.LabelSelector) (map[stri
 
 	foundCollections := make(map[string]collection)
 	for _, c := range collections {
-		apis, err := w.findAPIs(&c.Spec.APISelector)
+		apis, err := w.findAPIs(&c.Spec.APISelector, authorizedGroups)
 		if err != nil {
 			return nil, fmt.Errorf("find APICollection %q APIs: %w", c.Name, err)
 		}
 
 		foundCollections[c.Name] = collection{
-			APICollection: *c,
-			APIs:          apis,
+			APICollection:    *c,
+			APIs:             apis,
+			authorizedGroups: authorizedGroups,
 		}
 	}
 

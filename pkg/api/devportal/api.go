@@ -36,13 +36,14 @@ import (
 	logwrapper "github.com/traefik/hub-agent-kubernetes/pkg/logger"
 )
 
+const headerHubGroups = "Hub-Groups"
+
 // PortalAPI is a handler that exposes APIPortal information.
 type PortalAPI struct {
 	router     chi.Router
 	httpClient *http.Client
 
-	portal       *portal
-	listAPIsResp []byte
+	portal *portal
 }
 
 // NewPortalAPI creates a new PortalAPI handler.
@@ -53,16 +54,10 @@ func NewPortalAPI(portal *portal) (*PortalAPI, error) {
 		Str("component", "portal_api").
 		Logger())
 
-	listAPIsResp, err := json.Marshal(buildListResp(portal))
-	if err != nil {
-		return nil, fmt.Errorf("marshal list APIs response: %w", err)
-	}
-
 	p := &PortalAPI{
-		router:       chi.NewRouter(),
-		httpClient:   client.StandardClient(),
-		portal:       portal,
-		listAPIsResp: listAPIsResp,
+		router:     chi.NewRouter(),
+		httpClient: client.StandardClient(),
+		portal:     portal,
 	}
 
 	p.router.Get("/apis", p.handleListAPIs)
@@ -77,11 +72,13 @@ func (p *PortalAPI) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.router.ServeHTTP(rw, req)
 }
 
-func (p *PortalAPI) handleListAPIs(rw http.ResponseWriter, _ *http.Request) {
+func (p *PortalAPI) handleListAPIs(rw http.ResponseWriter, r *http.Request) {
+	userGroups := r.Header.Values(headerHubGroups)
+
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 
-	if _, err := rw.Write(p.listAPIsResp); err != nil {
+	if err := json.NewEncoder(rw).Encode(buildListResp(p.portal, userGroups)); err != nil {
 		log.Error().Err(err).
 			Str("portal_name", p.portal.Name).
 			Msg("Write list APIs response")
@@ -97,8 +94,7 @@ func (p *PortalAPI) handleGetAPISpec(rw http.ResponseWriter, r *http.Request) {
 		Logger()
 
 	a, ok := p.portal.Gateway.APIs[apiNameNamespace]
-	if !ok {
-		logger.Debug().Msg("API not found")
+	if !ok || !a.authorizes(r.Header.Values(headerHubGroups)) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -117,11 +113,11 @@ func (p *PortalAPI) handleGetCollectionAPISpec(rw http.ResponseWriter, r *http.R
 		Logger()
 
 	c, ok := p.portal.Gateway.Collections[collectionName]
-	if !ok {
-		logger.Debug().Msg("APICollection not found")
+	if !ok || !c.authorizes(r.Header.Values(headerHubGroups)) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
+
 	a, ok := c.APIs[apiNameNamespace]
 	if !ok {
 		logger.Debug().Msg("API not found")
@@ -132,10 +128,10 @@ func (p *PortalAPI) handleGetCollectionAPISpec(rw http.ResponseWriter, r *http.R
 	p.serveAPISpec(logger.WithContext(r.Context()), rw, &p.portal.Gateway, &c, &a)
 }
 
-func (p *PortalAPI) serveAPISpec(ctx context.Context, rw http.ResponseWriter, g *gateway, c *collection, a *hubv1alpha1.API) {
+func (p *PortalAPI) serveAPISpec(ctx context.Context, rw http.ResponseWriter, g *gateway, c *collection, a *api) {
 	logger := log.Ctx(ctx)
 
-	spec, err := p.getOpenAPISpec(ctx, a)
+	spec, err := p.getOpenAPISpec(ctx, &a.API)
 	if err != nil {
 		logger.Error().Err(err).Msg("Unable to fetch OpenAPI spec")
 		rw.WriteHeader(http.StatusBadGateway)
@@ -310,9 +306,13 @@ type apiResp struct {
 	SpecLink   string `json:"specLink"`
 }
 
-func buildListResp(p *portal) listResp {
+func buildListResp(p *portal, userGroups []string) listResp {
 	var resp listResp
 	for collectionName, c := range p.Gateway.Collections {
+		if !c.authorizes(userGroups) {
+			continue
+		}
+
 		cr := collectionResp{
 			Name:       collectionName,
 			PathPrefix: c.Spec.PathPrefix,
@@ -333,6 +333,10 @@ func buildListResp(p *portal) listResp {
 	sortCollectionsResp(resp.Collections)
 
 	for apiNameNamespace, a := range p.Gateway.APIs {
+		if !a.authorizes(userGroups) {
+			continue
+		}
+
 		resp.APIs = append(resp.APIs, apiResp{
 			Name:       a.Name,
 			PathPrefix: a.Spec.PathPrefix,
