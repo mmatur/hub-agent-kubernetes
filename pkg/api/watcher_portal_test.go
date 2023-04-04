@@ -67,6 +67,7 @@ func Test_WatcherRun(t *testing.T) {
 		wantEdgeIngresses string
 		wantIngresses     string
 		wantSecrets       string
+		wantACP           string
 	}{
 		{
 			desc: "new portal present on the platform needs to be created on the cluster",
@@ -78,6 +79,10 @@ func Test_WatcherRun(t *testing.T) {
 					Gateway:     "gateway",
 					Version:     "version-1",
 					HubDomain:   "majestic-beaver-123.hub-traefik.io",
+					HubACPConfig: OIDCConfig{
+						ClientID:     "client-id",
+						ClientSecret: "client-secret",
+					},
 					CustomDomains: []CustomDomain{
 						{Name: "hello.example.com", Verified: true},
 						{Name: "welcome.example.com", Verified: true},
@@ -88,6 +93,7 @@ func Test_WatcherRun(t *testing.T) {
 			wantEdgeIngresses: "testdata/new-portal/want.edge-ingresses.yaml",
 			wantIngresses:     "testdata/new-portal/want.ingresses.yaml",
 			wantSecrets:       "testdata/new-portal/want.secrets.yaml",
+			wantACP:           "testdata/new-portal/want.acp.yaml",
 		},
 		{
 			desc: "modified portal on the platform needs to be updated on the cluster",
@@ -99,6 +105,10 @@ func Test_WatcherRun(t *testing.T) {
 					Gateway:     "modified-gateway",
 					Version:     "version-2",
 					HubDomain:   "majestic-beaver-123.hub-traefik.io",
+					HubACPConfig: OIDCConfig{
+						ClientID:     "client-id",
+						ClientSecret: "client-secret",
+					},
 					CustomDomains: []CustomDomain{
 						{Name: "hello.example.com", Verified: true},
 						{Name: "new.example.com", Verified: true},

@@ -40,6 +40,8 @@ type Portal struct {
 	HubDomain     string         `json:"hubDomain,omitempty"`
 	CustomDomains []CustomDomain `json:"customDomains,omitempty"`
 
+	HubACPConfig OIDCConfig `json:"hubAcpConfig"`
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 	Version   string    `json:"version"`
@@ -49,6 +51,12 @@ type Portal struct {
 type CustomDomain struct {
 	Name     string `json:"name"`
 	Verified bool   `json:"verified"`
+}
+
+// OIDCConfig is the OIDC client configuration used to secure the access to a portal.
+type OIDCConfig struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
 }
 
 // Resource builds the v1alpha1 APIPortal resource.

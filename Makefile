@@ -34,7 +34,7 @@ build-portal:
 
 image: export GOOS := linux
 image: export GOARCH := amd64
-image: build
+image: build-portal build
 	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/traefik/$(BIN_NAME):$(VERSION) .
 
 image-dev: export GOOS := linux

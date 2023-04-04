@@ -1,0 +1,25 @@
+apiVersion: hub.traefik.io/v1alpha1
+kind: AccessControlPolicy
+metadata:
+  name: new-portal-3684986092-portal-acp
+  ownerReferences:
+  - apiVersion: hub.traefik.io/v1alpha1
+    kind: APIPortal
+    name: my-portal
+  labels:
+    app.kubernetes.io/managed-by: traefik-hub
+spec:
+  oidc:
+    issuer: http://hydra.docker.localhost
+    clientId: client-id
+    secret:
+      name: my-portal-542300818-portal-acp
+      namespace: hub-agent
+    redirectUrl: /callback
+    scopes:
+    - openid
+    - offline_access
+    session:
+      refresh: true
+    forwardHeaders:
+      Hub-Groups: groups

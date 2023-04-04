@@ -414,7 +414,7 @@ func (w *Watcher) upsertSecret(ctx context.Context, cert Certificate, name, name
 	if kerror.IsNotFound(err) {
 		secret = &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "core.k8s.io/v1",
+				APIVersion: "v1",
 				Kind:       "Secret",
 			},
 			ObjectMeta: metav1.ObjectMeta{

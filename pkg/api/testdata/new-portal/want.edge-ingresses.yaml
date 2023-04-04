@@ -10,6 +10,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: traefik-hub
 spec:
+  acp:
+    name: new-portal-3684986092-portal-acp
   service:
     name: dev-portal-service-name
     port: 8080

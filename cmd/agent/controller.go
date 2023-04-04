@@ -44,9 +44,10 @@ import (
 )
 
 const (
-	flagPlatformURL       = "platform-url"
-	flagToken             = "token"
-	flagTraefikMetricsURL = "traefik.metrics-url"
+	flagPlatformURL                 = "platform-url"
+	flagPlatformIdentityProviderURL = "platform-idp-url"
+	flagToken                       = "token"
+	flagTraefikMetricsURL           = "traefik.metrics-url"
 )
 
 type controllerCmd struct {
@@ -60,6 +61,13 @@ func newControllerCmd() controllerCmd {
 			Usage:   "The URL at which to reach the Hub platform API",
 			Value:   "https://platform.hub.traefik.io/agent",
 			EnvVars: []string{strcase.ToSNAKE(flagPlatformURL)},
+			Hidden:  true,
+		},
+		&cli.StringFlag{
+			Name:    flagPlatformIdentityProviderURL,
+			Usage:   "The URL used to set the `issuer` property of OIDC ACPs protecting dev portals",
+			Value:   "https://auth.hub.traefik.io",
+			EnvVars: []string{strcase.ToSNAKE(flagPlatformIdentityProviderURL)},
 			Hidden:  true,
 		},
 		&cli.StringFlag{

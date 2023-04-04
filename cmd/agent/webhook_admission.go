@@ -175,15 +175,16 @@ func webhookAdmission(ctx context.Context, cliCtx *cli.Context, platformClient *
 	}
 
 	portalWatcherCfg := &api.WatcherPortalConfig{
-		IngressClassName:        cliCtx.String(flagIngressClassName),
-		AgentNamespace:          currentNamespace(),
-		TraefikAPIEntryPoint:    cliCtx.String(flagTraefikAPIEntryPoint),
-		TraefikTunnelEntryPoint: cliCtx.String(flagTraefikTunnelEntryPoint),
-		DevPortalServiceName:    cliCtx.String(flagDevPortalServiceName),
-		DevPortalPort:           cliCtx.Int(flagDevPortalPort),
-		PortalSyncInterval:      time.Minute,
-		CertSyncInterval:        time.Hour,
-		CertRetryInterval:       time.Minute,
+		IngressClassName:            cliCtx.String(flagIngressClassName),
+		AgentNamespace:              currentNamespace(),
+		TraefikAPIEntryPoint:        cliCtx.String(flagTraefikAPIEntryPoint),
+		TraefikTunnelEntryPoint:     cliCtx.String(flagTraefikTunnelEntryPoint),
+		DevPortalServiceName:        cliCtx.String(flagDevPortalServiceName),
+		DevPortalPort:               cliCtx.Int(flagDevPortalPort),
+		PlatformIdentityProviderURL: cliCtx.String(flagPlatformIdentityProviderURL),
+		PortalSyncInterval:          time.Minute,
+		CertSyncInterval:            time.Hour,
+		CertRetryInterval:           time.Minute,
 	}
 
 	gatewayWatcherCfg := &api.WatcherGatewayConfig{
@@ -347,10 +348,17 @@ func setupAdmissionHandlers(ctx context.Context, platformClient *platform.Client
 	return admission.NewHandler(reviewers, traefikReviewer), edgeadmission.NewHandler(platformClient), apiHandler, nil
 }
 
-func setupAPIManagementWatcher(ctx context.Context, platformClient *platform.Client,
-	kubeClientSet *kclientset.Clientset, hubClientSet *hubclientset.Clientset, traefikClientSet v1alpha1.TraefikV1alpha1Interface,
-	kubeInformer kinformers.SharedInformerFactory, hubInformer hubinformers.SharedInformerFactory,
-	portalWatcherCfg *api.WatcherPortalConfig, gatewayWatcherCfg *api.WatcherGatewayConfig, cfgWatcher *platform.ConfigWatcher,
+func setupAPIManagementWatcher(
+	ctx context.Context,
+	platformClient *platform.Client,
+	kubeClientSet *kclientset.Clientset,
+	hubClientSet *hubclientset.Clientset,
+	traefikClientSet v1alpha1.TraefikV1alpha1Interface,
+	kubeInformer kinformers.SharedInformerFactory,
+	hubInformer hubinformers.SharedInformerFactory,
+	portalWatcherCfg *api.WatcherPortalConfig,
+	gatewayWatcherCfg *api.WatcherGatewayConfig,
+	cfgWatcher *platform.ConfigWatcher,
 ) error {
 	portalWatcher := api.NewWatcherPortal(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, portalWatcherCfg)
 	gatewayWatcher := api.NewWatcherGateway(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, gatewayWatcherCfg)

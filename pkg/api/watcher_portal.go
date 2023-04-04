@@ -55,12 +55,13 @@ type PlatformClient interface {
 
 // WatcherPortalConfig holds the portal watcher configuration.
 type WatcherPortalConfig struct {
-	IngressClassName        string
-	AgentNamespace          string
-	TraefikAPIEntryPoint    string
-	TraefikTunnelEntryPoint string
-	DevPortalServiceName    string
-	DevPortalPort           int
+	IngressClassName            string
+	AgentNamespace              string
+	TraefikAPIEntryPoint        string
+	TraefikTunnelEntryPoint     string
+	DevPortalServiceName        string
+	DevPortalPort               int
+	PlatformIdentityProviderURL string
 
 	PortalSyncInterval time.Duration
 	CertSyncInterval   time.Duration
@@ -163,8 +164,8 @@ func (w *WatcherPortal) setupCertificates(ctx context.Context, portal *hubv1alph
 		return fmt.Errorf("get portal custom domains secret name: %w", err)
 	}
 
-	if err = w.upsertSecret(ctx, cert, portal, secretName); err != nil {
-		return fmt.Errorf("upsert secret: %w", err)
+	if err = w.upsertCertificateSecret(ctx, cert, portal, secretName); err != nil {
+		return fmt.Errorf("upsert certificate secret: %w", err)
 	}
 
 	return nil
@@ -230,7 +231,7 @@ func (w *WatcherPortal) createPortal(ctx context.Context, portal *Portal) error 
 		Str("name", obj.Name).
 		Msg("APIPortal created")
 
-	return w.syncChildResources(ctx, obj)
+	return w.syncChildResources(ctx, obj, portal.HubACPConfig)
 }
 
 func (w *WatcherPortal) updatePortal(ctx context.Context, oldPortal *hubv1alpha1.APIPortal, newPortal *Portal) error {
@@ -252,7 +253,7 @@ func (w *WatcherPortal) updatePortal(ctx context.Context, oldPortal *hubv1alpha1
 			Msg("APIPortal updated")
 	}
 
-	return w.syncChildResources(ctx, obj)
+	return w.syncChildResources(ctx, obj, newPortal.HubACPConfig)
 }
 
 func (w *WatcherPortal) cleanPortals(ctx context.Context, portals map[string]*hubv1alpha1.APIPortal) {
@@ -276,8 +277,13 @@ func (w *WatcherPortal) cleanPortals(ctx context.Context, portals map[string]*hu
 	}
 }
 
-func (w *WatcherPortal) syncChildResources(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
-	if err := w.upsertPortalEdgeIngress(ctx, portal); err != nil {
+func (w *WatcherPortal) syncChildResources(ctx context.Context, portal *hubv1alpha1.APIPortal, hubACPConfig OIDCConfig) error {
+	acp, err := w.upsertPortalACP(ctx, portal, hubACPConfig)
+	if err != nil {
+		return fmt.Errorf("upsert portal ACP: %w", err)
+	}
+
+	if err = w.upsertPortalEdgeIngress(ctx, portal, acp.Name); err != nil {
 		return fmt.Errorf("upsert portal edge ingress: %w", err)
 	}
 
@@ -285,18 +291,162 @@ func (w *WatcherPortal) syncChildResources(ctx context.Context, portal *hubv1alp
 		return nil
 	}
 
-	if err := w.setupCertificates(ctx, portal); err != nil {
+	if err = w.setupCertificates(ctx, portal); err != nil {
 		return fmt.Errorf("setup certificate: %w", err)
 	}
 
-	if err := w.upsertPortalIngress(ctx, portal); err != nil {
+	if err = w.upsertPortalIngress(ctx, portal, acp.Name); err != nil {
 		return fmt.Errorf("upsert portal ingress: %w", err)
 	}
 
 	return nil
 }
 
-func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) upsertPortalACP(ctx context.Context, portal *hubv1alpha1.APIPortal, hubACPConfig OIDCConfig) (*hubv1alpha1.AccessControlPolicy, error) {
+	acpName, err := getACPPortalName(portal.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get ACP name: %w", err)
+	}
+
+	if err = w.upsertACPSecret(ctx, portal, acpName, hubACPConfig.ClientSecret); err != nil {
+		return nil, fmt.Errorf("upsert ACP secret: %w", err)
+	}
+
+	acp := &hubv1alpha1.AccessControlPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: acpName,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "traefik-hub",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: portal.APIVersion,
+					Kind:       portal.Kind,
+					Name:       portal.Name,
+					UID:        portal.UID,
+				},
+			},
+		},
+		Spec: hubv1alpha1.AccessControlPolicySpec{
+			OIDC: &hubv1alpha1.AccessControlPolicyOIDC{
+				Issuer:      w.config.PlatformIdentityProviderURL,
+				RedirectURL: "/callback",
+				ClientID:    hubACPConfig.ClientID,
+				Scopes:      []string{"openid", "offline_access"},
+				Session: &hubv1alpha1.Session{
+					Refresh: pointer.Bool(true),
+				},
+				Secret: &corev1.SecretReference{
+					Name:      acpName,
+					Namespace: w.config.AgentNamespace,
+				},
+				ForwardHeaders: map[string]string{
+					"Hub-Groups": "groups",
+					"Hub-Email":  "sub",
+				},
+			},
+		},
+	}
+
+	existingACP, err := w.hubClientSet.HubV1alpha1().AccessControlPolicies().Get(ctx, acpName, metav1.GetOptions{})
+	if err != nil && !kerror.IsNotFound(err) {
+		return nil, fmt.Errorf("get existing ACP: %w", err)
+	}
+
+	if kerror.IsNotFound(err) {
+		existingACP, err = w.hubClientSet.HubV1alpha1().AccessControlPolicies().Create(ctx, acp, metav1.CreateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("create ACP: %w", err)
+		}
+
+		log.Debug().
+			Str("name", existingACP.Name).
+			Msg("ACP created")
+
+		return acp, nil
+	}
+
+	existingACP.Spec = acp.Spec
+	// Override Annotations and Labels in case new values are added in the future.
+	existingACP.ObjectMeta.Annotations = acp.ObjectMeta.Annotations
+	existingACP.ObjectMeta.Labels = acp.ObjectMeta.Labels
+
+	existingACP, err = w.hubClientSet.HubV1alpha1().AccessControlPolicies().Update(ctx, existingACP, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("update ACP: %w", err)
+	}
+
+	log.Debug().
+		Str("name", existingACP.Name).
+		Msg("ACP updated")
+
+	return acp, nil
+}
+
+func (w *WatcherPortal) upsertACPSecret(ctx context.Context, portal *hubv1alpha1.APIPortal, name, clientSecret string) error {
+	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: w.config.AgentNamespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: portal.APIVersion,
+					Kind:       portal.Kind,
+					Name:       portal.Name,
+					UID:        portal.UID,
+				},
+			},
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "traefik-hub",
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"clientSecret": []byte(clientSecret),
+		},
+	}
+
+	existingSecret, err := w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil && !kerror.IsNotFound(err) {
+		return fmt.Errorf("get existing ACP secret: %w", err)
+	}
+
+	if kerror.IsNotFound(err) {
+		_, err = w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create ACP secret: %w", err)
+		}
+
+		log.Debug().
+			Str("name", secret.Name).
+			Str("namespace", secret.Namespace).
+			Msg("ACP secret created")
+
+		return nil
+	}
+
+	existingSecret.Data = secret.Data
+	existingSecret.ObjectMeta.Annotations = secret.ObjectMeta.Annotations
+	existingSecret.ObjectMeta.Labels = secret.ObjectMeta.Labels
+
+	_, err = w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Update(ctx, existingSecret, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update existing ACP secret: %w", err)
+	}
+
+	log.Debug().
+		Str("name", existingSecret.Name).
+		Str("namespace", existingSecret.Namespace).
+		Msg("ACP secret updated")
+
+	return nil
+}
+
+func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hubv1alpha1.APIPortal, acpName string) error {
 	ingName, err := getEdgeIngressPortalName(portal.Name)
 	if err != nil {
 		return fmt.Errorf("get edge ingress name: %w", err)
@@ -323,6 +473,9 @@ func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hub
 			},
 		},
 		Spec: hubv1alpha1.EdgeIngressSpec{
+			ACP: &hubv1alpha1.EdgeIngressACP{
+				Name: acpName,
+			},
 			Service: hubv1alpha1.EdgeIngressService{
 				Name: w.config.DevPortalServiceName,
 				Port: w.config.DevPortalPort,
@@ -374,7 +527,7 @@ func (w *WatcherPortal) upsertPortalEdgeIngress(ctx context.Context, portal *hub
 	return nil
 }
 
-func (w *WatcherPortal) upsertPortalIngress(ctx context.Context, portal *hubv1alpha1.APIPortal) error {
+func (w *WatcherPortal) upsertPortalIngress(ctx context.Context, portal *hubv1alpha1.APIPortal, acpName string) error {
 	ingressName, err := getIngressPortalName(portal.Name)
 	if err != nil {
 		return fmt.Errorf("get ingress name: %w", err)
@@ -390,7 +543,7 @@ func (w *WatcherPortal) upsertPortalIngress(ctx context.Context, portal *hubv1al
 		return fmt.Errorf("get ingress: %w", err)
 	}
 
-	ingress := w.buildIngress(portal, ingressName, secretName)
+	ingress := w.buildIngress(portal, ingressName, secretName, acpName)
 	if kerror.IsNotFound(err) {
 		_, err = w.kubeClientSet.NetworkingV1().Ingresses(w.config.AgentNamespace).Create(ctx, ingress, metav1.CreateOptions{})
 		if err != nil {
@@ -422,7 +575,7 @@ func (w *WatcherPortal) upsertPortalIngress(ctx context.Context, portal *hubv1al
 	return nil
 }
 
-func (w *WatcherPortal) buildIngress(portal *hubv1alpha1.APIPortal, ingressName, secretName string) *netv1.Ingress {
+func (w *WatcherPortal) buildIngress(portal *hubv1alpha1.APIPortal, ingressName, secretName, acpName string) *netv1.Ingress {
 	pathPrefix := netv1.PathTypePrefix
 	rule := netv1.IngressRuleValue{
 		HTTP: &netv1.HTTPIngressRuleValue{
@@ -459,6 +612,7 @@ func (w *WatcherPortal) buildIngress(portal *hubv1alpha1.APIPortal, ingressName,
 			Name:      ingressName,
 			Namespace: w.config.AgentNamespace,
 			Annotations: map[string]string{
+				"hub.traefik.io/access-control-policy":             acpName,
 				"traefik.ingress.kubernetes.io/router.tls":         "true",
 				"traefik.ingress.kubernetes.io/router.entrypoints": w.config.TraefikAPIEntryPoint,
 			},
@@ -488,7 +642,7 @@ func (w *WatcherPortal) buildIngress(portal *hubv1alpha1.APIPortal, ingressName,
 	}
 }
 
-func (w *WatcherPortal) upsertSecret(ctx context.Context, cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) error {
+func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) error {
 	existingSecret, err := w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
 		return fmt.Errorf("get secret: %w", err)
@@ -529,7 +683,7 @@ func (w *WatcherPortal) upsertSecret(ctx context.Context, cert edgeingress.Certi
 func (w *WatcherPortal) buildSecret(cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "core.k8s.io/v1",
+			APIVersion: "v1",
 			Kind:       "Secret",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -577,6 +731,18 @@ func getIngressPortalName(portalName string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s-%d-portal-ing", portalName, h), nil
+}
+
+// getACPPortalName compute the name of the Hub ACP of a portal.
+// The name follow this format: {portal-name}-{hash(portal-name)}-portal-acp
+// This hash is here to reduce the chance of getting a collision on an existing ACP.
+func getACPPortalName(portalName string) (string, error) {
+	h, err := hash(portalName)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d-portal-acp", portalName, h), nil
 }
 
 // getPortalCustomDomainSecretName compute the name of the secret storing the certificate of the portal custom domains.

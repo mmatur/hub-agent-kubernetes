@@ -10,6 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
+    hub.traefik.io/access-control-policy: portal-3118032615-portal-acp
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
 spec:
