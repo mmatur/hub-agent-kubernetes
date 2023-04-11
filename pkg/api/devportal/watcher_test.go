@@ -19,9 +19,7 @@ package devportal
 
 import (
 	"context"
-	"os"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -30,49 +28,59 @@ import (
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
-	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	hublistersv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/listers/hub/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	kschema "k8s.io/apimachinery/pkg/runtime/schema"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
-func TestWatcher_Run(t *testing.T) {
-	clientSet := hubfake.NewSimpleClientset()
+// Mandatory to be able to parse traefik.containo.us/v1alpha1 and traefik.io/v1alpha1 resources.
+func init() {
+	if err := hubv1alpha1.AddToScheme(kscheme.Scheme); err != nil {
+		panic(err)
+	}
+}
 
-	internalObjects := loadK8sObjects(t, clientSet, "./testdata/manifests/internal-portal.yaml")
-	externalObjects := loadK8sObjects(t, clientSet, "./testdata/manifests/external-portal.yaml")
+func TestWatcher_Run(t *testing.T) {
+	internalObjects := kube.LoadK8sObjects(t, "./testdata/manifests/internal-portal.yaml")
+	internalK8sObjects := newK8sObjects(t, internalObjects)
+
+	externalObjects := kube.LoadK8sObjects(t, "./testdata/manifests/external-portal.yaml")
+	externalK8sObjects := newK8sObjects(t, externalObjects)
+
+	clientSet := kube.NewFakeHubClientset(append(internalObjects, externalObjects...)...)
 
 	portals, gateways, apis, collections, accesses := setupInformers(t, clientSet)
 
 	wantPortals := []portal{
 		{
-			APIPortal: externalObjects.APIPortals["external-portal"],
+			APIPortal: externalK8sObjects.APIPortals["external-portal"],
 			Gateway: gateway{
-				APIGateway: externalObjects.APIGateways["external-gateway"],
+				APIGateway: externalK8sObjects.APIGateways["external-gateway"],
 				Collections: map[string]collection{
 					"products": {
-						APICollection: externalObjects.APICollections["products"],
+						APICollection: externalK8sObjects.APICollections["products"],
 						APIs: map[string]api{
-							"books@products-ns": {API: externalObjects.APIs["books@products-ns"], authorizedGroups: []string{"supplier"}},
-							"toys@products-ns":  {API: externalObjects.APIs["toys@products-ns"], authorizedGroups: []string{"supplier"}},
+							"books@products-ns": {API: externalK8sObjects.APIs["books@products-ns"], authorizedGroups: []string{"supplier"}},
+							"toys@products-ns":  {API: externalK8sObjects.APIs["toys@products-ns"], authorizedGroups: []string{"supplier"}},
 						},
 						authorizedGroups: []string{"supplier"},
 					},
 				},
 				APIs: map[string]api{
-					"search@default": {API: externalObjects.APIs["search@default"], authorizedGroups: []string{"consumer"}},
+					"search@default": {API: externalK8sObjects.APIs["search@default"], authorizedGroups: []string{"consumer"}},
 				},
 			},
 		},
 		{
-			APIPortal: internalObjects.APIPortals["internal-portal"],
+			APIPortal: internalK8sObjects.APIPortals["internal-portal"],
 			Gateway: gateway{
-				APIGateway:  internalObjects.APIGateways["internal-gateway"],
+				APIGateway:  internalK8sObjects.APIGateways["internal-gateway"],
 				Collections: map[string]collection{},
 				APIs: map[string]api{
-					"accounting-reports@accounting-ns": {API: internalObjects.APIs["accounting-reports@accounting-ns"], authorizedGroups: []string{"accounting-team"}},
+					"accounting-reports@accounting-ns": {API: internalK8sObjects.APIs["accounting-reports@accounting-ns"], authorizedGroups: []string{"accounting-team"}},
 				},
 			},
 		},
@@ -325,94 +333,51 @@ func TestWatcher_OnUpdate(t *testing.T) {
 	}
 }
 
-func loadK8sObjects(t *testing.T, clientSet *hubfake.Clientset, path string) *k8sObjects {
-	t.Helper()
-
-	objects := newK8sObjects()
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-
-	files := strings.Split(string(content), "---")
-
-	for _, file := range files {
-		if file == "\n" || file == "" {
-			continue
-		}
-
-		decoder := scheme.Codecs.UniversalDeserializer()
-		object, _, err := decoder.Decode([]byte(file), nil, nil)
-		require.NoError(t, err)
-
-		objects.Add(t, object)
-
-		// clientSet.Tracker().Add uses an heuristic for finding the plural form of a resource. In the
-		// case of `APIGateway` it outputs `apigatewaies` which doesn't match the real plural form `apigateway.
-		// Therefore, preventing any ClientSet APIs and Listers from working. To alleviate the issue, such objects
-		// must be manually created with the right GroupVersionResource.
-		if object.GetObjectKind().GroupVersionKind().Kind == "APIGateway" {
-			err = clientSet.Tracker().Create(kschema.GroupVersionResource{
-				Group:    "hub.traefik.io",
-				Version:  "v1alpha1",
-				Resource: "apigateways",
-			}, object, "")
-			require.NoError(t, err)
-			continue
-		}
-
-		err = clientSet.Tracker().Add(object)
-		require.NoError(t, err)
-	}
-
-	return objects
-}
-
 type k8sObjects struct {
 	APIPortals     map[string]hubv1alpha1.APIPortal
 	APIGateways    map[string]hubv1alpha1.APIGateway
 	APICollections map[string]hubv1alpha1.APICollection
 	APIs           map[string]hubv1alpha1.API
 	APIAccesses    map[string]hubv1alpha1.APIAccess
-
-	accessor meta.MetadataAccessor
 }
 
-func newK8sObjects() *k8sObjects {
+func newK8sObjects(t *testing.T, objects []runtime.Object) *k8sObjects {
+	t.Helper()
+
 	accessor := meta.NewAccessor()
 
-	return &k8sObjects{
-		accessor: accessor,
-
+	o := &k8sObjects{
 		APIPortals:     make(map[string]hubv1alpha1.APIPortal),
 		APIGateways:    make(map[string]hubv1alpha1.APIGateway),
 		APICollections: make(map[string]hubv1alpha1.APICollection),
 		APIs:           make(map[string]hubv1alpha1.API),
 		APIAccesses:    make(map[string]hubv1alpha1.APIAccess),
 	}
-}
 
-func (o *k8sObjects) Add(t *testing.T, object runtime.Object) {
-	t.Helper()
+	for _, object := range objects {
+		name, err := accessor.Name(object)
+		require.NoError(t, err)
 
-	kind, err := o.accessor.Kind(object)
-	require.NoError(t, err)
-	name, err := o.accessor.Name(object)
-	require.NoError(t, err)
-	namespace, err := o.accessor.Namespace(object)
-	require.NoError(t, err)
+		namespace, err := accessor.Namespace(object)
+		require.NoError(t, err)
 
-	switch kind {
-	case "APIPortal":
-		o.APIPortals[name] = *object.(*hubv1alpha1.APIPortal)
-	case "APIGateway":
-		o.APIGateways[name] = *object.(*hubv1alpha1.APIGateway)
-	case "APICollection":
-		o.APICollections[name] = *object.(*hubv1alpha1.APICollection)
-	case "API":
-		o.APIs[name+"@"+namespace] = *object.(*hubv1alpha1.API)
-	case "APIAccess":
-		o.APIAccesses[name] = *object.(*hubv1alpha1.APIAccess)
+		switch obj := object.(type) {
+		case *hubv1alpha1.APIPortal:
+			o.APIPortals[name] = *obj
+		case *hubv1alpha1.APIGateway:
+			o.APIGateways[name] = *obj
+		case *hubv1alpha1.APICollection:
+			o.APICollections[name] = *obj
+		case *hubv1alpha1.API:
+			o.APIs[name+"@"+namespace] = *obj
+		case *hubv1alpha1.APIAccess:
+			o.APIAccesses[name] = *obj
+		default:
+			t.Fatal("unknown type", obj)
+		}
 	}
+
+	return o
 }
 
 func setupInformers(t *testing.T, clientSet *hubfake.Clientset) (hublistersv1alpha1.APIPortalLister, hublistersv1alpha1.APIGatewayLister, hublistersv1alpha1.APILister, hublistersv1alpha1.APICollectionLister, hublistersv1alpha1.APIAccessLister) {

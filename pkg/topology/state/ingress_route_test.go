@@ -27,6 +27,7 @@ import (
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
@@ -267,7 +268,7 @@ func TestFetcher_GetIngressRoutes(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			objects := loadK8sObjects(t, "fixtures/ingress-route/"+test.fixture)
+			objects := kube.LoadK8sObjects(t, "fixtures/ingress-route/"+test.fixture)
 
 			kubeClient := kubefake.NewSimpleClientset()
 			// Faking having Traefik CRDs installed on cluster.

@@ -229,21 +229,21 @@ func Test_WatcherGatewayRun(t *testing.T) {
 			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
 			traefikClientSet := traefikcrdfake.NewSimpleClientset(traefikObjects...)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
 			kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 0)
-			hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 0)
+			kubeInformer.Networking().V1().Ingresses().Informer()
 
+			hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 0)
 			hubInformer.Hub().V1alpha1().APIGateways().Informer()
 			hubInformer.Hub().V1alpha1().APIAccesses().Informer()
 			hubInformer.Hub().V1alpha1().APICollections().Informer()
 			hubInformer.Hub().V1alpha1().APIs().Informer()
-			kubeInformer.Networking().V1().Ingresses().Informer()
 
 			hubInformer.Start(ctx.Done())
-			hubInformer.WaitForCacheSync(ctx.Done())
-
 			kubeInformer.Start(ctx.Done())
+
+			hubInformer.WaitForCacheSync(ctx.Done())
 			kubeInformer.WaitForCacheSync(ctx.Done())
 
 			client := newPlatformClientMock(t)
@@ -296,7 +296,11 @@ func Test_WatcherGatewayRun(t *testing.T) {
 				close(stop)
 			}()
 
-			<-stop
+			select {
+			case <-ctx.Done():
+				t.Log(ctx.Err())
+			case <-stop:
+			}
 
 			assertGatewaysMatches(t, hubClientSet, wantGateways)
 			assertSecretsMatches(t, kubeClientSet, namespaces, wantSecrets)

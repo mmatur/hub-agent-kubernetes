@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kschema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,7 +51,7 @@ func TestFetcher_GetAPIs(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/api/api.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/api/api.yml")
 	kubeClient, traefikClient, hubClient := setupClientSets(t, objects)
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
@@ -81,7 +82,7 @@ func TestFetcher_getAPICollections(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/api/api_collection.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/api/api_collection.yml")
 	kubeClient, traefikClient, hubClient := setupClientSets(t, objects)
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
@@ -112,7 +113,7 @@ func TestFetcher_GetAPIAccesses(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/api/access.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/api/access.yml")
 	kubeClient, traefikClient, hubClient := setupClientSets(t, objects)
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
@@ -135,7 +136,7 @@ func TestFetcher_GetAPIPortals(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/api/portal.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/api/portal.yml")
 	kubeClient, traefikClient, hubClient := setupClientSets(t, objects)
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")
@@ -161,7 +162,7 @@ func TestFetcher_GetAPIGateways(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/api/gateway.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/api/gateway.yml")
 	kubeClient, traefikClient, hubClient := setupClientSets(t, objects)
 
 	f, err := watchAll(context.Background(), kubeClient, traefikClient, hubClient, "v1.20.1")

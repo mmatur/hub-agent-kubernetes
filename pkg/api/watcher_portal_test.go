@@ -157,7 +157,7 @@ func Test_WatcherRun(t *testing.T) {
 			kubeClientSet := kubefake.NewSimpleClientset(kubeObjects...)
 			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
 			kubeInformer := kinformers.NewSharedInformerFactory(kubeClientSet, 0)
 			hubInformer := hubinformers.NewSharedInformerFactory(hubClientSet, 0)
@@ -218,7 +218,11 @@ func Test_WatcherRun(t *testing.T) {
 				close(stop)
 			}()
 
-			<-stop
+			select {
+			case <-ctx.Done():
+				t.Log(ctx.Err())
+			case <-stop:
+			}
 
 			if test.wantPortals != "" {
 				wantPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.wantPortals)

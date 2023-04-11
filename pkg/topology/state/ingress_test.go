@@ -19,19 +19,16 @@ package state
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
-	kscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 func TestFetcher_GetIngresses(t *testing.T) {
@@ -85,7 +82,7 @@ func TestFetcher_GetIngresses(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/ingress/one-ingress-matches-ingress-class.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/ingress/one-ingress-matches-ingress-class.yml")
 
 	kubeClient := kubefake.NewSimpleClientset(objects...)
 	traefikClient := traefikcrdfake.NewSimpleClientset()
@@ -166,7 +163,7 @@ func TestFetcher_FetchIngresses(t *testing.T) {
 		},
 	}
 
-	objects := loadK8sObjects(t, "fixtures/ingress/v1.18-ingress.yml")
+	objects := kube.LoadK8sObjects(t, "fixtures/ingress/v1.18-ingress.yml")
 
 	kubeClient := kubefake.NewSimpleClientset(objects...)
 	traefikClient := traefikcrdfake.NewSimpleClientset()
@@ -187,28 +184,4 @@ func stringPtr(s string) *string {
 
 func netv1PathType(pathType netv1.PathType) *netv1.PathType {
 	return &pathType
-}
-
-func loadK8sObjects(t *testing.T, path string) []runtime.Object {
-	t.Helper()
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-
-	files := strings.Split(string(content), "---")
-
-	objects := make([]runtime.Object, 0, len(files))
-	for _, file := range files {
-		if file == "\n" || file == "" {
-			continue
-		}
-
-		decoder := kscheme.Codecs.UniversalDeserializer()
-		object, _, err := decoder.Decode([]byte(file), nil, nil)
-		require.NoError(t, err)
-
-		objects = append(objects, object)
-	}
-
-	return objects
 }
