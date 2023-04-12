@@ -3,10 +3,12 @@
 package devportal
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
 
 // updatableHandlerMock mock of UpdatableHandler.
@@ -113,4 +115,485 @@ func (_c *updatableHandlerUpdateCall) OnUpdate(portals []portal) *updatableHandl
 
 func (_c *updatableHandlerUpdateCall) OnUpdateRaw(portals interface{}) *updatableHandlerUpdateCall {
 	return _c.Parent.OnUpdateRaw(portals)
+}
+
+// platformClientMock mock of PlatformClient.
+type platformClientMock struct{ mock.Mock }
+
+// newPlatformClientMock creates a new platformClientMock.
+func newPlatformClientMock(tb testing.TB) *platformClientMock {
+	tb.Helper()
+
+	m := &platformClientMock{}
+	m.Mock.Test(tb)
+
+	tb.Cleanup(func() { m.AssertExpectations(tb) })
+
+	return m
+}
+
+func (_m *platformClientMock) CreateUserToken(_ context.Context, userEmail string, tokenName string) (string, error) {
+	_ret := _m.Called(userEmail, tokenName)
+
+	if _rf, ok := _ret.Get(0).(func(string, string) (string, error)); ok {
+		return _rf(userEmail, tokenName)
+	}
+
+	_ra0 := _ret.String(0)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnCreateUserToken(userEmail string, tokenName string) *platformClientCreateUserTokenCall {
+	return &platformClientCreateUserTokenCall{Call: _m.Mock.On("CreateUserToken", userEmail, tokenName), Parent: _m}
+}
+
+func (_m *platformClientMock) OnCreateUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientCreateUserTokenCall {
+	return &platformClientCreateUserTokenCall{Call: _m.Mock.On("CreateUserToken", userEmail, tokenName), Parent: _m}
+}
+
+type platformClientCreateUserTokenCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientCreateUserTokenCall) Panic(msg string) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) Once() *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) Twice() *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) Times(i int) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) WaitUntil(w <-chan time.Time) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) After(d time.Duration) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) Run(fn func(args mock.Arguments)) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) Maybe() *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) TypedReturns(a string, b error) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) ReturnsFn(fn func(string, string) (string, error)) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) TypedRun(fn func(string, string)) *platformClientCreateUserTokenCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_userEmail := args.String(0)
+		_tokenName := args.String(1)
+		fn(_userEmail, _tokenName)
+	})
+	return _c
+}
+
+func (_c *platformClientCreateUserTokenCall) OnCreateUserToken(userEmail string, tokenName string) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnDeleteUserToken(userEmail string, tokenName string) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnListUserTokens(userEmail string) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokens(userEmail)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnSuspendUserToken(userEmail string, tokenName string, suspend bool) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserToken(userEmail, tokenName, suspend)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnCreateUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnDeleteUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnListUserTokensRaw(userEmail interface{}) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokensRaw(userEmail)
+}
+
+func (_c *platformClientCreateUserTokenCall) OnSuspendUserTokenRaw(userEmail interface{}, tokenName interface{}, suspend interface{}) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserTokenRaw(userEmail, tokenName, suspend)
+}
+
+func (_m *platformClientMock) DeleteUserToken(_ context.Context, userEmail string, tokenName string) error {
+	_ret := _m.Called(userEmail, tokenName)
+
+	if _rf, ok := _ret.Get(0).(func(string, string) error); ok {
+		return _rf(userEmail, tokenName)
+	}
+
+	_ra0 := _ret.Error(0)
+
+	return _ra0
+}
+
+func (_m *platformClientMock) OnDeleteUserToken(userEmail string, tokenName string) *platformClientDeleteUserTokenCall {
+	return &platformClientDeleteUserTokenCall{Call: _m.Mock.On("DeleteUserToken", userEmail, tokenName), Parent: _m}
+}
+
+func (_m *platformClientMock) OnDeleteUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientDeleteUserTokenCall {
+	return &platformClientDeleteUserTokenCall{Call: _m.Mock.On("DeleteUserToken", userEmail, tokenName), Parent: _m}
+}
+
+type platformClientDeleteUserTokenCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientDeleteUserTokenCall) Panic(msg string) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) Once() *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) Twice() *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) Times(i int) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) WaitUntil(w <-chan time.Time) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) After(d time.Duration) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) Run(fn func(args mock.Arguments)) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) Maybe() *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) TypedReturns(a error) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) ReturnsFn(fn func(string, string) error) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) TypedRun(fn func(string, string)) *platformClientDeleteUserTokenCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_userEmail := args.String(0)
+		_tokenName := args.String(1)
+		fn(_userEmail, _tokenName)
+	})
+	return _c
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnCreateUserToken(userEmail string, tokenName string) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnDeleteUserToken(userEmail string, tokenName string) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnListUserTokens(userEmail string) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokens(userEmail)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnSuspendUserToken(userEmail string, tokenName string, suspend bool) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserToken(userEmail, tokenName, suspend)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnCreateUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnDeleteUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnListUserTokensRaw(userEmail interface{}) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokensRaw(userEmail)
+}
+
+func (_c *platformClientDeleteUserTokenCall) OnSuspendUserTokenRaw(userEmail interface{}, tokenName interface{}, suspend interface{}) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserTokenRaw(userEmail, tokenName, suspend)
+}
+
+func (_m *platformClientMock) ListUserTokens(_ context.Context, userEmail string) ([]platform.Token, error) {
+	_ret := _m.Called(userEmail)
+
+	if _rf, ok := _ret.Get(0).(func(string) ([]platform.Token, error)); ok {
+		return _rf(userEmail)
+	}
+
+	_ra0, _ := _ret.Get(0).([]platform.Token)
+	_rb1 := _ret.Error(1)
+
+	return _ra0, _rb1
+}
+
+func (_m *platformClientMock) OnListUserTokens(userEmail string) *platformClientListUserTokensCall {
+	return &platformClientListUserTokensCall{Call: _m.Mock.On("ListUserTokens", userEmail), Parent: _m}
+}
+
+func (_m *platformClientMock) OnListUserTokensRaw(userEmail interface{}) *platformClientListUserTokensCall {
+	return &platformClientListUserTokensCall{Call: _m.Mock.On("ListUserTokens", userEmail), Parent: _m}
+}
+
+type platformClientListUserTokensCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientListUserTokensCall) Panic(msg string) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) Once() *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) Twice() *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) Times(i int) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) WaitUntil(w <-chan time.Time) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) After(d time.Duration) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) Run(fn func(args mock.Arguments)) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) Maybe() *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) TypedReturns(a []platform.Token, b error) *platformClientListUserTokensCall {
+	_c.Call = _c.Return(a, b)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) ReturnsFn(fn func(string) ([]platform.Token, error)) *platformClientListUserTokensCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) TypedRun(fn func(string)) *platformClientListUserTokensCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_userEmail := args.String(0)
+		fn(_userEmail)
+	})
+	return _c
+}
+
+func (_c *platformClientListUserTokensCall) OnCreateUserToken(userEmail string, tokenName string) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientListUserTokensCall) OnDeleteUserToken(userEmail string, tokenName string) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientListUserTokensCall) OnListUserTokens(userEmail string) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokens(userEmail)
+}
+
+func (_c *platformClientListUserTokensCall) OnSuspendUserToken(userEmail string, tokenName string, suspend bool) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserToken(userEmail, tokenName, suspend)
+}
+
+func (_c *platformClientListUserTokensCall) OnCreateUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientListUserTokensCall) OnDeleteUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientListUserTokensCall) OnListUserTokensRaw(userEmail interface{}) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokensRaw(userEmail)
+}
+
+func (_c *platformClientListUserTokensCall) OnSuspendUserTokenRaw(userEmail interface{}, tokenName interface{}, suspend interface{}) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserTokenRaw(userEmail, tokenName, suspend)
+}
+
+func (_m *platformClientMock) SuspendUserToken(_ context.Context, userEmail string, tokenName string, suspend bool) error {
+	_ret := _m.Called(userEmail, tokenName, suspend)
+
+	if _rf, ok := _ret.Get(0).(func(string, string, bool) error); ok {
+		return _rf(userEmail, tokenName, suspend)
+	}
+
+	_ra0 := _ret.Error(0)
+
+	return _ra0
+}
+
+func (_m *platformClientMock) OnSuspendUserToken(userEmail string, tokenName string, suspend bool) *platformClientSuspendUserTokenCall {
+	return &platformClientSuspendUserTokenCall{Call: _m.Mock.On("SuspendUserToken", userEmail, tokenName, suspend), Parent: _m}
+}
+
+func (_m *platformClientMock) OnSuspendUserTokenRaw(userEmail interface{}, tokenName interface{}, suspend interface{}) *platformClientSuspendUserTokenCall {
+	return &platformClientSuspendUserTokenCall{Call: _m.Mock.On("SuspendUserToken", userEmail, tokenName, suspend), Parent: _m}
+}
+
+type platformClientSuspendUserTokenCall struct {
+	*mock.Call
+	Parent *platformClientMock
+}
+
+func (_c *platformClientSuspendUserTokenCall) Panic(msg string) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Panic(msg)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) Once() *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Once()
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) Twice() *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Twice()
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) Times(i int) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Times(i)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) WaitUntil(w <-chan time.Time) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.WaitUntil(w)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) After(d time.Duration) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.After(d)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) Run(fn func(args mock.Arguments)) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Run(fn)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) Maybe() *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Maybe()
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) TypedReturns(a error) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Return(a)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) ReturnsFn(fn func(string, string, bool) error) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Return(fn)
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) TypedRun(fn func(string, string, bool)) *platformClientSuspendUserTokenCall {
+	_c.Call = _c.Call.Run(func(args mock.Arguments) {
+		_userEmail := args.String(0)
+		_tokenName := args.String(1)
+		_suspend := args.Bool(2)
+		fn(_userEmail, _tokenName, _suspend)
+	})
+	return _c
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnCreateUserToken(userEmail string, tokenName string) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnDeleteUserToken(userEmail string, tokenName string) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserToken(userEmail, tokenName)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnListUserTokens(userEmail string) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokens(userEmail)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnSuspendUserToken(userEmail string, tokenName string, suspend bool) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserToken(userEmail, tokenName, suspend)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnCreateUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientCreateUserTokenCall {
+	return _c.Parent.OnCreateUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnDeleteUserTokenRaw(userEmail interface{}, tokenName interface{}) *platformClientDeleteUserTokenCall {
+	return _c.Parent.OnDeleteUserTokenRaw(userEmail, tokenName)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnListUserTokensRaw(userEmail interface{}) *platformClientListUserTokensCall {
+	return _c.Parent.OnListUserTokensRaw(userEmail)
+}
+
+func (_c *platformClientSuspendUserTokenCall) OnSuspendUserTokenRaw(userEmail interface{}, tokenName interface{}, suspend interface{}) *platformClientSuspendUserTokenCall {
+	return _c.Parent.OnSuspendUserTokenRaw(userEmail, tokenName, suspend)
 }

@@ -18,24 +18,36 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package devportal
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
+
+// PlatformClient can manage user tokens.
+type PlatformClient interface {
+	ListUserTokens(ctx context.Context, userEmail string) ([]platform.Token, error)
+	CreateUserToken(ctx context.Context, userEmail, tokenName string) (string, error)
+	SuspendUserToken(ctx context.Context, userEmail, tokenName string, suspend bool) error
+	DeleteUserToken(ctx context.Context, userEmail, tokenName string) error
+}
 
 // Handler exposes both an API and a UI for a set of APIPortals.
 // The handler can be safely updated to support more APIPortals as they come and go.
 type Handler struct {
-	handlerMu sync.RWMutex
-	handler   http.Handler
+	handlerMu      sync.RWMutex
+	handler        http.Handler
+	platformClient PlatformClient
 }
 
 // NewHandler builds a new instance of Handler.
-func NewHandler() *Handler {
+func NewHandler(platformClient PlatformClient) *Handler {
 	return &Handler{
-		handler: http.NotFoundHandler(),
+		handler:        http.NotFoundHandler(),
+		platformClient: platformClient,
 	}
 }
 
@@ -54,7 +66,7 @@ func (h *Handler) Update(portals []portal) error {
 	for _, p := range portals {
 		p := p
 
-		apiHandler, err := NewPortalAPI(&p)
+		apiHandler, err := NewPortalAPI(&p, h.platformClient)
 		if err != nil {
 			return fmt.Errorf("create portal %q API handler: %w", p.Name, err)
 		}

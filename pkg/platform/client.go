@@ -202,6 +202,12 @@ type Command struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+// Token is a user token used for API management.
+type Token struct {
+	Name      string `json:"name"`
+	Suspended bool   `json:"suspended"`
+}
+
 // CommandExecutionStatus describes the execution status of a command.
 type CommandExecutionStatus string
 
@@ -488,6 +494,194 @@ func (c *Client) ListVerifiedDomains(ctx context.Context) ([]string, error) {
 	}
 
 	return domains, nil
+}
+
+// ListUserTokens lists the token of a user.
+func (c *Client) ListUserTokens(ctx context.Context, userEmail string) ([]Token, error) {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "users", userEmail, "tokens"))
+	if err != nil {
+		return nil, fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return nil, apiErr
+	}
+
+	var tokens []Token
+	if err = json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return tokens, nil
+}
+
+// CreateUserToken creates a token for a user.
+func (c *Client) CreateUserToken(ctx context.Context, userEmail, tokenName string) (string, error) {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "users", userEmail, "tokens"))
+	if err != nil {
+		return "", fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	payload := struct {
+		TokenName string `json:"tokenName"`
+	}{
+		TokenName: tokenName,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal create request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return "", apiErr
+	}
+
+	createdToken := struct {
+		TokenValue string `json:"tokenValue"`
+	}{}
+
+	if err = json.NewDecoder(resp.Body).Decode(&createdToken); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	return createdToken.TokenValue, nil
+}
+
+// SuspendUserToken suspends a token for a user.
+func (c *Client) SuspendUserToken(ctx context.Context, userEmail, tokenName string, suspend bool) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "users", userEmail, "tokens", "suspend"))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	payload := struct {
+		TokenName string `json:"tokenName"`
+		Suspend   bool   `json:"suspend"`
+	}{
+		TokenName: tokenName,
+		Suspend:   suspend,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal create request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+
+	return nil
+}
+
+// DeleteUserToken deletes a token for a user.
+func (c *Client) DeleteUserToken(ctx context.Context, userEmail, tokenName string) error {
+	baseURL, err := c.baseURL.Parse(path.Join(c.baseURL.Path, "users", userEmail, "tokens"))
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+
+	payload := struct {
+		TokenName string `json:"tokenName"`
+	}{
+		TokenName: tokenName,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal create request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	version.SetUserAgent(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent {
+		all, _ := io.ReadAll(resp.Body)
+
+		apiErr := APIError{StatusCode: resp.StatusCode}
+		if err = json.Unmarshal(all, &apiErr); err != nil {
+			apiErr.Message = string(all)
+		}
+
+		return apiErr
+	}
+
+	return nil
 }
 
 // CreateEdgeIngress creates an edge ingress.

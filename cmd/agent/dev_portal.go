@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ettle/strcase"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/traefik/hub-agent-kubernetes/pkg/api/devportal"
@@ -32,6 +33,7 @@ import (
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	"github.com/traefik/hub-agent-kubernetes/pkg/version"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/tools/cache"
@@ -48,6 +50,19 @@ func newDevPortalCmd() devPortalCmd {
 			Usage:   "Address on which the dev portal listens",
 			EnvVars: []string{"DEV_PORTAL_LISTEN_ADDR"},
 			Value:   "0.0.0.0:80",
+		},
+		&cli.StringFlag{
+			Name:    flagPlatformURL,
+			Usage:   "The URL to reach the Hub platform API",
+			Value:   "https://platform.hub.traefik.io/agent",
+			EnvVars: []string{strcase.ToSNAKE(flagPlatformURL)},
+			Hidden:  true,
+		},
+		&cli.StringFlag{
+			Name:     flagToken,
+			Usage:    "The token to use for Hub platform API calls",
+			EnvVars:  []string{strcase.ToSNAKE(flagToken)},
+			Required: true,
 		},
 	}
 
@@ -72,6 +87,11 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 
 	version.Log()
 
+	platformClient, err := platform.NewClient(cliCtx.String(flagPlatformURL), cliCtx.String(flagToken))
+	if err != nil {
+		return fmt.Errorf("build platform client: %w", err)
+	}
+
 	config, err := kube.InClusterConfigWithRetrier(2)
 	if err != nil {
 		return fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
@@ -90,7 +110,7 @@ func (c devPortalCmd) run(cliCtx *cli.Context) error {
 	collectionInformer := hubInformer.Hub().V1alpha1().APICollections()
 	accessInformer := hubInformer.Hub().V1alpha1().APIAccesses()
 
-	handler := devportal.NewHandler()
+	handler := devportal.NewHandler(platformClient)
 	portalWatcher := devportal.NewWatcher(handler,
 		portalInformer.Lister(),
 		gatewayInformer.Lister(),

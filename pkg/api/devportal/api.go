@@ -34,20 +34,25 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	logwrapper "github.com/traefik/hub-agent-kubernetes/pkg/logger"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 )
 
-const headerHubGroups = "Hub-Groups"
+const (
+	headerHubGroups = "Hub-Groups"
+	headerHubEmail  = "Hub-Email"
+)
 
 // PortalAPI is a handler that exposes APIPortal information.
 type PortalAPI struct {
 	router     chi.Router
 	httpClient *http.Client
+	platform   PlatformClient
 
 	portal *portal
 }
 
 // NewPortalAPI creates a new PortalAPI handler.
-func NewPortalAPI(portal *portal) (*PortalAPI, error) {
+func NewPortalAPI(portal *portal, platformClient PlatformClient) (*PortalAPI, error) {
 	client := retryablehttp.NewClient()
 	client.RetryMax = 4
 	client.Logger = logwrapper.NewRetryableHTTPWrapper(log.Logger.With().
@@ -57,12 +62,17 @@ func NewPortalAPI(portal *portal) (*PortalAPI, error) {
 	p := &PortalAPI{
 		router:     chi.NewRouter(),
 		httpClient: client.StandardClient(),
+		platform:   platformClient,
 		portal:     portal,
 	}
 
 	p.router.Get("/apis", p.handleListAPIs)
 	p.router.Get("/apis/{api}", p.handleGetAPISpec)
 	p.router.Get("/collections/{collection}/apis/{api}", p.handleGetCollectionAPISpec)
+	p.router.Get("/tokens", p.handleListTokens)
+	p.router.Post("/tokens", p.handleCreateToken)
+	p.router.Post("/tokens/suspend", p.handleSuspendToken)
+	p.router.Delete("/tokens", p.handleDeleteToken)
 
 	return p, nil
 }
@@ -70,6 +80,153 @@ func NewPortalAPI(portal *portal) (*PortalAPI, error) {
 // ServeHTTP serves HTTP requests.
 func (p *PortalAPI) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.router.ServeHTTP(rw, req)
+}
+
+func (p *PortalAPI) handleListTokens(rw http.ResponseWriter, r *http.Request) {
+	logger := log.With().Str("portal_name", p.portal.Name).Logger()
+
+	userEmail := r.Header.Get(headerHubEmail)
+	if userEmail == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	tokens, err := p.platform.ListUserTokens(r.Context(), userEmail)
+	if err != nil {
+		logger.Error().Err(err).Msg("Unable to list user tokens")
+
+		apiErr := platform.APIError{}
+		if !errors.As(err, &apiErr) {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(apiErr.StatusCode)
+		return
+	}
+
+	if tokens == nil {
+		tokens = make([]platform.Token, 0)
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(rw).Encode(tokens); err != nil {
+		logger.Error().Err(err).Msg("Unable to list user tokens")
+	}
+}
+
+type createTokenReq struct {
+	Name string `json:"name"`
+}
+type createTokenResp struct {
+	Token string `json:"token"`
+}
+
+func (p *PortalAPI) handleCreateToken(rw http.ResponseWriter, r *http.Request) {
+	logger := log.With().Str("portal_name", p.portal.Name).Logger()
+
+	userEmail := r.Header.Get(headerHubEmail)
+	if userEmail == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var payload createTokenReq
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		logger.Error().Err(err).Msg("Unable to decode payload")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	token, err := p.platform.CreateUserToken(r.Context(), userEmail, payload.Name)
+	if err != nil {
+		logger.Error().Err(err).Msg("Unable to create user token")
+
+		apiErr := platform.APIError{}
+		if !errors.As(err, &apiErr) {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(apiErr.StatusCode)
+		return
+	}
+
+	rw.WriteHeader(http.StatusCreated)
+	if err = json.NewEncoder(rw).Encode(createTokenResp{Token: token}); err != nil {
+		logger.Error().Err(err).Msg("Unable to create user token")
+	}
+}
+
+type suspendTokenReq struct {
+	Name    string `json:"name"`
+	Suspend bool   `json:"suspend"`
+}
+
+func (p *PortalAPI) handleSuspendToken(rw http.ResponseWriter, r *http.Request) {
+	logger := log.With().Str("portal_name", p.portal.Name).Logger()
+
+	userEmail := r.Header.Get(headerHubEmail)
+	if userEmail == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var payload suspendTokenReq
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		logger.Error().Err(err).Msg("Unable to decode payload")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := p.platform.SuspendUserToken(r.Context(), userEmail, payload.Name, payload.Suspend); err != nil {
+		logger.Error().Err(err).Msg("Unable to suspend user token")
+
+		apiErr := platform.APIError{}
+		if !errors.As(err, &apiErr) {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(apiErr.StatusCode)
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
+
+type deleteTokenReq struct {
+	Name string `json:"name"`
+}
+
+func (p *PortalAPI) handleDeleteToken(rw http.ResponseWriter, r *http.Request) {
+	logger := log.With().Str("portal_name", p.portal.Name).Logger()
+
+	userEmail := r.Header.Get(headerHubEmail)
+	if userEmail == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var payload deleteTokenReq
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		logger.Error().Err(err).Msg("Unable to decode payload")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := p.platform.DeleteUserToken(r.Context(), userEmail, payload.Name); err != nil {
+		logger.Error().Err(err).Msg("Unable to delete user token")
+
+		apiErr := platform.APIError{}
+		if !errors.As(err, &apiErr) {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		rw.WriteHeader(apiErr.StatusCode)
+	}
+
+	rw.WriteHeader(http.StatusNoContent)
 }
 
 func (p *PortalAPI) handleListAPIs(rw http.ResponseWriter, r *http.Request) {

@@ -18,7 +18,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package devportal
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,7 +33,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
+	"github.com/traefik/hub-agent-kubernetes/pkg/platform"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	testEmail     = "john.doe@example.com"
+	testTokenName = "my-token"
 )
 
 var testPortal = portal{
@@ -203,8 +211,266 @@ var testPortal = portal{
 	},
 }
 
+func TestPortalAPI_Router_listTokens(t *testing.T) {
+	tests := []struct {
+		desc           string
+		tokens         []platform.Token
+		platformErr    error
+		wantStatusCode int
+	}{
+		{
+			desc: "list tokens",
+			tokens: []platform.Token{
+				{Name: "token-1", Suspended: false},
+				{Name: "token-2", Suspended: true},
+			},
+			wantStatusCode: http.StatusOK,
+		},
+		{
+			desc: "not found",
+			platformErr: platform.APIError{
+				StatusCode: http.StatusNotFound,
+				Message:    "conflict",
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			desc:           "unexpected platform error",
+			platformErr:    errors.New("boom"),
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			platformClient := newPlatformClientMock(t)
+			platformClient.OnListUserTokens(testEmail).TypedReturns(test.tokens, test.platformErr)
+
+			a, err := NewPortalAPI(&testPortal, platformClient)
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(a)
+
+			req, err := http.NewRequest(http.MethodGet, srv.URL+"/tokens", http.NoBody)
+			require.NoError(t, err)
+
+			req.Header.Add("Hub-Email", testEmail)
+			req.Header.Add("Hub-Groups", "supplier")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			require.Equal(t, test.wantStatusCode, resp.StatusCode)
+			if test.wantStatusCode == http.StatusOK {
+				var got []platform.Token
+				err = json.NewDecoder(resp.Body).Decode(&got)
+				require.NoError(t, err)
+
+				assert.Equal(t, test.tokens, got)
+			}
+		})
+	}
+}
+
+func TestPortalAPI_Router_createToken(t *testing.T) {
+	tests := []struct {
+		desc           string
+		token          string
+		platformErr    error
+		wantStatusCode int
+	}{
+		{
+			desc:           "created",
+			token:          "token",
+			wantStatusCode: http.StatusCreated,
+		},
+		{
+			desc: "conflict",
+			platformErr: platform.APIError{
+				StatusCode: http.StatusConflict,
+				Message:    "conflict",
+			},
+			wantStatusCode: http.StatusConflict,
+		},
+		{
+			desc: "not found",
+			platformErr: platform.APIError{
+				StatusCode: http.StatusNotFound,
+				Message:    "conflict",
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			desc:           "unexpected platform error",
+			platformErr:    errors.New("boom"),
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			platformClient := newPlatformClientMock(t)
+			platformClient.OnCreateUserToken(testEmail, testTokenName).TypedReturns(test.token, test.platformErr)
+
+			a, err := NewPortalAPI(&testPortal, platformClient)
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(a)
+
+			body, err := json.Marshal(createTokenReq{Name: testTokenName})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodPost, srv.URL+"/tokens", bytes.NewReader(body))
+			require.NoError(t, err)
+
+			req.Header.Add("Hub-Email", testEmail)
+			req.Header.Add("Hub-Groups", "supplier")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			require.Equal(t, test.wantStatusCode, resp.StatusCode)
+
+			if test.token == "" {
+				return
+			}
+
+			var got createTokenResp
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			assert.Equal(t, createTokenResp{Token: test.token}, got)
+		})
+	}
+}
+
+func TestPortalAPI_Router_suspendToken(t *testing.T) {
+	tests := []struct {
+		desc           string
+		suspend        bool
+		platformErr    error
+		wantStatusCode int
+	}{
+		{
+			desc:           "suspended",
+			suspend:        true,
+			wantStatusCode: http.StatusOK,
+		},
+		{
+			desc:           "un-suspended",
+			suspend:        false,
+			wantStatusCode: http.StatusOK,
+		},
+		{
+			desc: "not found",
+			platformErr: platform.APIError{
+				StatusCode: http.StatusNotFound,
+				Message:    "conflict",
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			desc:           "unexpected platform error",
+			platformErr:    errors.New("boom"),
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			platformClient := newPlatformClientMock(t)
+			platformClient.OnSuspendUserToken(testEmail, testTokenName, test.suspend).TypedReturns(test.platformErr)
+
+			a, err := NewPortalAPI(&testPortal, platformClient)
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(a)
+
+			body, err := json.Marshal(suspendTokenReq{Name: testTokenName, Suspend: test.suspend})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodPost, srv.URL+"/tokens/suspend", bytes.NewReader(body))
+			require.NoError(t, err)
+
+			req.Header.Add("Hub-Email", testEmail)
+			req.Header.Add("Hub-Groups", "supplier")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			require.Equal(t, test.wantStatusCode, resp.StatusCode)
+		})
+	}
+}
+
+func TestPortalAPI_Router_deleteToken(t *testing.T) {
+	tests := []struct {
+		desc           string
+		platformErr    error
+		wantStatusCode int
+	}{
+		{
+			desc:           "deleted",
+			wantStatusCode: http.StatusNoContent,
+		},
+		{
+			desc: "not found",
+			platformErr: platform.APIError{
+				StatusCode: http.StatusNotFound,
+				Message:    "conflict",
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			desc:           "unexpected platform error",
+			platformErr:    errors.New("boom"),
+			wantStatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			platformClient := newPlatformClientMock(t)
+			platformClient.OnDeleteUserToken(testEmail, testTokenName).TypedReturns(test.platformErr)
+
+			a, err := NewPortalAPI(&testPortal, platformClient)
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(a)
+
+			body, err := json.Marshal(deleteTokenReq{Name: testTokenName})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodDelete, srv.URL+"/tokens", bytes.NewReader(body))
+			require.NoError(t, err)
+
+			req.Header.Add("Hub-Email", testEmail)
+			req.Header.Add("Hub-Groups", "supplier")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			require.Equal(t, test.wantStatusCode, resp.StatusCode)
+		})
+	}
+}
+
 func TestPortalAPI_Router_listAPIs(t *testing.T) {
-	a, err := NewPortalAPI(&testPortal)
+	a, err := NewPortalAPI(&testPortal, nil)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(a)
@@ -212,6 +478,7 @@ func TestPortalAPI_Router_listAPIs(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/apis", http.NoBody)
 	require.NoError(t, err)
 
+	req.Header.Add("Hub-Email", testEmail)
 	req.Header.Add("Hub-Groups", "supplier")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -245,7 +512,7 @@ func TestPortalAPI_Router_listAPIs(t *testing.T) {
 
 func TestPortalAPI_Router_listAPIs_noAPIsAndCollections(t *testing.T) {
 	var p portal
-	a, err := NewPortalAPI(&p)
+	a, err := NewPortalAPI(&p, nil)
 	require.NoError(t, err)
 
 	srv := httptest.NewServer(a)
@@ -323,7 +590,7 @@ func TestPortalAPI_Router_getCollectionAPISpec(t *testing.T) {
 				}
 			}))
 
-			a, err := NewPortalAPI(&testPortal)
+			a, err := NewPortalAPI(&testPortal, nil)
 			require.NoError(t, err)
 			a.httpClient = buildProxyClient(t, svcSrv.URL)
 
@@ -333,6 +600,7 @@ func TestPortalAPI_Router_getCollectionAPISpec(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, uri, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Email", testEmail)
 			req.Header.Add("Hub-Groups", "supplier")
 
 			resp, err := http.DefaultClient.Do(req)
@@ -492,7 +760,7 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 		test := test
 
 		t.Run(test.desc, func(t *testing.T) {
-			a, err := NewPortalAPI(&test.portal)
+			a, err := NewPortalAPI(&test.portal, nil)
 			require.NoError(t, err)
 			a.httpClient = http.DefaultClient
 
@@ -501,6 +769,7 @@ func TestPortalAPI_Router_getCollectionAPISpec_overrideServerAndAuth(t *testing.
 			req, err := http.NewRequest(http.MethodGet, apiSrv.URL+test.path, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Email", testEmail)
 			req.Header.Add("Hub-Groups", "supplier")
 
 			resp, err := http.DefaultClient.Do(req)
@@ -575,7 +844,7 @@ func TestPortalAPI_Router_getAPISpec(t *testing.T) {
 					rw.WriteHeader(http.StatusInternalServerError)
 				}
 			}))
-			a, err := NewPortalAPI(&testPortal)
+			a, err := NewPortalAPI(&testPortal, nil)
 			require.NoError(t, err)
 			a.httpClient = buildProxyClient(t, svcSrv.URL)
 
@@ -584,6 +853,7 @@ func TestPortalAPI_Router_getAPISpec(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, apiSrv.URL+"/apis/"+test.api, http.NoBody)
 			require.NoError(t, err)
 
+			req.Header.Add("Hub-Email", testEmail)
 			req.Header.Add("Hub-Groups", "supplier")
 
 			resp, err := http.DefaultClient.Do(req)
@@ -639,7 +909,7 @@ func TestPortalAPI_Router_getAPISpec_overrideServerAndAuth(t *testing.T) {
 		},
 	}
 
-	a, err := NewPortalAPI(&p)
+	a, err := NewPortalAPI(&p, nil)
 	require.NoError(t, err)
 	a.httpClient = http.DefaultClient
 
@@ -649,6 +919,7 @@ func TestPortalAPI_Router_getAPISpec_overrideServerAndAuth(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, uri, http.NoBody)
 	require.NoError(t, err)
 
+	req.Header.Add("Hub-Email", testEmail)
 	req.Header.Add("Hub-Groups", "supplier")
 
 	resp, err := http.DefaultClient.Do(req)
