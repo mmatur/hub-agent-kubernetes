@@ -32,6 +32,7 @@ import (
 	hubfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/fake"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,6 +137,8 @@ func Test_WatcherRun(t *testing.T) {
 		test := test
 
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
 			clusterPortals := loadFixtures[hubv1alpha1.APIPortal](t, test.clusterPortals)
 			clusterEdgeIngresses := loadFixtures[hubv1alpha1.EdgeIngress](t, test.clusterEdgeIngresses)
 			clusterIngresses := loadFixtures[netv1.Ingress](t, test.clusterIngresses)
@@ -155,7 +158,7 @@ func Test_WatcherRun(t *testing.T) {
 			}
 
 			kubeClientSet := kubefake.NewSimpleClientset(kubeObjects...)
-			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
+			hubClientSet := kube.NewFakeHubClientset(hubObjects...)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 

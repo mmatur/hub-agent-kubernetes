@@ -18,6 +18,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 package api
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"hash/fnv"
@@ -27,6 +28,7 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +39,8 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	kinformers "k8s.io/client-go/informers"
 	kclientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 )
 
@@ -79,10 +83,16 @@ type WatcherPortal struct {
 
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformers.SharedInformerFactory
+
+	eventRecorder record.EventRecorder
 }
 
 // NewWatcherPortal returns a new WatcherPortal.
 func NewWatcherPortal(client PlatformClient, kubeClientSet kclientset.Interface, kubeInformer kinformers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, config *WatcherPortalConfig) *WatcherPortal {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1.EventSinkImpl{Interface: kubeClientSet.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{})
+
 	return &WatcherPortal{
 		config: config,
 
@@ -93,6 +103,8 @@ func NewWatcherPortal(client PlatformClient, kubeClientSet kclientset.Interface,
 
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
+
+		eventRecorder: eventRecorder,
 	}
 }
 
@@ -164,8 +176,13 @@ func (w *WatcherPortal) setupCertificates(ctx context.Context, portal *hubv1alph
 		return fmt.Errorf("get portal custom domains secret name: %w", err)
 	}
 
-	if err = w.upsertCertificateSecret(ctx, cert, portal, secretName); err != nil {
+	upserted, err := w.upsertCertificateSecret(ctx, cert, portal, secretName)
+	if err != nil {
+		w.eventRecorder.Eventf(portal, "Failed", "CertificateSyncing", "Unable to sync certificate for [%s] with the Hub platform: %s", strings.Join(portal.Status.CustomDomains, ", "), err)
 		return fmt.Errorf("upsert certificate secret: %w", err)
+	}
+	if upserted {
+		w.eventRecorder.Eventf(portal, corev1.EventTypeNormal, "CertificateSynced", "Certificate for [%s] has been synced successfully with the Hub platform.", strings.Join(portal.Status.CustomDomains, ", "))
 	}
 
 	return nil
@@ -192,68 +209,72 @@ func (w *WatcherPortal) syncPortals(ctx context.Context) {
 	for _, portal := range platformPortals {
 		platformPortal := portal
 
-		clusterPortal, found := portalsByName[platformPortal.Name]
+		logger := log.With().Str("name", platformPortal.Name).Logger()
+
+		oldClusterPortal, found := portalsByName[platformPortal.Name]
 
 		// Portals that will remain in the map will be deleted.
 		delete(portalsByName, platformPortal.Name)
 
+		newClusterPortal, resourceErr := platformPortal.Resource()
+		if resourceErr != nil {
+			logger.Error().Err(resourceErr).Msg("Unable to build APIPortal resource")
+			continue
+		}
+
 		if !found {
-			if err = w.createPortal(ctx, &platformPortal); err != nil {
-				log.Error().Err(err).
-					Str("name", platformPortal.Name).
-					Msg("Unable to create APIPortal")
+			if err = w.createPortal(ctx, newClusterPortal, platformPortal.HubACPConfig); err != nil {
+				logger.Error().Err(err).Msg("Unable to create APIPortal")
 			}
 			continue
 		}
 
-		if err = w.updatePortal(ctx, clusterPortal, &platformPortal); err != nil {
-			log.Error().Err(err).
-				Str("name", platformPortal.Name).
-				Msg("Unable to update APIPortal")
+		if err = w.updatePortal(ctx, oldClusterPortal, newClusterPortal, platformPortal.HubACPConfig); err != nil {
+			logger.Error().Err(err).Msg("Unable to update APIPortal")
+		}
+
+		if unverified := platformPortal.UnverifiedCustomDomains(); len(unverified) > 0 {
+			w.eventRecorder.Eventf(oldClusterPortal, corev1.EventTypeWarning, "DomainOwnership", "Domains [%s] ownership have not been verified yet. The APIPortal won't be served for these domains.", strings.Join(unverified, ", "))
 		}
 	}
 
 	w.cleanPortals(ctx, portalsByName)
 }
 
-func (w *WatcherPortal) createPortal(ctx context.Context, portal *Portal) error {
-	obj, err := portal.Resource()
+func (w *WatcherPortal) createPortal(ctx context.Context, portal *hubv1alpha1.APIPortal, hubACPConfig OIDCConfig) error {
+	createdPortal, err := w.hubClientSet.HubV1alpha1().APIPortals().Create(ctx, portal, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("build APIPortal resource: %w", err)
-	}
-
-	obj, err = w.hubClientSet.HubV1alpha1().APIPortals().Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil {
+		w.eventRecorder.Eventf(portal, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 		return fmt.Errorf("creating APIPortal: %w", err)
 	}
 
 	log.Debug().
-		Str("name", obj.Name).
+		Str("name", createdPortal.Name).
 		Msg("APIPortal created")
 
-	return w.syncChildResources(ctx, obj, portal.HubACPConfig)
+	w.eventRecorder.Event(createdPortal, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
+
+	return w.syncChildResources(ctx, createdPortal, hubACPConfig)
 }
 
-func (w *WatcherPortal) updatePortal(ctx context.Context, oldPortal *hubv1alpha1.APIPortal, newPortal *Portal) error {
-	obj, err := newPortal.Resource()
-	if err != nil {
-		return fmt.Errorf("build APIPortal resource: %w", err)
-	}
+func (w *WatcherPortal) updatePortal(ctx context.Context, oldPortal, newPortal *hubv1alpha1.APIPortal, hubACPConfig OIDCConfig) error {
+	newPortal.ObjectMeta = oldPortal.ObjectMeta
 
-	obj.ObjectMeta = oldPortal.ObjectMeta
-
-	if obj.Status.Version != oldPortal.Status.Version {
-		obj, err = w.hubClientSet.HubV1alpha1().APIPortals().Update(ctx, obj, metav1.UpdateOptions{})
+	if newPortal.Status.Version != oldPortal.Status.Version {
+		updatedPortal, err := w.hubClientSet.HubV1alpha1().APIPortals().Update(ctx, newPortal, metav1.UpdateOptions{})
 		if err != nil {
+			w.eventRecorder.Eventf(newPortal, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 			return fmt.Errorf("updating APIPortal: %w", err)
 		}
 
 		log.Debug().
-			Str("name", obj.Name).
+			Str("name", updatedPortal.Name).
 			Msg("APIPortal updated")
+
+		w.eventRecorder.Event(updatedPortal, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 	}
 
-	return w.syncChildResources(ctx, obj, newPortal.HubACPConfig)
+	return w.syncChildResources(ctx, newPortal, hubACPConfig)
 }
 
 func (w *WatcherPortal) cleanPortals(ctx context.Context, portals map[string]*hubv1alpha1.APIPortal) {
@@ -642,17 +663,17 @@ func (w *WatcherPortal) buildIngress(portal *hubv1alpha1.APIPortal, ingressName,
 	}
 }
 
-func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) error {
+func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) (bool, error) {
 	existingSecret, err := w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
-		return fmt.Errorf("get secret: %w", err)
+		return false, fmt.Errorf("get secret: %w", err)
 	}
 
 	secret := w.buildSecret(cert, portal, name)
 	if kerror.IsNotFound(err) {
 		_, err = w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("create secret: %w", err)
+			return false, fmt.Errorf("create secret: %w", err)
 		}
 
 		log.Debug().
@@ -660,7 +681,12 @@ func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgein
 			Str("namespace", secret.Namespace).
 			Msg("Portal certificate Secret created")
 
-		return nil
+		return true, nil
+	}
+
+	// Private key must have changed if the certificate has changed.
+	if bytes.Equal(cert.Certificate, existingSecret.Data["tls.crt"]) {
+		return false, nil
 	}
 
 	existingSecret.Data = secret.Data
@@ -669,7 +695,7 @@ func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgein
 
 	_, err = w.kubeClientSet.CoreV1().Secrets(w.config.AgentNamespace).Update(ctx, existingSecret, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("update secret: %w", err)
+		return false, fmt.Errorf("update secret: %w", err)
 	}
 
 	log.Debug().
@@ -677,7 +703,7 @@ func (w *WatcherPortal) upsertCertificateSecret(ctx context.Context, cert edgein
 		Str("namespace", existingSecret.Namespace).
 		Msg("Portal certificate Secret updated")
 
-	return nil
+	return true, nil
 }
 
 func (w *WatcherPortal) buildSecret(cert edgeingress.Certificate, portal *hubv1alpha1.APIPortal, name string) *corev1.Secret {

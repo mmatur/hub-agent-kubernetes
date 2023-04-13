@@ -32,6 +32,7 @@ import (
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/typed/traefik/v1alpha1"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
@@ -43,6 +44,8 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	kinformers "k8s.io/client-go/informers"
 	kclientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 )
 
@@ -79,10 +82,16 @@ type WatcherGateway struct {
 	hubInformer  hubinformers.SharedInformerFactory
 
 	traefikClientSet v1alpha1.TraefikV1alpha1Interface
+
+	eventRecorder record.EventRecorder
 }
 
 // NewWatcherGateway returns a new WatcherGateway.
 func NewWatcherGateway(client PlatformClient, kubeClientSet kclientset.Interface, kubeInformer kinformers.SharedInformerFactory, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, traefikClientSet v1alpha1.TraefikV1alpha1Interface, config *WatcherGatewayConfig) *WatcherGateway {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1.EventSinkImpl{Interface: kubeClientSet.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{})
+
 	return &WatcherGateway{
 		config: config,
 
@@ -95,6 +104,8 @@ func NewWatcherGateway(client PlatformClient, kubeClientSet kclientset.Interface
 		hubInformer:  hubInformer,
 
 		traefikClientSet: traefikClientSet,
+
+		eventRecorder: eventRecorder,
 	}
 }
 
@@ -152,7 +163,7 @@ func (w *WatcherGateway) syncCertificates(ctx context.Context) error {
 	}
 	w.wildCardCertMu.RUnlock()
 
-	if err = w.upsertSecret(ctx, wildcardCert, hubDomainSecretName, w.config.AgentNamespace, nil); err != nil {
+	if _, err = w.upsertSecret(ctx, wildcardCert, hubDomainSecretName, w.config.AgentNamespace, nil); err != nil {
 		return fmt.Errorf("upsert secret: %w", err)
 	}
 
@@ -184,10 +195,19 @@ func (w *WatcherGateway) syncCertificates(ctx context.Context) error {
 }
 
 func (w *WatcherGateway) setupCertificates(ctx context.Context, gateway *hubv1alpha1.APIGateway, apisByNamespace map[string][]resolvedAPI, certificate edgeingress.Certificate) error {
+	var wantEvent bool
 	for namespace := range apisByNamespace {
-		if err := w.upsertSecret(ctx, certificate, hubDomainSecretName, namespace, gateway); err != nil {
+		upserted, err := w.upsertSecret(ctx, certificate, hubDomainSecretName, namespace, gateway)
+		if err != nil {
+			w.eventRecorder.Eventf(gateway, "Failed", "CertificateSyncing", "Unable to sync certificate for [%s] with the Hub platform: %s", gateway.Status.HubDomain, err)
 			return fmt.Errorf("upsert secret: %w", err)
 		}
+		if upserted {
+			wantEvent = true
+		}
+	}
+	if wantEvent {
+		w.eventRecorder.Eventf(gateway, corev1.EventTypeNormal, "CertificateSynced", "Certificate for [%s] has been synced successfully with the Hub platform.", gateway.Status.HubDomain)
 	}
 
 	if len(gateway.Status.CustomDomains) == 0 {
@@ -204,19 +224,28 @@ func (w *WatcherGateway) setupCertificates(ctx context.Context, gateway *hubv1al
 		return fmt.Errorf("get custom domains secret name: %w", err)
 	}
 
+	wantEvent = false
 	for namespace := range apisByNamespace {
-		if err := w.upsertSecret(ctx, cert, secretName, namespace, gateway); err != nil {
+		upserted, err := w.upsertSecret(ctx, cert, secretName, namespace, gateway)
+		if err != nil {
+			w.eventRecorder.Eventf(gateway, "Failed", "CertificateSyncing", "Unable to sync certificate for [%s] with the Hub platform: %s", strings.Join(gateway.Status.CustomDomains, ", "), err)
 			return fmt.Errorf("upsert secret: %w", err)
 		}
+		if upserted {
+			wantEvent = true
+		}
+	}
+	if wantEvent {
+		w.eventRecorder.Eventf(gateway, corev1.EventTypeNormal, "CertificateSynced", "Certificate for [%s] has been synced successfully with the Hub platform.", strings.Join(gateway.Status.CustomDomains, ", "))
 	}
 
 	return nil
 }
 
-func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Certificate, name, namespace string, gateway *hubv1alpha1.APIGateway) error {
+func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Certificate, name, namespace string, gateway *hubv1alpha1.APIGateway) (bool, error) {
 	secret, err := w.kubeClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !kerror.IsNotFound(err) {
-		return fmt.Errorf("get secret: %w", err)
+		return false, fmt.Errorf("get secret: %w", err)
 	}
 
 	if kerror.IsNotFound(err) {
@@ -249,7 +278,7 @@ func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Cert
 
 		_, err = w.kubeClientSet.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("create secret: %w", err)
+			return false, fmt.Errorf("create secret: %w", err)
 		}
 
 		log.Debug().
@@ -257,7 +286,7 @@ func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Cert
 			Str("namespace", secret.Namespace).
 			Msg("Secret created")
 
-		return nil
+		return true, nil
 	}
 
 	newOwners := secret.OwnerReferences
@@ -270,7 +299,7 @@ func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Cert
 		})
 	}
 	if bytes.Equal(secret.Data["tls.crt"], cert.Certificate) && len(secret.OwnerReferences) == len(newOwners) {
-		return nil
+		return false, nil
 	}
 
 	secret.Data = map[string][]byte{
@@ -281,7 +310,7 @@ func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Cert
 
 	_, err = w.kubeClientSet.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("update secret: %w", err)
+		return false, fmt.Errorf("update secret: %w", err)
 	}
 
 	log.Debug().
@@ -289,7 +318,7 @@ func (w *WatcherGateway) upsertSecret(ctx context.Context, cert edgeingress.Cert
 		Str("namespace", secret.Namespace).
 		Msg("Secret updated")
 
-	return nil
+	return true, nil
 }
 
 func (w *WatcherGateway) syncGateways(ctx context.Context) {
@@ -313,68 +342,74 @@ func (w *WatcherGateway) syncGateways(ctx context.Context) {
 	for _, gateway := range platformGateways {
 		platformGateway := gateway
 
-		clusterGateway, found := gatewaysByName[platformGateway.Name]
+		logger := log.With().Str("name", platformGateway.Name).Logger()
+
+		oldClusterGateway, found := gatewaysByName[platformGateway.Name]
 
 		// Gateways that will remain in the map will be deleted.
 		delete(gatewaysByName, platformGateway.Name)
 
+		newClusterGateway, resourceErr := platformGateway.Resource()
+		if resourceErr != nil {
+			logger.Error().Err(resourceErr).Msg("Unable to build APIGateway resource")
+			continue
+		}
+
 		if !found {
-			if err = w.createGateway(ctx, &platformGateway); err != nil {
-				log.Error().Err(err).
-					Str("name", platformGateway.Name).
-					Msg("Unable to create APIGateway")
+			if err = w.createGateway(ctx, newClusterGateway); err != nil {
+				logger.Error().Err(err).Msg("Unable to create APIGateway")
 			}
 			continue
 		}
 
-		if err = w.updateGateway(ctx, clusterGateway, &platformGateway); err != nil {
-			log.Error().Err(err).
-				Str("name", platformGateway.Name).
-				Msg("Unable to update APIGateway")
+		if err = w.updateGateway(ctx, oldClusterGateway, newClusterGateway); err != nil {
+			logger.Error().Err(err).Msg("Unable to update APIGateway")
+		}
+
+		if unverified := platformGateway.UnverifiedCustomDomains(); len(unverified) > 0 {
+			w.eventRecorder.Eventf(oldClusterGateway, corev1.EventTypeWarning, "DomainOwnership", "Domains [%s] ownership have not been verified yet. The APIGateway won't be served for these domains.", strings.Join(unverified, ", "))
 		}
 	}
 
 	w.cleanGateways(ctx, gatewaysByName)
 }
 
-func (w *WatcherGateway) createGateway(ctx context.Context, gateway *Gateway) error {
-	obj, err := gateway.Resource()
+func (w *WatcherGateway) createGateway(ctx context.Context, gateway *hubv1alpha1.APIGateway) error {
+	createdGateway, err := w.hubClientSet.HubV1alpha1().APIGateways().Create(ctx, gateway, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("build APIGateway resource: %w", err)
-	}
-
-	obj, err = w.hubClientSet.HubV1alpha1().APIGateways().Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil {
+		w.eventRecorder.Eventf(gateway, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 		return fmt.Errorf("creating APIGateway: %w", err)
 	}
 
 	log.Debug().
-		Str("name", obj.Name).
+		Str("name", createdGateway.Name).
 		Msg("APIGateway created")
 
-	return w.syncChildResources(ctx, obj)
+	w.eventRecorder.Event(createdGateway, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
+
+	return w.syncChildResources(ctx, createdGateway)
 }
 
-func (w *WatcherGateway) updateGateway(ctx context.Context, oldGateway *hubv1alpha1.APIGateway, newGateway *Gateway) error {
-	obj, err := newGateway.Resource()
-	if err != nil {
-		return fmt.Errorf("build APIGateway resource: %w", err)
-	}
+func (w *WatcherGateway) updateGateway(ctx context.Context, oldGateway, newGateway *hubv1alpha1.APIGateway) error {
+	meta := oldGateway.ObjectMeta
+	meta.Labels = newGateway.Labels
+	newGateway.ObjectMeta = meta
 
-	obj.ObjectMeta = oldGateway.ObjectMeta
-
-	if obj.Status.Version != oldGateway.Status.Version {
-		obj, err = w.hubClientSet.HubV1alpha1().APIGateways().Update(ctx, obj, metav1.UpdateOptions{})
+	if newGateway.Status.Version != oldGateway.Status.Version {
+		updatedGateway, err := w.hubClientSet.HubV1alpha1().APIGateways().Update(ctx, newGateway, metav1.UpdateOptions{})
 		if err != nil {
+			w.eventRecorder.Eventf(newGateway, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 			return fmt.Errorf("updating APIGateway: %w", err)
 		}
 
 		log.Debug().
-			Str("name", obj.Name).
+			Str("name", updatedGateway.Name).
 			Msg("APIGateway updated")
+
+		w.eventRecorder.Event(updatedGateway, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 	}
 
-	return w.syncChildResources(ctx, obj)
+	return w.syncChildResources(ctx, newGateway)
 }
 
 func (w *WatcherGateway) cleanGateways(ctx context.Context, gateways map[string]*hubv1alpha1.APIGateway) {

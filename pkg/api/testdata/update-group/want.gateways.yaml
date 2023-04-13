@@ -1,7 +1,7 @@
 apiVersion: hub.traefik.io/v1alpha1
 kind: APIGateway
 metadata:
-  name: modified-gateway
+  name: gateway
   labels:
     area: products
     role: dev

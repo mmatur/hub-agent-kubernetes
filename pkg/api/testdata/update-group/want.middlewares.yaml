@@ -2,7 +2,7 @@
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: modified-gateway-713459761-stripprefix
+  name: gateway-3056690829-stripprefix
   namespace: default
 spec:
   stripPrefix:
@@ -15,7 +15,7 @@ spec:
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: modified-gateway-713459761-stripprefix
+  name: gateway-3056690829-stripprefix
   namespace: books
 spec:
   stripPrefix:

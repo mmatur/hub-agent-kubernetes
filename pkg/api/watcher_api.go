@@ -25,9 +25,14 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	kclientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // WatcherAPI watches hub APIs and sync them with the cluster.
@@ -36,18 +41,30 @@ type WatcherAPI struct {
 
 	platform PlatformClient
 
+	kubeClientSet kclientset.Interface
+
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformers.SharedInformerFactory
+
+	eventRecorder record.EventRecorder
 }
 
 // NewWatcherAPI returns a new WatcherAPI.
-func NewWatcherAPI(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, apiSyncInterval time.Duration) *WatcherAPI {
+func NewWatcherAPI(client PlatformClient, kubeClientSet kclientset.Interface, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, apiSyncInterval time.Duration) *WatcherAPI {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1.EventSinkImpl{Interface: kubeClientSet.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{})
+
 	return &WatcherAPI{
 		apiSyncInterval: apiSyncInterval,
 		platform:        client,
 
+		kubeClientSet: kubeClientSet,
+
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
+
+		eventRecorder: eventRecorder,
 	}
 }
 
@@ -91,70 +108,72 @@ func (w *WatcherAPI) syncAPIs(ctx context.Context) {
 	for _, api := range platformAPIs {
 		platformAPI := api
 
-		clusterAPI, found := clusterAPIsByNameNamespace[platformAPI.Name+"@"+platformAPI.Namespace]
+		logger := log.With().
+			Str("name", platformAPI.Name).
+			Str("namespace", platformAPI.Namespace).
+			Logger()
+
+		oldClusterAPI, found := clusterAPIsByNameNamespace[platformAPI.Name+"@"+platformAPI.Namespace]
 
 		// APIs that will remain in the map will be deleted.
 		delete(clusterAPIsByNameNamespace, platformAPI.Name+"@"+platformAPI.Namespace)
 
+		newClusterAPI, resourceErr := platformAPI.Resource()
+		if resourceErr != nil {
+			logger.Error().Err(resourceErr).Msg("Unable to build API resource")
+			continue
+		}
+
 		if !found {
-			if err = w.createAPI(ctx, &platformAPI); err != nil {
-				log.Error().Err(err).
-					Str("name", platformAPI.Name).
-					Str("namespace", platformAPI.Namespace).
-					Msg("Unable to create API")
+			if err = w.createAPI(ctx, newClusterAPI); err != nil {
+				logger.Error().Err(err).Msg("Unable to create API")
 			}
 			continue
 		}
 
-		if err = w.updateAPI(ctx, clusterAPI, &platformAPI); err != nil {
-			log.Error().Err(err).
-				Str("name", platformAPI.Name).
-				Str("namespace", platformAPI.Namespace).
-				Msg("Unable to update API")
+		if err = w.updateAPI(ctx, oldClusterAPI, newClusterAPI); err != nil {
+			logger.Error().Err(err).Msg("Unable to update API")
 		}
 	}
 
 	w.cleanAPIs(ctx, clusterAPIsByNameNamespace)
 }
 
-func (w *WatcherAPI) createAPI(ctx context.Context, api *API) error {
-	obj, err := api.Resource()
+func (w *WatcherAPI) createAPI(ctx context.Context, api *hubv1alpha1.API) error {
+	createdAPI, err := w.hubClientSet.HubV1alpha1().APIs(api.Namespace).Create(ctx, api, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("build API resource: %w", err)
-	}
-
-	obj, err = w.hubClientSet.HubV1alpha1().APIs(api.Namespace).Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil {
+		w.eventRecorder.Eventf(api, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 		return fmt.Errorf("creating API: %w", err)
 	}
 
 	log.Debug().
-		Str("name", obj.Name).
-		Str("namespace", obj.Namespace).
+		Str("name", createdAPI.Name).
+		Str("namespace", createdAPI.Namespace).
 		Msg("API created")
+
+	w.eventRecorder.Event(createdAPI, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 
 	return nil
 }
 
-func (w *WatcherAPI) updateAPI(ctx context.Context, oldAPI *hubv1alpha1.API, newAPI *API) error {
-	obj, err := newAPI.Resource()
-	if err != nil {
-		return fmt.Errorf("build API resource: %w", err)
-	}
+func (w *WatcherAPI) updateAPI(ctx context.Context, oldAPI, newAPI *hubv1alpha1.API) error {
+	meta := oldAPI.ObjectMeta
+	meta.Labels = newAPI.Labels
+	newAPI.ObjectMeta = meta
 
-	obj.ObjectMeta = oldAPI.ObjectMeta
-	obj.ObjectMeta.Labels = newAPI.Labels
-
-	if obj.Status.Version != oldAPI.Status.Version {
-		obj, err = w.hubClientSet.HubV1alpha1().APIs(obj.Namespace).Update(ctx, obj, metav1.UpdateOptions{})
+	if newAPI.Status.Version != oldAPI.Status.Version {
+		updatedAPI, err := w.hubClientSet.HubV1alpha1().APIs(newAPI.Namespace).Update(ctx, newAPI, metav1.UpdateOptions{})
 		if err != nil {
+			w.eventRecorder.Eventf(newAPI, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 			return fmt.Errorf("updating API: %w", err)
 		}
 
 		log.Debug().
-			Str("name", obj.Name).
-			Str("namespace", obj.Namespace).
+			Str("name", updatedAPI.Name).
+			Str("namespace", updatedAPI.Namespace).
 			Msg("API updated")
+
+		w.eventRecorder.Event(updatedAPI, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 	}
 
 	return nil

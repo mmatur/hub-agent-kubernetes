@@ -25,9 +25,14 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	kclientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // WatcherAccess watches hub API accesses and sync them with the cluster.
@@ -36,18 +41,30 @@ type WatcherAccess struct {
 
 	platform PlatformClient
 
+	kubeClientSet kclientset.Interface
+
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformers.SharedInformerFactory
+
+	eventRecorder record.EventRecorder
 }
 
 // NewWatcherAccess returns a new WatcherAccess.
-func NewWatcherAccess(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, accessSyncInterval time.Duration) *WatcherAccess {
+func NewWatcherAccess(client PlatformClient, kubeClientSet kclientset.Interface, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, accessSyncInterval time.Duration) *WatcherAccess {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1.EventSinkImpl{Interface: kubeClientSet.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{})
+
 	return &WatcherAccess{
 		accessSyncInterval: accessSyncInterval,
 		platform:           client,
 
+		kubeClientSet: kubeClientSet,
+
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
+
+		eventRecorder: eventRecorder,
 	}
 }
 
@@ -90,66 +107,68 @@ func (w *WatcherAccess) syncAccesses(ctx context.Context) {
 
 	for _, access := range platformAccesses {
 		platformAccess := access
-		clusterAccess, found := clusterAccessesByName[platformAccess.Name]
+
+		logger := log.With().Str("name", platformAccess.Name).Logger()
+
+		oldClusterAccess, found := clusterAccessesByName[platformAccess.Name]
 
 		// Accesses that will remain in the map will be deleted.
 		delete(clusterAccessesByName, platformAccess.Name)
 
+		newClusterAccess, resourceErr := platformAccess.Resource()
+		if resourceErr != nil {
+			logger.Error().Err(resourceErr).Msg("Unable to build APIAccess resource")
+			continue
+		}
+
 		if !found {
-			if err = w.createAccess(ctx, &platformAccess); err != nil {
-				log.Error().Err(err).
-					Str("name", platformAccess.Name).
-					Msg("Unable to create APIAccess")
+			if err = w.createAccess(ctx, newClusterAccess); err != nil {
+				logger.Error().Err(err).Msg("Unable to create APIAccess")
 			}
 			continue
 		}
 
-		if err = w.updateAccess(ctx, clusterAccess, &platformAccess); err != nil {
-			log.Error().Err(err).
-				Str("name", platformAccess.Name).
-				Msg("Unable to update APIAccess")
+		if err = w.updateAccess(ctx, oldClusterAccess, newClusterAccess); err != nil {
+			logger.Error().Err(err).Msg("Unable to update APIAccess")
 		}
 	}
 
 	w.cleanAccesses(ctx, clusterAccessesByName)
 }
 
-func (w *WatcherAccess) createAccess(ctx context.Context, access *Access) error {
-	obj, err := access.Resource()
+func (w *WatcherAccess) createAccess(ctx context.Context, access *hubv1alpha1.APIAccess) error {
+	createdAccess, err := w.hubClientSet.HubV1alpha1().APIAccesses().Create(ctx, access, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("build APIAccess resource: %w", err)
-	}
-
-	obj, err = w.hubClientSet.HubV1alpha1().APIAccesses().Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil {
+		w.eventRecorder.Eventf(access, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 		return fmt.Errorf("creating APIAccess: %w", err)
 	}
 
 	log.Debug().
-		Str("name", obj.Name).
+		Str("name", createdAccess.Name).
 		Msg("APIAccess created")
+
+	w.eventRecorder.Event(createdAccess, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 
 	return nil
 }
 
-func (w *WatcherAccess) updateAccess(ctx context.Context, oldAccess *hubv1alpha1.APIAccess, newAccess *Access) error {
-	obj, err := newAccess.Resource()
-	if err != nil {
-		return fmt.Errorf("build APIAccess resource: %w", err)
-	}
+func (w *WatcherAccess) updateAccess(ctx context.Context, oldAccess, newAccess *hubv1alpha1.APIAccess) error {
+	meta := oldAccess.ObjectMeta
+	meta.Labels = newAccess.Labels
+	newAccess.ObjectMeta = meta
 
-	obj.ObjectMeta = oldAccess.ObjectMeta
-	obj.ObjectMeta.Labels = newAccess.Labels
-
-	if obj.Status.Version != oldAccess.Status.Version {
-		obj, err = w.hubClientSet.HubV1alpha1().APIAccesses().Update(ctx, obj, metav1.UpdateOptions{})
+	if newAccess.Status.Version != oldAccess.Status.Version {
+		updatedAccess, err := w.hubClientSet.HubV1alpha1().APIAccesses().Update(ctx, newAccess, metav1.UpdateOptions{})
 		if err != nil {
+			w.eventRecorder.Eventf(newAccess, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 			return fmt.Errorf("updating APIAccess: %w", err)
 		}
 
 		log.Debug().
-			Str("name", obj.Name).
+			Str("name", updatedAccess.Name).
 			Msg("APIAccess updated")
+
+		w.eventRecorder.Event(updatedAccess, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 	}
 
 	return nil

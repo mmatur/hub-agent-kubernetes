@@ -362,9 +362,9 @@ func setupAPIManagementWatcher(
 ) error {
 	portalWatcher := api.NewWatcherPortal(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, portalWatcherCfg)
 	gatewayWatcher := api.NewWatcherGateway(platformClient, kubeClientSet, kubeInformer, hubClientSet, hubInformer, traefikClientSet, gatewayWatcherCfg)
-	apiWatcher := api.NewWatcherAPI(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
-	collectionWatcher := api.NewWatcherCollection(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
-	accessWatcher := api.NewWatcherAccess(platformClient, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+	apiWatcher := api.NewWatcherAPI(platformClient, kubeClientSet, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+	collectionWatcher := api.NewWatcherCollection(platformClient, kubeClientSet, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
+	accessWatcher := api.NewWatcherAccess(platformClient, kubeClientSet, hubClientSet, hubInformer, portalWatcherCfg.PortalSyncInterval)
 
 	var cancel func()
 	var watcherStarted bool

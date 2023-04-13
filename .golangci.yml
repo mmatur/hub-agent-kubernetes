@@ -336,6 +336,10 @@ issues:
     - path: pkg/api/watcher_gateway_test.go
       linters:
         - gocognit
+    - path: pkg/api/watcher_gateway_test.go
+      text: "cyclomatic complexity 18 of func `(.*).run` is high"
+      linters:
+        - gocyclo
     - path: pkg/api/watcher_portal_test.go
       linters:
         - gocognit

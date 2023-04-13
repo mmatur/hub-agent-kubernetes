@@ -97,6 +97,18 @@ func (g *Gateway) Resource() (*hubv1alpha1.APIGateway, error) {
 	return gateway, nil
 }
 
+// UnverifiedCustomDomains returns the APIGateway unverified custom domains.
+func (g *Gateway) UnverifiedCustomDomains() []string {
+	var unverified []string
+	for _, domain := range g.CustomDomains {
+		if !domain.Verified {
+			unverified = append(unverified, domain.Name)
+		}
+	}
+
+	return unverified
+}
+
 type gatewayHash struct {
 	Labels        sortedMap[string] `json:"labels,omitempty"`
 	Accesses      []string          `json:"accesses,omitempty"`

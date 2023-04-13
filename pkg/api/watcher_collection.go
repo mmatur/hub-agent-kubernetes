@@ -25,9 +25,14 @@ import (
 	"github.com/rs/zerolog/log"
 	hubv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/hub/v1alpha1"
 	hubclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned"
+	"github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/clientset/versioned/scheme"
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	kclientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // WatcherCollection watches hub APICollections and sync them with the cluster.
@@ -36,18 +41,30 @@ type WatcherCollection struct {
 
 	platform PlatformClient
 
+	kubeClientSet kclientset.Interface
+
 	hubClientSet hubclientset.Interface
 	hubInformer  hubinformers.SharedInformerFactory
+
+	eventRecorder record.EventRecorder
 }
 
 // NewWatcherCollection returns a new WatcherCollection.
-func NewWatcherCollection(client PlatformClient, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, collectionSyncInterval time.Duration) *WatcherCollection {
+func NewWatcherCollection(client PlatformClient, kubeClientSet kclientset.Interface, hubClientSet hubclientset.Interface, hubInformer hubinformers.SharedInformerFactory, collectionSyncInterval time.Duration) *WatcherCollection {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1.EventSinkImpl{Interface: kubeClientSet.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{})
+
 	return &WatcherCollection{
 		collectionSyncInterval: collectionSyncInterval,
 		platform:               client,
 
+		kubeClientSet: kubeClientSet,
+
 		hubClientSet: hubClientSet,
 		hubInformer:  hubInformer,
+
+		eventRecorder: eventRecorder,
 	}
 }
 
@@ -91,66 +108,67 @@ func (w *WatcherCollection) syncCollections(ctx context.Context) {
 	for _, collection := range platformCollections {
 		platformCollection := collection
 
-		clusterCollection, found := clusterCollectionsByName[platformCollection.Name]
+		logger := log.With().Str("name", platformCollection.Name).Logger()
+
+		oldClusterCollection, found := clusterCollectionsByName[platformCollection.Name]
 
 		// Collections that will remain in the map will be deleted.
 		delete(clusterCollectionsByName, platformCollection.Name)
 
+		newClusterCollection, resourceErr := platformCollection.Resource()
+		if resourceErr != nil {
+			logger.Error().Err(resourceErr).Msg("Unable to build APICollection resource")
+			continue
+		}
+
 		if !found {
-			if err = w.createCollection(ctx, &platformCollection); err != nil {
-				log.Error().Err(err).
-					Str("name", platformCollection.Name).
-					Msg("Unable to create APICollection")
+			if err = w.createCollection(ctx, newClusterCollection); err != nil {
+				logger.Error().Err(err).Msg("Unable to create APICollection")
 			}
 			continue
 		}
 
-		if err = w.updateCollection(ctx, clusterCollection, &platformCollection); err != nil {
-			log.Error().Err(err).
-				Str("name", platformCollection.Name).
-				Msg("Unable to update APICollection")
+		if err = w.updateCollection(ctx, oldClusterCollection, newClusterCollection); err != nil {
+			logger.Error().Err(err).Msg("Unable to update APICollection")
 		}
 	}
 
 	w.cleanCollections(ctx, clusterCollectionsByName)
 }
 
-func (w *WatcherCollection) createCollection(ctx context.Context, collection *Collection) error {
-	obj, err := collection.Resource()
+func (w *WatcherCollection) createCollection(ctx context.Context, collection *hubv1alpha1.APICollection) error {
+	createdCollection, err := w.hubClientSet.HubV1alpha1().APICollections().Create(ctx, collection, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("build APICollection resource: %w", err)
-	}
-
-	obj, err = w.hubClientSet.HubV1alpha1().APICollections().Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil {
+		w.eventRecorder.Eventf(collection, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 		return fmt.Errorf("creating APICollection: %w", err)
 	}
 
 	log.Debug().
-		Str("name", obj.Name).
+		Str("name", createdCollection.Name).
 		Msg("APICollection created")
+
+	w.eventRecorder.Event(createdCollection, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 
 	return nil
 }
 
-func (w *WatcherCollection) updateCollection(ctx context.Context, oldCollection *hubv1alpha1.APICollection, newCollection *Collection) error {
-	obj, err := newCollection.Resource()
-	if err != nil {
-		return fmt.Errorf("build APICollection resource: %w", err)
-	}
+func (w *WatcherCollection) updateCollection(ctx context.Context, oldCollection, newCollection *hubv1alpha1.APICollection) error {
+	meta := oldCollection.ObjectMeta
+	meta.Labels = newCollection.Labels
+	newCollection.ObjectMeta = meta
 
-	obj.ObjectMeta = oldCollection.ObjectMeta
-	obj.ObjectMeta.Labels = newCollection.Labels
-
-	if obj.Status.Version != oldCollection.Status.Version {
-		obj, err = w.hubClientSet.HubV1alpha1().APICollections().Update(ctx, obj, metav1.UpdateOptions{})
+	if newCollection.Status.Version != oldCollection.Status.Version {
+		updatedCollection, err := w.hubClientSet.HubV1alpha1().APICollections().Update(ctx, newCollection, metav1.UpdateOptions{})
 		if err != nil {
+			w.eventRecorder.Eventf(newCollection, "Failed", "Syncing", "Unable to synchronize with the Hub platform: %s", err)
 			return fmt.Errorf("updating APICollection: %w", err)
 		}
 
 		log.Debug().
-			Str("name", obj.Name).
+			Str("name", updatedCollection.Name).
 			Msg("APICollection updated")
+
+		w.eventRecorder.Event(updatedCollection, corev1.EventTypeNormal, "Synced", "Synced successfully with the Hub platform")
 	}
 
 	return nil

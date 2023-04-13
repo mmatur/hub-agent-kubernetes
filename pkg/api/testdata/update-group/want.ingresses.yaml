@@ -2,12 +2,12 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761-4249197200-hub
+  name: gateway-3056690829-4249197200-hub
   namespace: default
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: modified-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -15,7 +15,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-modified-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -46,12 +46,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761-4249197200
+  name: gateway-3056690829-4249197200
   namespace: default
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: modified-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -59,7 +59,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-modified-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -115,7 +115,7 @@ spec:
                 port:
                   number: 8080
   tls:
-    - secretName: hub-certificate-custom-domains-713459761
+    - secretName: hub-certificate-custom-domains-3056690829
       hosts:
         - api.hello.example.com
         - api.welcome.example.com
@@ -126,12 +126,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761-4249197200-hub
+  name: gateway-3056690829-4249197200-hub
   namespace: books
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: modified-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -139,7 +139,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "books-modified-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -163,12 +163,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: modified-gateway-713459761-4249197200
+  name: gateway-3056690829-4249197200
   namespace: books
   ownerReferences:
     - apiVersion: hub.traefik.io/v1alpha1
       kind: APIGateway
-      name: modified-gateway
+      name: gateway
   labels:
     app.kubernetes.io/managed-by: traefik-hub
   annotations:
@@ -176,7 +176,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "books-modified-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -211,7 +211,7 @@ spec:
                 port:
                   number: 443
   tls:
-    - secretName: hub-certificate-custom-domains-713459761
+    - secretName: hub-certificate-custom-domains-3056690829
       hosts:
         - api.hello.example.com
         - api.welcome.example.com

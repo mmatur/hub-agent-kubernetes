@@ -30,6 +30,7 @@ import (
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -61,6 +62,7 @@ var accessToDelete = &hubv1alpha1.APIAccess{
 }
 
 func Test_WatcherAccessRun(t *testing.T) {
+	kubeClientSet := kubefake.NewSimpleClientset()
 	clientSetHub := hubfake.NewSimpleClientset([]runtime.Object{accessToUpdate, accessToDelete}...)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,7 +107,7 @@ func Test_WatcherAccessRun(t *testing.T) {
 			}
 		})
 
-	w := NewWatcherAccess(client, clientSetHub, hubInformer, time.Millisecond)
+	w := NewWatcherAccess(client, kubeClientSet, clientSetHub, hubInformer, time.Millisecond)
 	go w.Run(ctx)
 
 	<-ctx.Done()

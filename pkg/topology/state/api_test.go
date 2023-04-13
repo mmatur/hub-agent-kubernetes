@@ -28,7 +28,6 @@ import (
 	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kschema "k8s.io/apimachinery/pkg/runtime/schema"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -179,22 +178,7 @@ func setupClientSets(t *testing.T, hubObjects []runtime.Object) (*kubefake.Clien
 
 	kubeClient := kubefake.NewSimpleClientset()
 	traefikClient := traefikcrdfake.NewSimpleClientset()
-
-	hubClient := hubfake.NewSimpleClientset()
-	for _, obj := range hubObjects {
-		if obj.GetObjectKind().GroupVersionKind().Kind == "APIGateway" {
-			err := hubClient.Tracker().Create(kschema.GroupVersionResource{
-				Group:    "hub.traefik.io",
-				Version:  "v1alpha1",
-				Resource: "apigateways",
-			}, obj, "")
-			require.NoError(t, err)
-			continue
-		}
-
-		err := hubClient.Tracker().Add(obj)
-		require.NoError(t, err)
-	}
+	hubClient := kube.NewFakeHubClientset(hubObjects...)
 
 	return kubeClient, traefikClient, hubClient
 }

@@ -113,6 +113,18 @@ func (p *Portal) Resource() (*hubv1alpha1.APIPortal, error) {
 	return portal, nil
 }
 
+// UnverifiedCustomDomains returns the APIPortal unverified custom domains.
+func (p *Portal) UnverifiedCustomDomains() []string {
+	var unverified []string
+	for _, domain := range p.CustomDomains {
+		if !domain.Verified {
+			unverified = append(unverified, domain.Name)
+		}
+	}
+
+	return unverified
+}
+
 type portalHash struct {
 	Title         string   `json:"title,omitempty"`
 	Description   string   `json:"description,omitempty"`

@@ -32,6 +32,7 @@ import (
 	hubinformers "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/hub/informers/externalversions"
 	traefikcrdfake "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	"github.com/traefik/hub-agent-kubernetes/pkg/edgeingress"
+	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -98,7 +99,7 @@ func Test_WatcherGatewayRun(t *testing.T) {
 			desc: "modified gateway on the platform needs to be updated on the cluster",
 			platformGateways: []Gateway{
 				{
-					Name:      "modified-gateway",
+					Name:      "gateway",
 					Labels:    map[string]string{"area": "products", "role": "dev"},
 					Accesses:  []string{"products"},
 					Version:   "version-2",
@@ -122,7 +123,7 @@ func Test_WatcherGatewayRun(t *testing.T) {
 		{
 			desc: "update change group",
 			platformGateways: []Gateway{{
-				Name:      "modified-gateway",
+				Name:      "gateway",
 				Labels:    map[string]string{"area": "products", "role": "dev"},
 				Accesses:  []string{"products"},
 				Version:   "version-2",
@@ -184,6 +185,8 @@ func Test_WatcherGatewayRun(t *testing.T) {
 		test := test
 
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
 			wantGateways := loadFixtures[hubv1alpha1.APIGateway](t, test.wantGateways)
 			wantIngresses := loadFixtures[netv1.Ingress](t, test.wantIngresses)
 			wantSecrets := loadFixtures[corev1.Secret](t, test.wantSecrets)
@@ -226,7 +229,7 @@ func Test_WatcherGatewayRun(t *testing.T) {
 			}
 
 			kubeClientSet := kubefake.NewSimpleClientset(kubeObjects...)
-			hubClientSet := hubfake.NewSimpleClientset(hubObjects...)
+			hubClientSet := kube.NewFakeHubClientset(hubObjects...)
 			traefikClientSet := traefikcrdfake.NewSimpleClientset(traefikObjects...)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -263,17 +266,30 @@ func Test_WatcherGatewayRun(t *testing.T) {
 					PrivateKey:  []byte("private"),
 				}, nil)
 
-			var wantCustomDomains []string
+			var wantSyncCertificatesCustomDomains []string
+			for _, clusterGateway := range clusterGateways {
+				wantSyncCertificatesCustomDomains = append(wantSyncCertificatesCustomDomains, clusterGateway.Status.CustomDomains...)
+			}
+
+			if len(wantSyncCertificatesCustomDomains) > 0 {
+				client.OnGetCertificateByDomains(wantSyncCertificatesCustomDomains).
+					TypedReturns(edgeingress.Certificate{
+						Certificate: []byte("cert"),
+						PrivateKey:  []byte("private"),
+					}, nil)
+			}
+
+			var wantSyncGatewaysCustomDomains []string
 			for _, platformGateway := range test.platformGateways {
 				for _, customDomain := range platformGateway.CustomDomains {
 					if customDomain.Verified {
-						wantCustomDomains = append(wantCustomDomains, customDomain.Name)
+						wantSyncGatewaysCustomDomains = append(wantSyncGatewaysCustomDomains, customDomain.Name)
 					}
 				}
 			}
 
-			if len(wantCustomDomains) > 0 {
-				client.OnGetCertificateByDomains(wantCustomDomains).
+			if len(wantSyncGatewaysCustomDomains) > 0 {
+				client.OnGetCertificateByDomains(wantSyncGatewaysCustomDomains).
 					TypedReturns(edgeingress.Certificate{
 						Certificate: []byte("cert"),
 						PrivateKey:  []byte("private"),
@@ -286,8 +302,9 @@ func Test_WatcherGatewayRun(t *testing.T) {
 				TraefikAPIEntryPoint:    "api-entrypoint",
 				TraefikTunnelEntryPoint: "tunnel-entrypoint",
 				GatewaySyncInterval:     time.Millisecond,
-				CertSyncInterval:        time.Millisecond,
-				CertRetryInterval:       time.Millisecond,
+				// we don't want to test certSync here.
+				CertSyncInterval:  10 * time.Second,
+				CertRetryInterval: time.Millisecond,
 			})
 
 			stop := make(chan struct{})

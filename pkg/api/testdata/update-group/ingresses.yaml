@@ -15,7 +15,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -59,7 +59,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -115,7 +115,7 @@ spec:
                 port:
                   number: 8080
   tls:
-    - secretName: hub-certificate-custom-domains-713459761
+    - secretName: hub-certificate-custom-domains-3056690829
       hosts:
         - api.hello.example.com
         - api.welcome.example.com
@@ -139,7 +139,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: tunnel-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -176,7 +176,7 @@ metadata:
     hub.traefik.io/access-control-policy-groups: "suppliers"
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: api-entrypoint
-    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-713459761-stripprefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "books-gateway-3056690829-stripprefix@kubernetescrd"
 spec:
   ingressClassName: ingress-class
   rules:
@@ -211,7 +211,7 @@ spec:
                 port:
                   number: 443
   tls:
-    - secretName: hub-certificate-custom-domains-713459761
+    - secretName: hub-certificate-custom-domains-3056690829
       hosts:
         - api.hello.example.com
         - api.welcome.example.com
